@@ -1,0 +1,26 @@
+{
+  "name": "moduleloom-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "app": "tauri dev"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@types/cytoscape-dagre": "^2.3.4",
+    "cytoscape": "^3.30.4",
+    "cytoscape-dagre": "^4.0.1",
+    "cytoscape-fcose": "^2.2.0",
+    "lucide": "^0.475.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}

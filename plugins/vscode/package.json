@@ -1,0 +1,27 @@
+{
+  "name": "moduleloom",
+  "displayName": "ModuleLoom",
+  "description": "Explore Python module dependencies in VS Code",
+  "version": "0.1.0",
+  "publisher": "moduleloom",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Visualization", "Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onCommand:moduleloom.openGraph"],
+  "contributes": {
+    "commands": [
+      { "command": "moduleloom.openGraph", "title": "ModuleLoom: Open Module Graph" }
+    ],
+    "configuration": {
+      "title": "ModuleLoom",
+      "properties": {
+        "moduleloom.analyzerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the ModuleLoom analyze executable. Empty uses the workspace build or analyze from PATH."
+        }
+      }
+    }
+  },
+  "files": ["extension.js", "media/**", "README.md"]
+}

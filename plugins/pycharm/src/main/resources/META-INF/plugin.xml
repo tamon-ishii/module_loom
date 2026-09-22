@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>com.moduleloom.pycharm</id>
+    <name>ModuleLoom</name>
+    <version>${pluginVersion}</version>
+    <vendor>ModuleLoom</vendor>
+    <description><![CDATA[
+    Interactive Python module dependency graph visualization inside PyCharm.
+    Detects circular imports, inspects oversized modules, and provides one-click navigation to editor files.
+    ]]></description>
+
+    <!-- Compatibility with all JetBrains IDEs (PyCharm, IntelliJ, etc.) -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.jcef</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="ModuleLoom"
+                    anchor="right"
+                    canCloseContents="true"
+                    icon="AllIcons.Toolwindows.ToolWindowModuleDependencies"
+                    factoryClass="com.moduleloom.ModuleLoomToolWindowFactory"/>
+    </extensions>
+
+    <actions>
+        <action id="com.moduleloom.OpenInModuleLoomAction"
+                class="com.moduleloom.OpenInModuleLoomAction"
+                text="ModuleLoom で開く"
+                description="ModuleLoom でモジュール依存関係ダイアグラムを開く"
+                icon="AllIcons.Toolwindows.ToolWindowModuleDependencies">
+            <!-- Project view tree context menu -->
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="RevealIn"/>
+            <!-- Editor editor area context menu -->
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <!-- Editor tab header context menu -->
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
