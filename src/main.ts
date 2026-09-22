@@ -78,6 +78,12 @@ const chkGroupPackages = document.getElementById("chk-group-packages") as HTMLIn
 const chkFocusMode = document.getElementById("chk-focus-mode") as HTMLInputElement;
 const chkDirectOnly = document.getElementById("chk-direct-only") as HTMLInputElement;
 const layoutSelect = document.getElementById("layout-select") as HTMLSelectElement;
+const btnFlowDirection = document.getElementById("btn-flow-direction") as HTMLButtonElement;
+let flowDirection: "LR" | "TB" = localStorage.getItem("flow_direction") === "TB" ? "TB" : "LR";
+function updateFlowDirectionButton() {
+  btnFlowDirection.textContent = flowDirection === "LR" ? "↔ 横表示" : "↕ 縦表示";
+  btnFlowDirection.title = flowDirection === "LR" ? "依存図の流れを縦方向に切り替え" : "依存図の流れを横方向に切り替え";
+}
 const btnFit = document.getElementById("btn-fit") as HTMLButtonElement;
 const btnShowOverview = document.getElementById("btn-show-overview") as HTMLButtonElement | null;
 let currentViewMode: "overview" | "file" = "file";
@@ -1001,7 +1007,7 @@ function runLayout() {
   if (layoutName === "dagre") {
     options = {
       name: "dagre",
-      rankDir: "LR", // Left to right dependency flow
+      rankDir: flowDirection,
       nodeSep: 60,
       rankSep: 100,
       edgeSep: 30,
@@ -1135,7 +1141,7 @@ function applyFilters() {
     }
   });
 
-  // 4. Layout in file-centric mode: neat LR flow centered on origin and its dependencies
+  // 4. Layout visible modules in the chosen flow direction.
   if (isFileMode && selectedModule) {
     const visibleNodes = cy.nodes(":childless").not(".hidden");
     const visibleEdges = cy.edges().not(".hidden");
@@ -1144,7 +1150,7 @@ function applyFilters() {
       visibleEles
         .layout({
           name: "dagre",
-          rankDir: "LR",
+          rankDir: flowDirection,
           nodeSep: 50,
           rankSep: 130,
           edgeSep: 35,
@@ -1157,8 +1163,8 @@ function applyFilters() {
       cy.fit(visibleEles, 50);
       if (cy.zoom() > 1.2) {
         cy.zoom(1.2);
+        cy.center(visibleEles);
       }
-      cy.center(cy.$id(selectedModule.id));
     }
   }
 }
@@ -2338,6 +2344,16 @@ chkGroupPackages.addEventListener("change", () => {
   if (currentResult) updateGraph(currentResult);
 });
 layoutSelect.addEventListener("change", runLayout);
+btnFlowDirection.addEventListener("click", () => {
+  flowDirection = flowDirection === "LR" ? "TB" : "LR";
+  localStorage.setItem("flow_direction", flowDirection);
+  updateFlowDirectionButton();
+  if (currentViewMode === "file") applyFilters();
+  else {
+    layoutSelect.value = "dagre";
+    runLayout();
+  }
+});
 btnFit.addEventListener("click", zoomFit);
 
 // Header Zoom Controls
@@ -2430,6 +2446,7 @@ if (savedEditor && (savedEditor === "pycharm" || savedEditor === "vscode")) {
 }
 
 // Initialize
+updateFlowDirectionButton();
 initGraph();
 pathInput.value = localStorage.getItem("project_path") || "";
 if (pathInput.value) runAnalysis();

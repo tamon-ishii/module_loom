@@ -566,6 +566,7 @@
       <option value="concentric">同心円</option>
       <option value="grid">グリッド</option>
     </select>
+    <button class="btn" id="btn-flow-direction" title="依存図の流れを縦方向に切り替え">↔ 横表示</button>
   </div>
 
   <div class="main-content">
@@ -1031,6 +1032,27 @@
 
     let currentViewMode = "overview"; // "overview" | "file"
     let fileDiagramModuleId = null;
+    let flowDirection = localStorage.getItem("flow_direction") === "TB" ? "TB" : "LR";
+
+    function updateFlowDirectionButton() {
+      const button = document.getElementById("btn-flow-direction");
+      button.textContent = flowDirection === "LR" ? "↔ 横表示" : "↕ 縦表示";
+      button.title = flowDirection === "LR" ? "依存図の流れを縦方向に切り替え" : "依存図の流れを横方向に切り替え";
+    }
+
+    function toggleFlowDirection() {
+      flowDirection = flowDirection === "LR" ? "TB" : "LR";
+      localStorage.setItem("flow_direction", flowDirection);
+      updateFlowDirectionButton();
+      if (currentViewMode === "file" && fileDiagramModuleId) {
+        const inspectedModuleId = selectedNodeId;
+        jumpToFileCentricDiagram(fileDiagramModuleId);
+        if (inspectedModuleId && inspectedModuleId !== fileDiagramModuleId) highlightModule(inspectedModuleId, false);
+      } else {
+        document.getElementById("select-layout").value = "dagre";
+        runLayout();
+      }
+    }
 
     function switchToOverview() {
       if (!cy || !currentResult) return;
@@ -1340,7 +1362,7 @@
       if (visibleNodes.length > 0) {
         visibleEles.layout({
           name: "dagre",
-          rankDir: "LR",
+          rankDir: flowDirection,
           nodeSep: 50,
           rankSep: 140,
           edgeSep: 35,
@@ -1350,8 +1372,8 @@
         cy.fit(visibleEles, 50);
         if (cy.zoom() > 1.2) {
           cy.zoom(1.2);
+          cy.center(visibleEles);
         }
-        cy.center(cy.$id(moduleId));
       }
 
       // 5. Highlights
@@ -1758,7 +1780,7 @@
       if (layoutName === "dagre") {
         opts = {
           name: "dagre",
-          rankDir: "LR",
+          rankDir: flowDirection,
           nodeSep: 45,
           rankSep: 90,
           edgeSep: 25,
@@ -2378,6 +2400,7 @@
       }
     });
     document.getElementById("select-layout").addEventListener("change", runLayout);
+    document.getElementById("btn-flow-direction").addEventListener("click", toggleFlowDirection);
     document.getElementById("btn-toggle-tree")?.addEventListener("click", toggleTreePanel);
     document.getElementById("btn-tree-collapse")?.addEventListener("click", collapseAllTree);
     document.getElementById("btn-tree-expand")?.addEventListener("click", expandAllTree);
@@ -2416,6 +2439,7 @@
 
     // Initialize on load
     window.addEventListener("DOMContentLoaded", () => {
+      updateFlowDirectionButton();
       initCytoscape();
       // Auto trigger analyze on startup
       setTimeout(triggerAnalyze, 500);
