@@ -1924,7 +1924,13 @@ async function jumpToEditor(filePath: string, line: number = 1) {
 }
 
 async function runAnalysis() {
-  const path = pathInput.value.trim() || ".";
+  const path = pathInput.value.trim();
+  if (!path) {
+    statusBar.innerText = "Python プロジェクトのパスを入力してください";
+    pathInput.focus();
+    return;
+  }
+  localStorage.setItem("project_path", path);
   statusBar.innerText = `解析中: ${path}...`;
   try {
     const result = await invokeCommand<AnalysisResult>("analyze_project", { path });
@@ -2425,6 +2431,6 @@ if (savedEditor && (savedEditor === "pycharm" || savedEditor === "vscode")) {
 
 // Initialize
 initGraph();
-// Default target path set to sample_project
-pathInput.value = "/home/ishii/PycharmProjects/pymodulemgr/sample_project";
-runAnalysis();
+pathInput.value = localStorage.getItem("project_path") || "";
+if (pathInput.value) runAnalysis();
+else statusBar.innerText = "Python プロジェクトのパスを入力して解析を実行してください";

@@ -11,6 +11,12 @@ node_modules/
 dist/
 target/
 src-tauri/gen/
+plugins/pycharm/src/main/resources/bin/
+plugins/vscode/bin/
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/Square*Logo.png
+src-tauri/icons/StoreLogo.png
 
 # Local editor and tool state
 .idea/

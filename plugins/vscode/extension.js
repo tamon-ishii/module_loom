@@ -1,6 +1,8 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 let panel;
@@ -17,6 +19,19 @@ function getWorkspaceFolder(uri) {
 function analyzerExecutable(folder) {
   const configured = vscode.workspace.getConfiguration('moduleloom', folder.uri).get('analyzerPath').trim();
   if (configured) return configured;
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const platform = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
+  const executable = process.platform === 'win32' ? 'analyze.exe' : 'analyze';
+  const bundled = path.join(__dirname, 'bin', `${platform}-${arch}`, executable);
+  if (fs.existsSync(bundled)) {
+    const hash = crypto.createHash('sha256').update(fs.readFileSync(bundled)).digest('hex').slice(0, 16);
+    const directory = path.join(os.homedir(), '.cache', 'moduleloom', 'bin', `${platform}-${arch}`, hash);
+    const installed = path.join(directory, executable);
+    fs.mkdirSync(directory, { recursive: true });
+    if (!fs.existsSync(installed)) fs.copyFileSync(bundled, installed);
+    if (process.platform !== 'win32') fs.chmodSync(installed, 0o755);
+    return installed;
+  }
   const local = path.join(folder.uri.fsPath, 'target', 'release', process.platform === 'win32' ? 'analyze.exe' : 'analyze');
   return fs.existsSync(local) ? local : 'analyze';
 }

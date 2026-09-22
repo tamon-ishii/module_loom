@@ -43,6 +43,10 @@ content_types = '''<?xml version="1.0" encoding="utf-8"?>
 with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
     archive.writestr('[Content_Types].xml', content_types)
     archive.writestr('extension.vsixmanifest', vsix_manifest)
-    for file in (extension / 'package.json', extension / 'extension.js', extension / 'README.md', *sorted((extension / 'media').iterdir())):
+    files = [extension / 'package.json', extension / 'extension.js', extension / 'README.md']
+    files.extend(file for file in (extension / 'media').rglob('*') if file.is_file())
+    if (extension / 'bin').exists():
+        files.extend(file for file in (extension / 'bin').rglob('*') if file.is_file())
+    for file in sorted(files):
         archive.write(file, 'extension/' + file.relative_to(extension).as_posix())
 print(output)

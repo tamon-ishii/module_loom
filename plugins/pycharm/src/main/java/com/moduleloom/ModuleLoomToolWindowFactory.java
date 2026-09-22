@@ -36,6 +36,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -391,6 +393,33 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     }
 
     private static String findAnalyzerBinary() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        String architecture = System.getProperty("os.arch", "").toLowerCase();
+        boolean arm64 = architecture.equals("aarch64") || architecture.equals("arm64");
+        String platform = null;
+        if (osName.contains("win") && !arm64) platform = "windows-x64";
+        else if (osName.contains("linux") && !arm64) platform = "linux-x64";
+        else if (osName.contains("mac")) platform = arm64 ? "macos-arm64" : "macos-x64";
+
+        if (platform != null) {
+            String filename = osName.contains("win") ? "analyze.exe" : "analyze";
+            String resource = "/bin/" + platform + "/" + filename;
+            try (InputStream input = ModuleLoomToolWindowFactory.class.getResourceAsStream(resource)) {
+                if (input != null) {
+                    byte[] data = input.readAllBytes();
+                    byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
+                    String hash = HexFormat.of().formatHex(digest, 0, 8);
+                    Path target = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "bin", platform, hash, filename);
+                    Files.createDirectories(target.getParent());
+                    if (!Files.exists(target)) Files.write(target, data);
+                    if (!osName.contains("win")) target.toFile().setExecutable(true, false);
+                    return target.toString();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
         Path localPath = Path.of("/home/ishii/PycharmProjects/pymodulemgr/target/release/analyze");
         if (Files.exists(localPath)) {
             return localPath.toString();

@@ -1,0 +1,159 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyzer:
+    name: Analyzer ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            executable: analyze
+          - platform: windows-x64
+            runner: windows-latest
+            executable: analyze.exe
+          - platform: macos-x64
+            runner: macos-15-intel
+            executable: analyze
+          - platform: macos-arm64
+            runner: macos-15
+            executable: analyze
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release --bin analyze
+      - name: Stage analyzer
+        shell: bash
+        run: |
+          mkdir -p analyzer-output
+          cp "target/release/${{ matrix.executable }}" analyzer-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-${{ matrix.platform }}
+          path: analyzer-output/
+          if-no-files-found: error
+
+  desktop:
+    name: Desktop ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            bundles: appimage,deb
+            target: ""
+          - platform: windows-x64
+            runner: windows-latest
+            bundles: nsis
+            target: ""
+          - platform: macos-x64
+            runner: macos-15-intel
+            bundles: dmg
+            target: x86_64-apple-darwin
+          - platform: macos-arm64
+            runner: macos-15
+            bundles: dmg
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v1
+        with:
+          args: --bundles ${{ matrix.bundles }}${{ matrix.target && format(' --target {0}', matrix.target) || '' }}
+      - name: Collect desktop installers
+        run: python scripts/collect_desktop_bundles.py ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-desktop-${{ matrix.platform }}
+          path: target/release-assets/
+          if-no-files-found: error
+
+  ide_plugins:
+    name: PyCharm and VS Code
+    needs: analyzer
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: analyzer-*
+          path: analyzer-artifacts
+      - name: Bundle analyzers
+        run: python scripts/stage_analyzers.py analyzer-artifacts
+      - name: Download PyCharm build SDK
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2025.3.1.tar.gz
+          mkdir -p "$RUNNER_TEMP/pycharm"
+          tar -xzf "$RUNNER_TEMP/pycharm.tar.gz" -C "$RUNNER_TEMP/pycharm" --strip-components=1
+      - name: Set plugin version
+        run: echo "MODULELOOM_VERSION=$(python -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')" >> "$GITHUB_ENV"
+      - name: Build IDE plugins
+        env:
+          PYCHARM_HOME: ${{ runner.temp }}/pycharm
+        run: |
+          python scripts/build_pycharm_plugin.py --build-only
+          python scripts/package_vscode_extension.py
+          mkdir -p target/ide-release
+          cp target/pycharm-plugin/moduleloom.jar "target/ide-release/ModuleLoom-PyCharm-${MODULELOOM_VERSION}.jar"
+          cp "target/vscode-extension/moduleloom-${MODULELOOM_VERSION}.vsix" "target/ide-release/ModuleLoom-VSCode-${MODULELOOM_VERSION}.vsix"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ide-plugins
+          path: target/ide-release/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-cli
+          path: target/cli-release/
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, ide_plugins]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-files
+          merge-multiple: true
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "ModuleLoom $RELEASE_TAG" --generate-notes
+          fi
+          (cd release-files && sha256sum * > SHA256SUMS.txt)
+          gh release upload "$RELEASE_TAG" release-files/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false

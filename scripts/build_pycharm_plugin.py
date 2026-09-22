@@ -17,11 +17,12 @@ BUILD_DIR = os.path.join(PROJECT_ROOT, "target", "pycharm-plugin")
 CLASSES_DIR = os.path.join(BUILD_DIR, "classes")
 JAR_OUTPUT = os.path.join(BUILD_DIR, "moduleloom.jar")
 
-JAVAC_BIN = "/home/ishii/pycharm/pycharm-2025.3.1/jbr/bin/javac"
+PYCHARM_HOME = os.environ.get("PYCHARM_HOME", "/home/ishii/pycharm/pycharm-2025.3.1")
+JAVAC_BIN = os.environ.get("JAVAC_BIN", os.path.join(PYCHARM_HOME, "jbr", "bin", "javac"))
 
 def build():
     print("=== Building PyCharm Plugin for ModuleLoom ===")
-    plugin_version = datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M%S")
+    plugin_version = os.environ.get("MODULELOOM_VERSION") or datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M%S")
     if os.path.exists(CLASSES_DIR):
         shutil.rmtree(CLASSES_DIR)
     os.makedirs(CLASSES_DIR, exist_ok=True)
@@ -29,10 +30,13 @@ def build():
     # 1. Collect classpath jars
     classpath_jars = []
     for pattern in [
-        "/home/ishii/pycharm/pycharm-2025.3.1/lib/*.jar",
-        "/home/ishii/pycharm/pycharm-2025.3.1/plugins/jcef-plugin/lib/modules/*.jar"
+        os.path.join(PYCHARM_HOME, "lib", "*.jar"),
+        os.path.join(PYCHARM_HOME, "plugins", "jcef-plugin", "lib", "modules", "*.jar"),
     ]:
         classpath_jars.extend(glob.glob(pattern))
+
+    if not os.path.isfile(JAVAC_BIN) or not classpath_jars:
+        raise RuntimeError("Set PYCHARM_HOME to an unpacked PyCharm installation containing jbr/bin/javac and lib/*.jar")
 
     classpath = ":".join(classpath_jars)
     print(f"Collected {len(classpath_jars)} jars for compilation classpath.")

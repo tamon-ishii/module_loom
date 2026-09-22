@@ -23,5 +23,5 @@
       }
     }
   },
-  "files": ["extension.js", "media/**", "README.md"]
+  "files": ["extension.js", "media/**", "bin/**", "README.md"]
 }
