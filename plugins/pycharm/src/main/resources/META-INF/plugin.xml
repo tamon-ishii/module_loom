@@ -1,8 +1,9 @@
 <idea-plugin>
-    <id>com.moduleloom.pycharm</id>
+    <id>com.moduleloom</id>
     <name>ModuleLoom</name>
     <version>${pluginVersion}</version>
-    <vendor>ModuleLoom</vendor>
+    <vendor url="https://github.com/tamon-ishii/module_loom">ModuleLoom</vendor>
+    <idea-version since-build="253" />
     <description><![CDATA[
     Interactive Python module dependency graph visualization inside PyCharm.
     Detects circular imports, inspects oversized modules, and provides one-click navigation to editor files.

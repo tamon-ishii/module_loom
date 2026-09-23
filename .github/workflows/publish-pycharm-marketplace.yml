@@ -1,0 +1,97 @@
+name: Publish PyCharm plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "plugins/pycharm/**"
+      - "scripts/build_pycharm_plugin.py"
+      - "scripts/stage_analyzers.py"
+      - "shared/**"
+      - ".github/workflows/publish-pycharm-marketplace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pycharm-marketplace-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  analyzer:
+    name: Build analyzer (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            executable: analyze
+          - platform: windows-x64
+            runner: windows-latest
+            executable: analyze.exe
+          - platform: macos-x64
+            runner: macos-15-intel
+            executable: analyze
+          - platform: macos-arm64
+            runner: macos-15
+            executable: analyze
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release --bin analyze
+      - name: Stage analyzer
+        shell: bash
+        run: |
+          mkdir -p "analyzer/${{ matrix.platform }}"
+          cp "target/release/${{ matrix.executable }}" "analyzer/${{ matrix.platform }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pycharm-analyzer-${{ matrix.platform }}
+          path: analyzer/${{ matrix.platform }}/
+          if-no-files-found: error
+
+  publish:
+    name: Upload to JetBrains Marketplace
+    needs: analyzer
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pycharm-analyzer-*
+          path: analyzer-artifacts
+          merge-multiple: true
+      - name: Bundle analyzers
+        run: python scripts/stage_analyzers.py analyzer-artifacts
+      - name: Download PyCharm build SDK
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2025.3.1.tar.gz
+          mkdir -p "$RUNNER_TEMP/pycharm"
+          tar -xzf "$RUNNER_TEMP/pycharm.tar.gz" -C "$RUNNER_TEMP/pycharm" --strip-components=1
+      - name: Build plugin
+        env:
+          PYCHARM_HOME: ${{ runner.temp }}/pycharm
+          MODULELOOM_VERSION: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: python scripts/build_pycharm_plugin.py --build-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ModuleLoom-PyCharm-${{ github.run_number }}.${{ github.run_attempt }}
+          path: target/pycharm-plugin/moduleloom.jar
+          if-no-files-found: error
+      - name: Upload plugin update
+        env:
+          JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: |
+          if [ -z "$JETBRAINS_MARKETPLACE_TOKEN" ]; then
+            echo "JETBRAINS_MARKETPLACE_TOKEN is not configured. Add it after creating the plugin listing; Marketplace upload skipped."
+            exit 1
+          fi
+          curl --fail-with-body --show-error --silent \
+            --header "Authorization: Bearer $JETBRAINS_MARKETPLACE_TOKEN" \
+            --form "xmlId=com.moduleloom" \
+            --form "file=@target/pycharm-plugin/moduleloom.jar" \
+            https://plugins.jetbrains.com/api/updates/upload
