@@ -10,7 +10,7 @@ pub mod model;
 pub mod parser;
 
 use model::{AnalysisConfig, AnalysisResult, ForbiddenImportRule, IndependenceRule, LayerRule};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -28,6 +28,7 @@ pub fn analyze_directory_with_config(
     let architecture_violations =
         architecture::check_architecture(&modules, &edges, &config.architecture);
     let symbol_edges = build_symbol_edges(&modules);
+    let cross_file_references = build_cross_file_reference_index(&symbol_edges);
     let package_dependencies = dependencies::scan_package_dependencies(root);
     let unresolved_imports = graph::collect_unresolved_imports(&modules);
     let total_loc: usize = modules.iter().map(|m| m.loc).sum();
@@ -45,11 +46,10 @@ pub fn analyze_directory_with_config(
             .iter()
             .map(|call| call.callee.clone())
             .collect();
-        let referenced_cross_file: std::collections::HashSet<String> = symbol_edges
-            .iter()
-            .filter(|edge| edge.target_module == module.id)
-            .map(|edge| edge.target_symbol.clone())
-            .collect();
+        let referenced_cross_file = cross_file_references
+            .get(&module.id)
+            .cloned()
+            .unwrap_or_default();
         module.unused_symbol_candidates = module
             .symbols
             .iter()
@@ -78,34 +78,60 @@ pub fn analyze_directory_with_config(
 }
 
 fn build_symbol_edges(modules: &[model::ModuleInfo]) -> Vec<model::SymbolEdge> {
+    let mut symbol_index: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    for module in modules {
+        for symbol in &module.symbols {
+            let candidate = (module.id.clone(), symbol.name.clone());
+            symbol_index
+                .entry(symbol.name.clone())
+                .or_default()
+                .push(candidate.clone());
+            if let Some(short_name) = symbol.name.rsplit('.').next() {
+                if short_name != symbol.name {
+                    symbol_index
+                        .entry(short_name.to_string())
+                        .or_default()
+                        .push(candidate);
+                }
+            }
+        }
+    }
+
     let mut result = Vec::new();
     for source in modules {
         for call in &source.symbol_calls {
-            let matches: Vec<(&model::ModuleInfo, &model::SymbolInfo)> = modules
+            let candidates = symbol_index.get(&call.callee).into_iter().flatten();
+            let unique_candidates: HashSet<(String, String)> = candidates.cloned().collect();
+            let unique_modules: HashSet<&str> = unique_candidates
                 .iter()
-                .flat_map(|target| target.symbols.iter().map(move |symbol| (target, symbol)))
-                .filter(|(_, symbol)| {
-                    symbol.name == call.callee
-                        || symbol.name.ends_with(&format!(".{}", call.callee))
-                })
-                .collect();
-            let unique_modules: std::collections::HashSet<String> = matches
-                .iter()
-                .map(|(module, _)| module.id.clone())
+                .map(|(module, _)| module.as_str())
                 .collect();
             if unique_modules.len() == 1 {
-                let (target, symbol) = matches[0];
+                let (target_module, target_symbol) = unique_candidates.into_iter().next().unwrap();
                 result.push(model::SymbolEdge {
                     source_module: source.id.clone(),
                     source_symbol: call.caller.clone(),
-                    target_module: target.id.clone(),
-                    target_symbol: symbol.name.clone(),
+                    target_module,
+                    target_symbol,
                     line: call.line,
                 });
             }
         }
     }
     result
+}
+
+fn build_cross_file_reference_index(
+    symbol_edges: &[model::SymbolEdge],
+) -> HashMap<String, HashSet<String>> {
+    let mut references = HashMap::new();
+    for edge in symbol_edges {
+        references
+            .entry(edge.target_module.clone())
+            .or_insert_with(HashSet::new)
+            .insert(edge.target_symbol.clone());
+    }
+    references
 }
 
 pub fn load_config(root: &Path) -> Result<AnalysisConfig, String> {

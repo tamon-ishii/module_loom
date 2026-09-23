@@ -1,101 +1,21 @@
 import cytoscape, { Core, EventObject } from "cytoscape";
 // @ts-ignore
 import dagre from "cytoscape-dagre";
+import { escapeHtml } from "./utils";
+import {
+  compareAnalysisResults,
+  readAnalysisHistory,
+  recordAnalysisHistory,
+} from "./analysis-history";
+import type {
+  AnalysisResult,
+  CircularCycle,
+  FileCentricGraphData,
+  FileTreeNode,
+  ModuleInfo,
+} from "./types";
 
 cytoscape.use(dagre);
-
-interface ImportStmt {
-  module: string;
-  is_from: boolean;
-  level: number;
-  line: number;
-  imported_names: string[];
-  is_top_level?: boolean;
-}
-
-interface Diagnostic {
-  severity: "info" | "warning" | "error";
-  message: string;
-  line?: number;
-  rule?: string;
-}
-
-interface ModuleInfo {
-  id: string;
-  name: string;
-  relative_path: string;
-  absolute_path: string;
-  docstring?: string | null;
-  loc: number;
-  cyclomatic_complexity?: number;
-  class_count: number;
-  classes?: { name: string; line: number }[];
-  function_count: number;
-  functions?: { name: string; line: number }[];
-  symbols?: { name: string; kind: string; line: number }[];
-  symbol_calls?: { caller: string; callee: string; line: number }[];
-  unused_symbol_candidates?: string[];
-  imports: ImportStmt[];
-  unresolved_imports?: string[];
-  afferent_coupling?: number;
-  efferent_coupling?: number;
-  is_oversized: boolean;
-  diagnostics: Diagnostic[];
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  })[char] || char);
-}
-
-interface DependencyEdge {
-  source: string;
-  target: string;
-  is_circular: boolean;
-  line: number;
-  import_count?: number;
-  is_top_level?: boolean;
-}
-
-interface CircularCycle {
-  modules: string[];
-}
-
-interface AnalysisResult {
-  root_path: string;
-  modules: ModuleInfo[];
-  edges: DependencyEdge[];
-  cycles: CircularCycle[];
-  total_loc: number;
-  analysis_errors?: string[];
-  architecture_violations?: ArchitectureViolation[];
-  package_dependencies?: { name: string; version?: string; source: string }[];
-  symbol_edges?: SymbolEdge[];
-}
-
-interface SymbolEdge {
-  source_module: string;
-  source_symbol: string;
-  target_module: string;
-  target_symbol: string;
-  line: number;
-}
-
-interface ArchitectureViolation {
-  rule: string;
-  name: string;
-  source: string;
-  target: string;
-  line: number;
-  message: string;
-  suggestion?: string;
-}
-
-interface AnalysisSnapshot {
-  timestamp: string;
-  result: AnalysisResult;
-}
 
 // State
 let cy: Core | null = null;
@@ -592,15 +512,6 @@ function initGraph() {
   });
 }
 
-interface FileCentricGraphData {
-  allowedNodeIds: Set<string>;
-  allowedEdgeKeys: Set<string>;
-  hasCrashingCycle: boolean;
-  roots: string[];
-  cycleModules: Set<string>;
-  rootPaths: string[][];
-}
-
 function calculateFileCentricGraph(
   selectedMod: ModuleInfo,
   result: AnalysisResult
@@ -1038,7 +949,6 @@ function updateGraph(result: AnalysisResult) {
     const classes: string[] = [];
     if (isCycle) classes.push("in-cycle");
     if (mod.is_oversized) classes.push("oversized");
-    if (gitChangedModuleIds.has(mod.id)) classes.push("git-changed");
     if (gitChangedModuleIds.has(mod.id)) classes.push("git-changed");
 
     let parentId: string | undefined = undefined;
@@ -2162,47 +2072,6 @@ function closeCallGraph() {
   callGraphCy = null;
 }
 
-function historyKey(root: string): string {
-  return `moduleloom-history:${root}`;
-}
-
-function readAnalysisHistory(root: string): AnalysisSnapshot[] {
-  try {
-    const value = JSON.parse(localStorage.getItem(historyKey(root)) || "[]");
-    return Array.isArray(value) ? value as AnalysisSnapshot[] : [];
-  } catch {
-    return [];
-  }
-}
-
-function compareAnalysisResults(previous: AnalysisResult | undefined, current: AnalysisResult): string[] {
-  if (!previous) return [];
-  const changes: string[] = [];
-  const currentModules = new Map(current.modules.map((module) => [module.id, module]));
-  for (const oldModule of previous.modules) {
-    const nextModule = currentModules.get(oldModule.id);
-    if (!nextModule) {
-      changes.push(`モジュール削除: ${oldModule.id}`);
-      continue;
-    }
-    const nextSymbols = new Set((nextModule.symbols || []).map((symbol) => symbol.name));
-    for (const symbol of oldModule.symbols || []) {
-      if (!nextSymbols.has(symbol.name)) changes.push(`シンボル削除: ${oldModule.id}.${symbol.name}`);
-    }
-  }
-  const currentEdges = new Set(current.edges.map((edge) => `${edge.source}->${edge.target}`));
-  for (const edge of previous.edges) {
-    if (!currentEdges.has(`${edge.source}->${edge.target}`)) changes.push(`依存削除: ${edge.source} -> ${edge.target}`);
-  }
-  return changes;
-}
-
-function recordAnalysisHistory(result: AnalysisResult) {
-  const history = readAnalysisHistory(result.root_path);
-  history.push({ timestamp: new Date().toISOString(), result });
-  localStorage.setItem(historyKey(result.root_path), JSON.stringify(history.slice(-20)));
-}
-
 function showAnalysisHistory() {
   if (!currentResult) {
     statusBar.innerText = "先に解析を実行してください";
@@ -2522,14 +2391,6 @@ function zoomFit() {
 }
 
 // Tree View Implementation (Python Files Only)
-interface FileTreeNode {
-  name: string;
-  relPath: string;
-  isDir: boolean;
-  module?: ModuleInfo;
-  children: Map<string, FileTreeNode>;
-}
-
 function buildFileTree(modules: ModuleInfo[]): FileTreeNode {
   const root: FileTreeNode = {
     name: "root",
