@@ -23,8 +23,8 @@ PyCharm と VS Code の配布ファイルには、対応する OS の解析用�
 `main` へのプッシュと手動実行では、ビルド結果を GitHub Actions の成果物として保存します。`v` で始まるタグをプッシュすると、3種類の配布ファイルと解析 CLI を GitHub Releases に公開します。
 
 ```sh
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
 タグの版は `src-tauri/tauri.conf.json` と `plugins/vscode/package.json` の版に合わせてください。

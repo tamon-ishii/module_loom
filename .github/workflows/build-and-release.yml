@@ -175,6 +175,8 @@ jobs:
           (cd release-files && sha256sum * > SHA256SUMS.txt)
           gh release upload "$RELEASE_TAG" release-files/* --clobber
           (cd release-files && sha256sum * | awk '{print $2 " sha256:" $1}' | sort) > expected-asset-digests.txt
-          gh api --paginate "repos/$GH_REPO/releases/tags/$RELEASE_TAG" --jq '.assets[] | "\(.name) \(.digest)"' | sort > actual-asset-digests.txt
+          release_id=$(gh api --paginate "repos/$GH_REPO/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id")
+          test -n "$release_id"
+          gh api --paginate "repos/$GH_REPO/releases/$release_id/assets" --jq '.[] | "\(.name) \(.digest)"' | sort > actual-asset-digests.txt
           diff -u expected-asset-digests.txt actual-asset-digests.txt
           gh release edit "$RELEASE_TAG" --draft=false
