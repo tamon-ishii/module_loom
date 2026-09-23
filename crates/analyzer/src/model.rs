@@ -147,6 +147,8 @@ pub struct ModuleInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClassInfo {
     pub name: String,
+    #[serde(default)]
+    pub signature: String,
     pub line: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_class_line: Option<usize>,
@@ -157,6 +159,8 @@ pub struct ClassInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FunctionInfo {
     pub name: String,
+    #[serde(default)]
+    pub signature: String,
     pub line: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_class_line: Option<usize>,

@@ -144,6 +144,20 @@ jobs:
           pattern: release-*
           path: release-files
           merge-multiple: true
+      - name: Verify required plugin release assets
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for platform in linux-x64 windows-x64 macos-x64 macos-arm64; do
+            test -s "release-files/ModuleLoom-CLI-${platform}.zip"
+          done
+          test -s "release-files/ModuleLoom-Desktop-linux-x64-ModuleLoom_${version}_amd64.AppImage"
+          test -s "release-files/ModuleLoom-Desktop-linux-x64-ModuleLoom_${version}_amd64.deb"
+          test -s "release-files/ModuleLoom-Desktop-windows-x64-ModuleLoom_${version}_x64-setup.exe"
+          test -s "release-files/ModuleLoom-Desktop-macos-x64-ModuleLoom_${version}_x64.dmg"
+          test -s "release-files/ModuleLoom-Desktop-macos-arm64-ModuleLoom_${version}_aarch64.dmg"
+          test -s "release-files/ModuleLoom-PyCharm-${version}.jar"
+          test -s "release-files/ModuleLoom-VSCode-${version}.vsix"
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -155,4 +169,7 @@ jobs:
           fi
           (cd release-files && sha256sum * > SHA256SUMS.txt)
           gh release upload "$RELEASE_TAG" release-files/* --clobber
+          (cd release-files && sha256sum * | awk '{print $2 " sha256:" $1}' | sort) > expected-asset-digests.txt
+          gh api --paginate "repos/$GH_REPO/releases/tags/$RELEASE_TAG" --jq '.assets[] | "\(.name) \(.digest)"' | sort > actual-asset-digests.txt
+          diff -u expected-asset-digests.txt actual-asset-digests.txt
           gh release edit "$RELEASE_TAG" --draft=false

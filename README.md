@@ -1,5 +1,7 @@
 # ModuleLoom
 
+![ModuleLoom の依存関係グラフ画面](module_loom.png)
+
 Python モジュールの依存関係、循環インポート、肥大化を可視化するツールです。デスクトップアプリ、PyCharm プラグイン、VS Code 拡張を別々に配布します。
 
 ## GitHub からインストール
@@ -104,15 +106,19 @@ kinds = ["type_only", "runtime", "unknown"]
 
 ## MkDocs マニュアル生成
 
-デスクトップ版または PyCharm プラグインの「MkDocs 出力」、あるいは CLI の `--mkdocs` で、全体依存図とモジュール別ページを含む MkDocs プロジェクトを生成できます。PyCharm では ModuleLoom ツールウィンドウ上部のボタンから出力先ディレクトリを選びます。各モジュールページの先頭に直接の依存・被依存図を置き、モジュール・クラス・関数の docstring をマニュアル本文に使います。全体図のノードと一覧からモジュールページへ移動できます。
+デスクトップ版または PyCharm プラグインの「MkDocs 出力」、あるいは CLI の `--mkdocs` で、全体依存図、モジュール別ページ、API 一覧ページを含む MkDocs プロジェクトを生成できます。各モジュールページにはモジュール・クラス・関数・メソッドの docstring と、クラスの基底クラス、呼び出し可能オブジェクトの引数・既定値・型注釈・戻り値注釈を掲載します。Google、NumPy、Sphinx 形式の docstring 見出しも Markdown に整えます。ソースコード本文は出力しません。PyCharm とデスクトップ版は生成先・モジュール数・言語を確認してから生成します。
+
+表示言語は `auto`（マシンのロケールから自動選択）、`ja`、`en`、`fr`、`de`、`es`、`zh`、`ko`、`pt` を指定できます。PyCharm では出力時に選択し、CLI では `--lang` で指定します。
 
 ```sh
 moduleloom-analyze --mkdocs ./moduleloom-docs ./my-project
+# 日本語で生成する場合
+moduleloom-analyze --mkdocs ./moduleloom-docs --lang ja ./my-project
 cd moduleloom-docs
 mkdocs serve
 ```
 
-生成した `mkdocs.yml` は Material for MkDocs と Mermaid 用に設定されています。表示には `mkdocs-material` が必要です。図のノードをクリック可能にするため、生成サイトは Mermaid の JavaScript モジュールを CDN から読み込みます。出力先は空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを指定してください。再生成時は生成ページが更新され、不要になった生成ページは削除されます。
+生成した `mkdocs.yml` は Material for MkDocs と Mermaid 用に設定されています。表示には `mkdocs-material` が必要です。Mermaid の JavaScript とライセンス表示は生成先に同梱するため、図はオフラインでも表示できます。翻訳カタログは解析器の `mkdocs_i18n.json` で管理します。出力先は空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを指定してください。再生成時は生成ページが更新され、不要になった生成ページは削除されます。
 
 全体図では「外部ノード」でプロジェクト外への import を表示でき、モジュール選択後に「表示範囲」で 1～3 ホップへ絞れます。「集約」は指定件数を超える同一パッケージ内のモジュールを１ノードにまとめ、ダブルクリックで展開できます。「経路検索」は２モジュール間の最短 import 経路を強調表示します。CLI でも `moduleloom-analyze --chain app.api app.db ./my-project` で照会できます（`--json` も併用可能）。
 

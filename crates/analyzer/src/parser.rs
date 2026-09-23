@@ -168,6 +168,59 @@ fn body_docstring(body: &[Stmt]) -> Option<String> {
     }
 }
 
+fn format_arg(arg: &ast::Arg, default: Option<&ast::Expr>) -> String {
+    let mut value = arg.arg.to_string();
+    if let Some(annotation) = &arg.annotation {
+        value.push_str(&format!(": {annotation}"));
+    }
+    if let Some(default) = default {
+        value.push_str(&format!(" = {default}"));
+    }
+    value
+}
+
+fn function_signature(args: &ast::Arguments, returns: Option<&ast::Expr>) -> String {
+    let mut params = Vec::new();
+    for arg in &args.posonlyargs {
+        params.push(format_arg(&arg.def, arg.default.as_deref()));
+    }
+    if !args.posonlyargs.is_empty() {
+        params.push("/".into());
+    }
+    for arg in &args.args {
+        params.push(format_arg(&arg.def, arg.default.as_deref()));
+    }
+    if let Some(arg) = &args.vararg {
+        params.push(format!("*{}", format_arg(arg, None)));
+    } else if !args.kwonlyargs.is_empty() {
+        params.push("*".into());
+    }
+    for arg in &args.kwonlyargs {
+        params.push(format_arg(&arg.def, arg.default.as_deref()));
+    }
+    if let Some(arg) = &args.kwarg {
+        params.push(format!("**{}", format_arg(arg, None)));
+    }
+    let mut signature = format!("({})", params.join(", "));
+    if let Some(returns) = returns {
+        signature.push_str(&format!(" -> {returns}"));
+    }
+    signature
+}
+
+fn class_signature(class_def: &ast::StmtClassDef) -> String {
+    let mut args: Vec<String> = class_def.bases.iter().map(ToString::to_string).collect();
+    args.extend(class_def.keywords.iter().map(|keyword| match &keyword.arg {
+        Some(name) => format!("{name}={}", keyword.value),
+        None => format!("**{}", keyword.value),
+    }));
+    if args.is_empty() {
+        String::new()
+    } else {
+        format!("({})", args.join(", "))
+    }
+}
+
 struct ComplexityVisitor {
     complexity: usize,
 }
@@ -353,6 +406,7 @@ fn collect_stmt_info(
             let line = index.line_index(class_def.range.start()).get() as usize;
             classes.push(ClassInfo {
                 name: class_def.name.to_string(),
+                signature: class_signature(class_def),
                 line,
                 parent_class_line,
                 docstring: body_docstring(&class_def.body),
@@ -375,6 +429,7 @@ fn collect_stmt_info(
             *function_count += 1;
             functions.push(FunctionInfo {
                 name: fn_def.name.to_string(),
+                signature: function_signature(&fn_def.args, fn_def.returns.as_deref()),
                 line: index.line_index(fn_def.range.start()).get() as usize,
                 parent_class_line,
                 docstring: body_docstring(&fn_def.body),
@@ -397,6 +452,7 @@ fn collect_stmt_info(
             *function_count += 1;
             functions.push(FunctionInfo {
                 name: fn_def.name.to_string(),
+                signature: function_signature(&fn_def.args, fn_def.returns.as_deref()),
                 line: index.line_index(fn_def.range.start()).get() as usize,
                 parent_class_line,
                 docstring: body_docstring(&fn_def.body),
@@ -596,6 +652,7 @@ def top_function():
             mod_info.classes,
             vec![ClassInfo {
                 name: "MyClass".to_string(),
+                signature: "".to_string(),
                 line: 8,
                 parent_class_line: None,
                 docstring: None,
@@ -607,12 +664,14 @@ def top_function():
             vec![
                 FunctionInfo {
                     name: "method".to_string(),
+                    signature: "(self)".to_string(),
                     line: 9,
                     parent_class_line: Some(8),
                     docstring: None,
                 },
                 FunctionInfo {
                     name: "top_function".to_string(),
+                    signature: "()".to_string(),
                     line: 12,
                     parent_class_line: None,
                     docstring: None,
@@ -730,6 +789,7 @@ class MyClass:
             mod_info.functions,
             vec![FunctionInfo {
                 name: "fetch".to_string(),
+                signature: "()".to_string(),
                 line: 1,
                 parent_class_line: None,
                 docstring: None,

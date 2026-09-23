@@ -42,6 +42,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -211,12 +212,22 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             chooser.setToolTipText("空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを選択してください (推奨: " + suggested + ")");
             if (chooser.showSaveDialog(mainPanel) == JFileChooser.APPROVE_OPTION) {
                 Path output = chooser.getSelectedFile().toPath().toAbsolutePath().normalize();
-                String lang = JOptionPane.showInputDialog(mainPanel,
-                        "ドキュメントの言語 (auto / ja / en)", "auto");
-                if (lang == null) return;
-                lang = lang.trim();
-                if (lang.isEmpty()) lang = "auto";
+                String[] languages = {"auto", "ja", "en", "fr", "de", "es", "zh", "ko", "pt"};
+                Object languageChoice = JOptionPane.showInputDialog(mainPanel,
+                        "ドキュメントの言語", "MkDocs", JOptionPane.QUESTION_MESSAGE,
+                        null, languages, "auto");
+                if (languageChoice == null) return;
+                String lang = languageChoice.toString();
+                if ("auto".equals(lang)) {
+                    lang = Locale.getDefault().getLanguage();
+                    if (lang.isBlank() || !List.of("ja", "en", "fr", "de", "es", "zh", "ko", "pt").contains(lang)) lang = "en";
+                }
                 String analysisPath = selectedAnalysisPath(project, targetCombo);
+                int moduleCount = countModules(holder.lastResultJson);
+                String preview = "生成先: " + output + "\nモジュール数: " + moduleCount
+                        + "\n言語: " + lang + "\n\nMkDocs プロジェクトを生成しますか？";
+                if (JOptionPane.showConfirmDialog(mainPanel, preview, "MkDocs 出力の確認",
+                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION) return;
                 String selectedLang = lang;
                 ApplicationManager.getApplication().executeOnPooledThread(() ->
                         generateMkDocs(project, holder, analysisPath, output, selectedLang));
@@ -452,6 +463,34 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         final int dialogType = messageType;
         ApplicationManager.getApplication().invokeLater(() ->
                 JOptionPane.showMessageDialog(holder.browser.getComponent(), dialogMessage, "ModuleLoom", dialogType));
+    }
+
+    private static int countModules(String json) {
+        if (json == null) return 0;
+        Matcher matcher = Pattern.compile("\\\"modules\\\"\\s*:\\s*\\[").matcher(json);
+        if (!matcher.find()) return 0;
+        int count = 0;
+        int objectDepth = 0;
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int i = matcher.end(); i < json.length(); i++) {
+            char current = json.charAt(i);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (current == '\\') escaped = true;
+                else if (current == '"') quoted = false;
+            } else if (current == '"') {
+                quoted = true;
+            } else if (current == '{') {
+                if (objectDepth == 0) count++;
+                objectDepth++;
+            } else if (current == '}') {
+                objectDepth--;
+            } else if (current == ']' && objectDepth == 0) {
+                break;
+            }
+        }
+        return count;
     }
 
     private static void setStatus(ToolWindowHolder holder, String text) {

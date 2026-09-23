@@ -23,9 +23,9 @@ export interface ModuleInfo {
   loc: number;
   cyclomatic_complexity?: number;
   class_count: number;
-  classes?: { name: string; line: number; docstring?: string | null }[];
+  classes?: { name: string; signature?: string; line: number; docstring?: string | null }[];
   function_count: number;
-  functions?: { name: string; line: number; docstring?: string | null }[];
+  functions?: { name: string; signature?: string; line: number; docstring?: string | null }[];
   symbols?: { name: string; kind: string; line: number }[];
   symbol_calls?: { caller: string; callee: string; line: number }[];
   unused_symbol_candidates?: string[];

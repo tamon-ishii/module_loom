@@ -2649,7 +2649,13 @@ async function exportMkDocs() {
   const separator = root.includes("\\") ? "\\" : "/";
   const output = window.prompt("MkDocs プロジェクトの出力先", `${root}${separator}moduleloom-docs`)?.trim();
   if (!output) return;
-  const lang = window.prompt("ドキュメントの言語 (auto / ja / en)", "auto")?.trim() || "auto";
+  let lang = window.prompt("ドキュメントの言語 (auto / ja / en / fr / de / es / zh / ko / pt)", "auto")?.trim() || "auto";
+  if (lang.toLowerCase() === "auto") {
+    const locale = (navigator.language || "en").split(/[-_]/)[0].toLowerCase();
+    lang = ["ja", "en", "fr", "de", "es", "zh", "ko", "pt"].includes(locale) ? locale : "en";
+  }
+  const preview = `生成先: ${output}\nモジュール数: ${currentResult.modules.length}\n言語: ${lang}\n\nMkDocs プロジェクトを生成しますか？`;
+  if (!window.confirm(preview)) return;
   try {
     await invokeCommand<string>("generate_mkdocs", { path: currentResult.root_path, output, lang });
     statusBar.innerText = `MkDocs ドキュメントを生成しました: ${output}`;
