@@ -167,6 +167,8 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         String initialPath = selectedAnalysisPath(project, targetCombo);
         JTextField projectPathField = new JTextField(initialPath != null ? initialPath : projBase, 18);
         projectPathField.setToolTipText("解析する Python プロジェクトのパス");
+        JButton btnBrowseProject = new JButton("参照…");
+        btnBrowseProject.setToolTipText("解析するプロジェクトのディレクトリを選択");
 
         JButton btnAnalyze = new JButton("解析実行");
         btnAnalyze.setToolTipText("指定したパスのモジュール依存関係を解析します");
@@ -179,17 +181,40 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         JButton btnTargetSettings = new JButton("対象設定 ▸");
         btnTargetSettings.setToolTipText("解析対象: " + projectPathField.getText());
-        JPanel targetSettingsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        targetSettingsPanel.add(new JLabel("解析対象:"));
-        targetSettingsPanel.add(targetCombo);
-        targetSettingsPanel.add(new JLabel("プロジェクトパス:"));
-        targetSettingsPanel.add(projectPathField);
+        JPanel targetSettingsPanel = new JPanel();
+        targetSettingsPanel.setLayout(new BoxLayout(targetSettingsPanel, BoxLayout.Y_AXIS));
+        JPanel projectPathRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        projectPathRow.add(new JLabel("プロジェクトパス:"));
+        projectPathRow.add(projectPathField);
+        projectPathRow.add(btnBrowseProject);
+        JPanel analysisTargetRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        analysisTargetRow.add(new JLabel("解析対象:"));
+        analysisTargetRow.add(targetCombo);
+        targetSettingsPanel.add(projectPathRow);
+        targetSettingsPanel.add(analysisTargetRow);
         targetSettingsPanel.setVisible(false);
         btnTargetSettings.addActionListener(e -> {
             boolean expanded = !targetSettingsPanel.isVisible();
             targetSettingsPanel.setVisible(expanded);
             btnTargetSettings.setText(expanded ? "対象設定 ▾" : "対象設定 ▸");
             mainPanel.revalidate();
+        });
+        btnBrowseProject.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle("解析するプロジェクトのディレクトリを選択");
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            String currentPath = projectPathField.getText().trim();
+            File currentDirectory = currentPath.isEmpty() ? null : new File(currentPath);
+            if (currentDirectory != null && currentDirectory.isDirectory()) {
+                chooser.setCurrentDirectory(currentDirectory);
+            } else if (!projBase.isEmpty()) {
+                chooser.setCurrentDirectory(new File(projBase));
+            }
+            if (chooser.showOpenDialog(mainPanel) == JFileChooser.APPROVE_OPTION) {
+                String selectedPath = chooser.getSelectedFile().getAbsolutePath();
+                projectPathField.setText(selectedPath);
+                btnTargetSettings.setToolTipText("解析対象: " + selectedPath);
+            }
         });
 
         toolbarPanel.add(btnAnalyze);
