@@ -1,0 +1,24 @@
+name: ModuleLoom Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: cargo test --workspace
+      - run: npm ci
+      - run: npm run build
+      - run: cargo run -p moduleloom-analyzer --bin analyze -- --check sample_project

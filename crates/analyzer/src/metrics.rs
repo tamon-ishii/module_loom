@@ -20,13 +20,22 @@ pub fn check_bloat(mod_info: &ModuleInfo, thresholds: &BloatThresholds) -> Optio
     let mut reasons = Vec::new();
 
     if mod_info.loc > thresholds.max_loc {
-        reasons.push(format!("行数超過 (LOC: {} > {})", mod_info.loc, thresholds.max_loc));
+        reasons.push(format!(
+            "行数超過 (LOC: {} > {})",
+            mod_info.loc, thresholds.max_loc
+        ));
     }
     if mod_info.function_count > thresholds.max_functions {
-        reasons.push(format!("関数定義数超過 ({} > {})", mod_info.function_count, thresholds.max_functions));
+        reasons.push(format!(
+            "関数定義数超過 ({} > {})",
+            mod_info.function_count, thresholds.max_functions
+        ));
     }
     if mod_info.class_count > thresholds.max_classes {
-        reasons.push(format!("クラス定義数超過 ({} > {})", mod_info.class_count, thresholds.max_classes));
+        reasons.push(format!(
+            "クラス定義数超過 ({} > {})",
+            mod_info.class_count, thresholds.max_classes
+        ));
     }
 
     if !reasons.is_empty() {
@@ -55,11 +64,18 @@ mod tests {
             absolute_path: PathBuf::from("normal.py"),
             docstring: None,
             loc: 100,
+            cyclomatic_complexity: 1,
             class_count: 2,
             classes: vec![],
             function_count: 5,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: false,
             diagnostics: vec![],
         };
@@ -71,11 +87,18 @@ mod tests {
             absolute_path: PathBuf::from("bloated.py"),
             docstring: None,
             loc: 500,
+            cyclomatic_complexity: 1,
             class_count: 15,
             classes: vec![],
             function_count: 30,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: true,
             diagnostics: vec![],
         };

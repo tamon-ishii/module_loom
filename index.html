@@ -20,6 +20,7 @@
           <button id="btn-analyze" class="btn-primary">解析実行</button>
           <div class="filter-controls">
             <input type="text" id="search-input" placeholder="モジュール検索..." />
+            <label title="Python ファイルの変更時に自動で再解析"><input type="checkbox" id="chk-watch" checked /> 自動更新</label>
             <label title="循環インポートに含まれるノードのみ表示"><input type="checkbox" id="chk-only-cycles" /> 循環のみ</label>
             <label title="LOCや関数数が肥大化したモジュールのみ表示"><input type="checkbox" id="chk-only-bloat" /> 肥大化のみ</label>
             <label title="ディレクトリ階層ごとに枠で囲む"><input type="checkbox" id="chk-group-packages" checked /> パッケージ枠</label>
@@ -28,7 +29,12 @@
           </div>
         </div>
         <div class="toolbar-actions">
+          <button id="btn-back" class="btn-secondary" title="前の表示に戻る">← 戻る</button>
           <button id="btn-show-overview" class="btn-secondary" title="プロジェクト全モジュールの全体図を表示">🌐 全体図を見る</button>
+          <button id="btn-git-diff" class="btn-secondary" title="Git の変更ファイルをグラフ上で強調">Git差分</button>
+          <button id="btn-git-history" class="btn-secondary" title="base..head のコミット差分を強調">履歴差分</button>
+          <button id="btn-export-report" class="btn-secondary" title="解析結果を JSON / HTML で保存">レポート出力</button>
+          <button id="btn-history" class="btn-secondary" title="解析履歴を表示">履歴</button>
           <button id="btn-toggle-tree" class="btn-secondary active" title="ソースツリーの表示/非表示">📁 ツリー</button>
           <label for="layout-select">レイアウト:</label>
           <select id="layout-select">
@@ -97,8 +103,19 @@
 
       <footer class="app-footer">
         <div id="status-bar">準備完了</div>
-        <div id="metrics-summary">モジュール数: 0 | 循環インポート: 0 | 肥大化警告: 0</div>
+        <div id="metrics-summary">モジュール数: 0 | 循環インポート: 0 | 肥大化警告: 0 | 解析エラー: 0</div>
       </footer>
+    </div>
+
+    <div id="callgraph-modal" class="modal-overlay hidden">
+      <div class="modal-container">
+        <div class="modal-header">
+          <div class="modal-title-area"><span class="modal-icon">☎</span><span id="callgraph-title" class="modal-title">コールグラフ</span></div>
+          <button id="btn-close-callgraph" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body"><div class="modal-legend"><div class="legend-item">緑: 選択モジュール</div><div class="legend-item">ノードをダブルクリック: 定義位置を開く</div></div><div id="callgraph-cy-container" class="modal-graph-canvas"></div></div>
+        <div class="modal-footer"><div></div><button id="btn-close-callgraph-footer" class="btn-secondary btn-sm">閉じる</button></div>
+      </div>
     </div>
 
     <!-- 依存関係ダイアログ図 モーダル -->

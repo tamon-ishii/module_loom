@@ -9,5 +9,13 @@ export default defineConfig({
   build: {
     target: "esnext",
     outDir: "dist",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          cytoscape: ["cytoscape"],
+          "cytoscape-dagre": ["cytoscape-dagre"],
+        },
+      },
+    },
   },
 });

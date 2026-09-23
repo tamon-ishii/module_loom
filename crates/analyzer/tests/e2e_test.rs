@@ -19,12 +19,14 @@ fn test_end_to_end_module_graph_analysis() {
 
     fs::write(
         pkg_a.join("mod1.py"),
-        r#"from pkg_b.mod2 import func2
+        r#"import os
+from pkg_b.mod2 import func2
 
 def func1(x: int) -> int:
     return func2(x)
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     fs::write(
         pkg_b.join("mod2.py"),
@@ -33,7 +35,8 @@ def func1(x: int) -> int:
 def func2(y):
     return y * 2
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Giant module with > 300 LOC
     let mut giant_content = String::new();
@@ -50,7 +53,11 @@ def func2(y):
     assert_eq!(result.modules.len(), 3);
 
     // 2. Verify circular import detection
-    assert_eq!(result.cycles.len(), 1, "Must detect 1 circular import cycle");
+    assert_eq!(
+        result.cycles.len(),
+        1,
+        "Must detect 1 circular import cycle"
+    );
     let cycle = &result.cycles[0];
     assert!(cycle.modules.contains(&"pkg_a.mod1".to_string()));
     assert!(cycle.modules.contains(&"pkg_b.mod2".to_string()));
@@ -59,15 +66,37 @@ def func2(y):
     assert_eq!(result.edges.len(), 2);
     assert!(result.edges.iter().all(|e| e.is_circular));
 
+    let mod1 = result
+        .modules
+        .iter()
+        .find(|m| m.id == "pkg_a.mod1")
+        .unwrap();
+    assert_eq!(mod1.efferent_coupling, 1);
+    assert_eq!(mod1.afferent_coupling, 1);
+    assert_eq!(mod1.unresolved_imports, vec!["os".to_string()]);
+
     // 4. Verify bloat detection
-    let giant_mod = result.modules.iter().find(|m| m.id == "pkg_c.giant").expect("Find giant");
-    assert!(giant_mod.is_oversized, "Giant module must be flagged as oversized");
+    let giant_mod = result
+        .modules
+        .iter()
+        .find(|m| m.id == "pkg_c.giant")
+        .expect("Find giant");
+    assert!(
+        giant_mod.is_oversized,
+        "Giant module must be flagged as oversized"
+    );
     assert!(giant_mod.loc > 300);
 
     // 5. Verify type check diagnostic (func2 has untyped argument y)
-    let mod2 = result.modules.iter().find(|m| m.id == "pkg_b.mod2").expect("Find mod2");
+    let mod2 = result
+        .modules
+        .iter()
+        .find(|m| m.id == "pkg_b.mod2")
+        .expect("Find mod2");
     assert!(
-        mod2.diagnostics.iter().any(|d| d.rule.as_deref() == Some("ty-type-check")),
+        mod2.diagnostics
+            .iter()
+            .any(|d| d.rule.as_deref() == Some("ty-type-check")),
         "Should generate type check diagnostic for untyped argument y"
     );
 }

@@ -1,23 +1,37 @@
 use crate::model::*;
-use rustpython_ast::{self as ast, Stmt};
-use rustpython_parser::{Parse, source_code::LineIndex};
+use rustpython_ast::{self as ast, Stmt, Visitor};
+use rustpython_parser::{source_code::LineIndex, Parse};
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
 pub fn scan_directory(root: &Path) -> Result<Vec<ModuleInfo>, String> {
-    let mut modules = Vec::new();
+    Ok(scan_directory_with_config(root, &AnalysisConfig::default())?.0)
+}
 
-    for entry in WalkDir::new(root)
-        .into_iter()
-        .filter_entry(|e| {
-            if e.depth() == 0 {
-                return true;
-            }
-            let name = e.file_name().to_string_lossy();
-            !name.starts_with('.') && name != "__pycache__" && name != "venv" && name != ".venv" && name != "node_modules" && name != "target"
-        })
-    {
+pub fn scan_directory_with_errors(root: &Path) -> Result<(Vec<ModuleInfo>, Vec<String>), String> {
+    scan_directory_with_config(root, &AnalysisConfig::default())
+}
+
+pub fn scan_directory_with_config(
+    root: &Path,
+    config: &AnalysisConfig,
+) -> Result<(Vec<ModuleInfo>, Vec<String>), String> {
+    let mut modules = Vec::new();
+    let mut errors = Vec::new();
+
+    for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
+        if e.depth() == 0 {
+            return true;
+        }
+        let name = e.file_name().to_string_lossy();
+        !name.starts_with('.')
+            && name != "__pycache__"
+            && name != "venv"
+            && name != ".venv"
+            && name != "node_modules"
+            && name != "target"
+    }) {
         let entry = match entry {
             Ok(e) => e,
             Err(err) => return Err(format!("Walkdir error: {}", err)),
@@ -25,24 +39,42 @@ pub fn scan_directory(root: &Path) -> Result<Vec<ModuleInfo>, String> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("py") {
-            match parse_python_file(path, root) {
+            match parse_python_file_with_config(path, root, config) {
                 Ok(mod_info) => modules.push(mod_info),
                 Err(err) => {
                     eprintln!("Warning: Failed to parse {}: {}", path.display(), err);
+                    errors.push(format!("{}: {}", path.display(), err));
                 }
             }
         }
     }
 
-    Ok(modules)
+    Ok((modules, errors))
 }
 
 pub fn parse_python_file(path: &Path, root: &Path) -> Result<ModuleInfo, String> {
+    parse_python_file_with_config(path, root, &AnalysisConfig::default())
+}
+
+pub fn parse_python_file_with_config(
+    path: &Path,
+    root: &Path,
+    config: &AnalysisConfig,
+) -> Result<ModuleInfo, String> {
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    parse_python_source(&content, path, root)
+    parse_python_source_with_config(&content, path, root, config)
 }
 
 pub fn parse_python_source(content: &str, path: &Path, root: &Path) -> Result<ModuleInfo, String> {
+    parse_python_source_with_config(content, path, root, &AnalysisConfig::default())
+}
+
+pub fn parse_python_source_with_config(
+    content: &str,
+    path: &Path,
+    root: &Path,
+    config: &AnalysisConfig,
+) -> Result<ModuleInfo, String> {
     let rel_path = path.strip_prefix(root).unwrap_or(path);
     let rel_str = rel_path.to_string_lossy().to_string();
     let mod_id = file_path_to_module_id(rel_path);
@@ -71,17 +103,32 @@ pub fn parse_python_source(content: &str, path: &Path, root: &Path) -> Result<Mo
     let mut function_count = 0;
 
     for stmt in &ast {
-        collect_stmt_info(stmt, &index, &mut imports, &mut classes, &mut functions, &mut class_count, &mut function_count, true, None);
+        collect_stmt_info(
+            stmt,
+            &index,
+            &mut imports,
+            &mut classes,
+            &mut functions,
+            &mut class_count,
+            &mut function_count,
+            true,
+            None,
+        );
     }
 
     let loc = content.lines().count();
-    let is_oversized = loc > 300 || class_count > 10 || function_count > 20;
+    let is_oversized = loc > config.max_loc
+        || class_count > config.max_classes
+        || function_count > config.max_functions;
 
     let mut diagnostics = Vec::new();
     if is_oversized {
         diagnostics.push(Diagnostic {
             severity: DiagnosticSeverity::Warning,
-            message: format!("モジュールの規模が閾値を超過しています (LOC: {}, 関数: {}, クラス: {})", loc, function_count, class_count),
+            message: format!(
+                "モジュールの規模が閾値を超過しています (LOC: {}, 関数: {}, クラス: {})",
+                loc, function_count, class_count
+            ),
             line: Some(1),
             rule: Some("module-bloat".to_string()),
         });
@@ -89,6 +136,9 @@ pub fn parse_python_source(content: &str, path: &Path, root: &Path) -> Result<Mo
 
     // Check for common type checking and lint issues in AST
     crate::diagnostics::check_ast_diagnostics(&ast, &index, &mut diagnostics);
+    crate::diagnostics::check_security_diagnostics(&ast, &index, &mut diagnostics);
+    let (symbols, symbol_calls) = collect_symbol_info(&ast, &index);
+    let cyclomatic_complexity = calculate_complexity(&ast);
 
     Ok(ModuleInfo {
         id: mod_id,
@@ -97,14 +147,157 @@ pub fn parse_python_source(content: &str, path: &Path, root: &Path) -> Result<Mo
         absolute_path: path.to_path_buf(),
         docstring,
         loc,
+        cyclomatic_complexity,
         class_count,
         classes,
         function_count,
         functions,
+        symbols,
+        symbol_calls,
+        unused_symbol_candidates: Vec::new(),
         imports,
+        unresolved_imports: Vec::new(),
+        afferent_coupling: 0,
+        efferent_coupling: 0,
         is_oversized,
         diagnostics,
     })
+}
+
+struct ComplexityVisitor {
+    complexity: usize,
+}
+
+impl Visitor for ComplexityVisitor {
+    fn visit_stmt_if(&mut self, node: ast::StmtIf) {
+        self.complexity += 1;
+        self.generic_visit_stmt_if(node);
+    }
+    fn visit_stmt_for(&mut self, node: ast::StmtFor) {
+        self.complexity += 1;
+        self.generic_visit_stmt_for(node);
+    }
+    fn visit_stmt_async_for(&mut self, node: ast::StmtAsyncFor) {
+        self.complexity += 1;
+        self.generic_visit_stmt_async_for(node);
+    }
+    fn visit_stmt_while(&mut self, node: ast::StmtWhile) {
+        self.complexity += 1;
+        self.generic_visit_stmt_while(node);
+    }
+    fn visit_stmt_try(&mut self, node: ast::StmtTry) {
+        self.complexity += node.handlers.len();
+        self.generic_visit_stmt_try(node);
+    }
+    fn visit_expr_bool_op(&mut self, node: ast::ExprBoolOp) {
+        self.complexity += node.values.len().saturating_sub(1);
+        self.generic_visit_expr_bool_op(node);
+    }
+}
+
+fn calculate_complexity(ast: &[Stmt]) -> usize {
+    let mut visitor = ComplexityVisitor { complexity: 1 };
+    for stmt in ast {
+        visitor.visit_stmt(stmt.clone());
+    }
+    visitor.complexity
+}
+
+struct SymbolCollector<'a> {
+    index: &'a LineIndex,
+    context: Vec<String>,
+    symbols: Vec<SymbolInfo>,
+    calls: Vec<SymbolCall>,
+}
+
+impl<'a> SymbolCollector<'a> {
+    fn current_symbol(&self) -> String {
+        self.context
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "<module>".to_string())
+    }
+}
+
+impl<'a> Visitor for SymbolCollector<'a> {
+    fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
+        let line = self.index.line_index(node.range.start()).get() as usize;
+        self.symbols.push(SymbolInfo {
+            name: node.name.to_string(),
+            kind: "class".to_string(),
+            line,
+        });
+        self.context.push(node.name.to_string());
+        self.generic_visit_stmt_class_def(node);
+        self.context.pop();
+    }
+
+    fn visit_stmt_function_def(&mut self, node: ast::StmtFunctionDef) {
+        let line = self.index.line_index(node.range.start()).get() as usize;
+        let name = if self.context.is_empty() {
+            node.name.to_string()
+        } else {
+            format!("{}.{}", self.current_symbol(), node.name)
+        };
+        self.symbols.push(SymbolInfo {
+            name: name.clone(),
+            kind: "function".to_string(),
+            line,
+        });
+        self.context.push(name);
+        self.generic_visit_stmt_function_def(node);
+        self.context.pop();
+    }
+
+    fn visit_stmt_async_function_def(&mut self, node: ast::StmtAsyncFunctionDef) {
+        let line = self.index.line_index(node.range.start()).get() as usize;
+        let name = if self.context.is_empty() {
+            node.name.to_string()
+        } else {
+            format!("{}.{}", self.current_symbol(), node.name)
+        };
+        self.symbols.push(SymbolInfo {
+            name: name.clone(),
+            kind: "async_function".to_string(),
+            line,
+        });
+        self.context.push(name);
+        self.generic_visit_stmt_async_function_def(node);
+        self.context.pop();
+    }
+
+    fn visit_expr_call(&mut self, node: ast::ExprCall) {
+        if let Some(callee) = expression_name(&node.func) {
+            let line = self.index.line_index(node.range.start()).get() as usize;
+            self.calls.push(SymbolCall {
+                caller: self.current_symbol(),
+                callee,
+                line,
+            });
+        }
+        self.generic_visit_expr_call(node);
+    }
+}
+
+fn expression_name(expr: &ast::Expr) -> Option<String> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Attribute(attribute) => Some(attribute.attr.to_string()),
+        _ => None,
+    }
+}
+
+fn collect_symbol_info(ast: &[Stmt], index: &LineIndex) -> (Vec<SymbolInfo>, Vec<SymbolCall>) {
+    let mut collector = SymbolCollector {
+        index,
+        context: Vec::new(),
+        symbols: Vec::new(),
+        calls: Vec::new(),
+    };
+    for stmt in ast {
+        collector.visit_stmt(stmt.clone());
+    }
+    (collector.symbols, collector.calls)
 }
 
 fn collect_stmt_info(
@@ -134,7 +327,11 @@ fn collect_stmt_info(
         }
         Stmt::ImportFrom(from_stmt) => {
             let line = index.line_index(from_stmt.range.start()).get() as usize;
-            let module_name = from_stmt.module.as_ref().map(|m| m.as_str().to_string()).unwrap_or_default();
+            let module_name = from_stmt
+                .module
+                .as_ref()
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             let level = from_stmt.level.map(|l| l.to_u32() as usize).unwrap_or(0);
             let imported = from_stmt.names.iter().map(|a| a.name.to_string()).collect();
 
@@ -156,7 +353,17 @@ fn collect_stmt_info(
                 parent_class_line,
             });
             for inner in &class_def.body {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, false, Some(line));
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    false,
+                    Some(line),
+                );
             }
         }
         Stmt::FunctionDef(fn_def) => {
@@ -167,7 +374,17 @@ fn collect_stmt_info(
                 parent_class_line,
             });
             for inner in &fn_def.body {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, false, parent_class_line);
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    false,
+                    parent_class_line,
+                );
             }
         }
         Stmt::AsyncFunctionDef(fn_def) => {
@@ -178,7 +395,17 @@ fn collect_stmt_info(
                 parent_class_line,
             });
             for inner in &fn_def.body {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, false, parent_class_line);
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    false,
+                    parent_class_line,
+                );
             }
         }
         Stmt::If(if_stmt) => {
@@ -186,32 +413,102 @@ fn collect_stmt_info(
             if is_type_checking_condition(&if_stmt.test) {
                 // Ignore type-checking imports, but traverse else branch if present
                 for inner in &if_stmt.orelse {
-                    collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                    collect_stmt_info(
+                        inner,
+                        index,
+                        imports,
+                        classes,
+                        functions,
+                        class_count,
+                        function_count,
+                        is_top_level,
+                        parent_class_line,
+                    );
                 }
             } else {
                 for inner in &if_stmt.body {
-                    collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                    collect_stmt_info(
+                        inner,
+                        index,
+                        imports,
+                        classes,
+                        functions,
+                        class_count,
+                        function_count,
+                        is_top_level,
+                        parent_class_line,
+                    );
                 }
                 for inner in &if_stmt.orelse {
-                    collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                    collect_stmt_info(
+                        inner,
+                        index,
+                        imports,
+                        classes,
+                        functions,
+                        class_count,
+                        function_count,
+                        is_top_level,
+                        parent_class_line,
+                    );
                 }
             }
         }
         Stmt::Try(try_stmt) => {
             for inner in &try_stmt.body {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    is_top_level,
+                    parent_class_line,
+                );
             }
             for handler in &try_stmt.handlers {
                 let rustpython_ast::ExceptHandler::ExceptHandler(h) = handler;
                 for inner in &h.body {
-                    collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                    collect_stmt_info(
+                        inner,
+                        index,
+                        imports,
+                        classes,
+                        functions,
+                        class_count,
+                        function_count,
+                        is_top_level,
+                        parent_class_line,
+                    );
                 }
             }
             for inner in &try_stmt.orelse {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    is_top_level,
+                    parent_class_line,
+                );
             }
             for inner in &try_stmt.finalbody {
-                collect_stmt_info(inner, index, imports, classes, functions, class_count, function_count, is_top_level, parent_class_line);
+                collect_stmt_info(
+                    inner,
+                    index,
+                    imports,
+                    classes,
+                    functions,
+                    class_count,
+                    function_count,
+                    is_top_level,
+                    parent_class_line,
+                );
             }
         }
         _ => {}
@@ -256,10 +553,13 @@ mod tests {
     fn test_module_docstring_only_comes_from_first_statement() {
         let root = PathBuf::from("/project");
         let file = root.join("module.py");
-        let documented = parse_python_source("\"\"\"Overview\nDetails\"\"\"\nvalue = 1\n", &file, &root).unwrap();
+        let documented =
+            parse_python_source("\"\"\"Overview\nDetails\"\"\"\nvalue = 1\n", &file, &root)
+                .unwrap();
         assert_eq!(documented.docstring.as_deref(), Some("Overview\nDetails"));
 
-        let undocumented = parse_python_source("value = 1\n\"later string\"\n", &file, &root).unwrap();
+        let undocumented =
+            parse_python_source("value = 1\n\"later string\"\n", &file, &root).unwrap();
         assert_eq!(undocumented.docstring, None);
     }
 
@@ -285,16 +585,38 @@ def top_function():
 
         assert_eq!(mod_info.id, "mypkg.service");
         assert_eq!(mod_info.class_count, 1);
-        assert_eq!(mod_info.classes, vec![ClassInfo { name: "MyClass".to_string(), line: 8, parent_class_line: None }]);
+        assert_eq!(
+            mod_info.classes,
+            vec![ClassInfo {
+                name: "MyClass".to_string(),
+                line: 8,
+                parent_class_line: None
+            }]
+        );
         assert_eq!(mod_info.function_count, 2); // 1 method + 1 top function
-        assert_eq!(mod_info.functions, vec![
-            FunctionInfo { name: "method".to_string(), line: 9, parent_class_line: Some(8) },
-            FunctionInfo { name: "top_function".to_string(), line: 12, parent_class_line: None },
-        ]);
+        assert_eq!(
+            mod_info.functions,
+            vec![
+                FunctionInfo {
+                    name: "method".to_string(),
+                    line: 9,
+                    parent_class_line: Some(8)
+                },
+                FunctionInfo {
+                    name: "top_function".to_string(),
+                    line: 12,
+                    parent_class_line: None
+                },
+            ]
+        );
         assert_eq!(mod_info.imports.len(), 5);
 
         // Check relative import
-        let local_import = mod_info.imports.iter().find(|i| i.module == "local_mod").unwrap();
+        let local_import = mod_info
+            .imports
+            .iter()
+            .find(|i| i.module == "local_mod")
+            .unwrap();
         assert_eq!(local_import.level, 1);
         assert!(local_import.is_from);
     }
@@ -302,7 +624,10 @@ def top_function():
     #[test]
     fn test_file_path_to_module_id() {
         assert_eq!(file_path_to_module_id(Path::new("app/main.py")), "app.main");
-        assert_eq!(file_path_to_module_id(Path::new("app/core/__init__.py")), "app.core");
+        assert_eq!(
+            file_path_to_module_id(Path::new("app/core/__init__.py")),
+            "app.core"
+        );
         assert_eq!(file_path_to_module_id(Path::new("main.py")), "main");
     }
 
@@ -329,8 +654,14 @@ class User:
         assert_eq!(mod_info.imports.len(), 2);
         assert!(mod_info.imports.iter().any(|i| i.module == "os"));
         assert!(mod_info.imports.iter().any(|i| i.module == "typing"));
-        assert!(!mod_info.imports.iter().any(|i| i.module == "app.circular_mod"));
-        assert!(!mod_info.imports.iter().any(|i| i.module == "app.another_type"));
+        assert!(!mod_info
+            .imports
+            .iter()
+            .any(|i| i.module == "app.circular_mod"));
+        assert!(!mod_info
+            .imports
+            .iter()
+            .any(|i| i.module == "app.another_type"));
     }
 
     #[test]
@@ -351,16 +682,32 @@ class MyClass:
         let mod_info = parse_python_source(code, &file, &root).expect("Parsing should succeed");
 
         assert_eq!(mod_info.imports.len(), 4);
-        let top = mod_info.imports.iter().find(|i| i.module == "top_module").unwrap();
+        let top = mod_info
+            .imports
+            .iter()
+            .find(|i| i.module == "top_module")
+            .unwrap();
         assert!(top.is_top_level);
 
-        let def_imp = mod_info.imports.iter().find(|i| i.module == "app.deferred").unwrap();
+        let def_imp = mod_info
+            .imports
+            .iter()
+            .find(|i| i.module == "app.deferred")
+            .unwrap();
         assert!(!def_imp.is_top_level);
 
-        let helper = mod_info.imports.iter().find(|i| i.module == "app.helper").unwrap();
+        let helper = mod_info
+            .imports
+            .iter()
+            .find(|i| i.module == "app.helper")
+            .unwrap();
         assert!(!helper.is_top_level);
 
-        let method_imp = mod_info.imports.iter().find(|i| i.module == "app.method_import").unwrap();
+        let method_imp = mod_info
+            .imports
+            .iter()
+            .find(|i| i.module == "app.method_import")
+            .unwrap();
         assert!(!method_imp.is_top_level);
     }
 
@@ -369,7 +716,55 @@ class MyClass:
         let root = PathBuf::from("/project");
         let file = root.join("module.py");
         let mod_info = parse_python_source("async def fetch():\n    pass\n", &file, &root).unwrap();
-        assert_eq!(mod_info.functions, vec![FunctionInfo { name: "fetch".to_string(), line: 1, parent_class_line: None }]);
+        assert_eq!(
+            mod_info.functions,
+            vec![FunctionInfo {
+                name: "fetch".to_string(),
+                line: 1,
+                parent_class_line: None
+            }]
+        );
+    }
+
+    #[test]
+    fn test_symbol_calls_are_extracted() {
+        let root = PathBuf::from("/project");
+        let file = PathBuf::from("/project/app/service.py");
+        let module = parse_python_source(
+            "def run():\n    helper()\n\ndef helper():\n    print('ok')\n",
+            &file,
+            &root,
+        )
+        .unwrap();
+        assert!(module.symbols.iter().any(|symbol| symbol.name == "run"));
+        assert!(module
+            .symbol_calls
+            .iter()
+            .any(|call| call.caller == "run" && call.callee == "helper" && call.line == 2));
+    }
+
+    #[test]
+    fn test_cyclomatic_complexity_counts_branches_and_conditions() {
+        let root = PathBuf::from("/project");
+        let file = PathBuf::from("/project/logic.py");
+        let module = parse_python_source("def run(value):\n    if value and value > 0:\n        return 1\n    for item in []:\n        print(item)\n    return 0\n", &file, &root).unwrap();
+        assert_eq!(module.cyclomatic_complexity, 4);
+    }
+
+    #[test]
+    fn test_security_diagnostics_detect_dynamic_execution() {
+        let root = PathBuf::from("/project");
+        let file = PathBuf::from("/project/risky.py");
+        let module =
+            parse_python_source("value = eval(source)\nexec(value)\n", &file, &root).unwrap();
+        assert_eq!(
+            module
+                .diagnostics
+                .iter()
+                .filter(|d| d.rule.as_deref() == Some("security-dynamic-exec"))
+                .count(),
+            2
+        );
     }
 
     #[test]

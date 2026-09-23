@@ -1,15 +1,18 @@
+use moduleloom_analyzer::analyze_directory;
 use std::env;
 use std::path::Path;
-use moduleloom_analyzer::analyze_directory;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut json_mode = false;
+    let mut check_mode = false;
     let mut target = ".";
 
     for arg in args.iter().skip(1) {
         if arg == "--json" {
             json_mode = true;
+        } else if arg == "--check" {
+            check_mode = true;
         } else if !arg.starts_with("--") {
             target = arg;
         }
@@ -30,11 +33,22 @@ fn main() {
                 println!("Modules found: {}", res.modules.len());
                 println!("Edges found: {}", res.edges.len());
                 println!("Cycles found: {}", res.cycles.len());
+                println!(
+                    "Architecture violations: {}",
+                    res.architecture_violations.len()
+                );
                 for c in &res.cycles {
                     println!("  Cycle: {:?}", c.modules);
                 }
                 let bloat = res.modules.iter().filter(|m| m.is_oversized).count();
                 println!("Bloated modules: {}", bloat);
+            }
+            if check_mode && !res.architecture_violations.is_empty() {
+                eprintln!(
+                    "Architecture check failed: {} violation(s)",
+                    res.architecture_violations.len()
+                );
+                std::process::exit(1);
             }
         }
         Err(e) => {

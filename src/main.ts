@@ -27,11 +27,18 @@ interface ModuleInfo {
   absolute_path: string;
   docstring?: string | null;
   loc: number;
+  cyclomatic_complexity?: number;
   class_count: number;
   classes?: { name: string; line: number }[];
   function_count: number;
   functions?: { name: string; line: number }[];
+  symbols?: { name: string; kind: string; line: number }[];
+  symbol_calls?: { caller: string; callee: string; line: number }[];
+  unused_symbol_candidates?: string[];
   imports: ImportStmt[];
+  unresolved_imports?: string[];
+  afferent_coupling?: number;
+  efferent_coupling?: number;
   is_oversized: boolean;
   diagnostics: Diagnostic[];
 }
@@ -61,17 +68,47 @@ interface AnalysisResult {
   edges: DependencyEdge[];
   cycles: CircularCycle[];
   total_loc: number;
+  analysis_errors?: string[];
+  architecture_violations?: ArchitectureViolation[];
+  package_dependencies?: { name: string; version?: string; source: string }[];
+  symbol_edges?: SymbolEdge[];
+}
+
+interface SymbolEdge {
+  source_module: string;
+  source_symbol: string;
+  target_module: string;
+  target_symbol: string;
+  line: number;
+}
+
+interface ArchitectureViolation {
+  rule: string;
+  name: string;
+  source: string;
+  target: string;
+  line: number;
+  message: string;
+  suggestion?: string;
+}
+
+interface AnalysisSnapshot {
+  timestamp: string;
+  result: AnalysisResult;
 }
 
 // State
 let cy: Core | null = null;
 let currentResult: AnalysisResult | null = null;
 let selectedModule: ModuleInfo | null = null;
+let gitChangedModuleIds = new Set<string>();
+let lastBreakingChanges: string[] = [];
 
 // DOM Elements
 const pathInput = document.getElementById("project-path-input") as HTMLInputElement;
 const btnAnalyze = document.getElementById("btn-analyze") as HTMLButtonElement;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
+const chkWatch = document.getElementById("chk-watch") as HTMLInputElement;
 const chkOnlyCycles = document.getElementById("chk-only-cycles") as HTMLInputElement;
 const chkOnlyBloat = document.getElementById("chk-only-bloat") as HTMLInputElement;
 const chkGroupPackages = document.getElementById("chk-group-packages") as HTMLInputElement;
@@ -108,6 +145,12 @@ const btnModalJumpEditor = document.getElementById("btn-modal-jump-editor") as H
 const modalCyclesInfo = document.getElementById("modal-cycles-info") as HTMLDivElement;
 const modalCyContainer = document.getElementById("modal-cy-container") as HTMLDivElement;
 
+// Symbol call graph modal
+let callGraphCy: Core | null = null;
+const callGraphModal = document.getElementById("callgraph-modal") as HTMLDivElement | null;
+const callGraphContainer = document.getElementById("callgraph-cy-container") as HTMLDivElement | null;
+const callGraphTitle = document.getElementById("callgraph-title") as HTMLElement | null;
+
 // Tree DOM Elements
 const treePanel = document.getElementById("tree-panel") as HTMLElement;
 const treeContent = document.getElementById("tree-content") as HTMLDivElement;
@@ -132,6 +175,21 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
     alert(`[外部エディタ起動]: ${args.editor}\nファイル: ${args.filePath}:${args.line || 1}`);
     return {} as T;
   }
+  if (cmd === "watch_project" || cmd === "stop_watching") {
+    return {} as T;
+  }
+  if (cmd === "git_changed_files") {
+    return [] as T;
+  }
+  if (cmd === "git_diff_files") {
+    return [] as T;
+  }
+  if (cmd === "detect_editors") {
+    return [] as T;
+  }
+  if (cmd === "git_changed_files") {
+    return [] as T;
+  }
   throw new Error(`Unknown command: ${cmd}`);
 }
 
@@ -154,12 +212,12 @@ function initGraph() {
           "border-width": 2,
           label: "data(label)",
           color: "#cdd6f4",
-          "font-size": "11px",
+          "font-size": "13px",
           "font-weight": 600,
           "text-valign": "center",
           "text-halign": "center",
           "text-wrap": "wrap",
-          "text-max-width": "120px",
+          "text-max-width": "150px",
           width: "data(width)",
           height: "data(height)",
           padding: "6px",
@@ -177,7 +235,7 @@ function initGraph() {
           "border-style": "dashed",
           label: "data(label)",
           color: "#a6adc8",
-          "font-size": "12px",
+          "font-size": "13px",
           "font-weight": "bold",
           "text-valign": "top",
           "text-halign": "center",
@@ -224,7 +282,7 @@ function initGraph() {
           "border-width": 4.5,
           "background-color": "#2c281e",
           color: "#f9e2af",
-          "font-size": "12px",
+          "font-size": "14px",
           "font-weight": "bold",
           "z-index": 1200,
         },
@@ -237,9 +295,25 @@ function initGraph() {
           "border-width": 3.5,
           "background-color": "#1e2e24",
           color: "#a6e3a1",
-          "font-size": "11.5px",
+          "font-size": "13px",
           "font-weight": "bold",
           "z-index": 1100,
+        },
+      },
+      {
+        selector: "node.git-changed:childless",
+        style: {
+          "border-color": "#94e2d5",
+          "border-width": 4,
+          "background-color": "#173b3a",
+        },
+      },
+      {
+        selector: "node.git-changed:childless",
+        style: {
+          "border-color": "#94e2d5",
+          "border-width": 4,
+          "background-color": "#173b3a",
         },
       },
       // Selected node
@@ -379,7 +453,7 @@ function initGraph() {
           "arrow-scale": 1.7,
           opacity: 1.0,
           label: "data(cycleLabel)",
-          "font-size": "10px",
+          "font-size": "12px",
           "font-weight": "bold",
           color: "#ff8599",
           "text-background-opacity": 0.95,
@@ -407,7 +481,7 @@ function initGraph() {
           "arrow-scale": 2.0,
           opacity: 1.0,
           label: "data(cycleLabel)",
-          "font-size": "11px",
+          "font-size": "13px",
           "font-weight": "bold",
           color: "#ffffff",
           "text-background-opacity": 1.0,
@@ -488,6 +562,8 @@ function initGraph() {
     const moduleId = node.id();
     jumpToFileCentricDiagram(moduleId);
   });
+
+  cy.on("dragfree", "node:childless", () => saveGraphPositions());
 
   // Edge selection handler: click edge to show details
   cy.on("tap", "edge", (evt: EventObject) => {
@@ -751,6 +827,7 @@ function switchToOverview() {
   cy.elements().removeClass("hidden faded highlighted-in highlighted-out highlighted-in-node highlighted-out-node focal-node root-node");
   applyFilters();
   runLayout();
+  restoreGraphPositions();
   updateOverviewButton();
 
   inspectorContent.innerHTML = `
@@ -763,6 +840,37 @@ function switchToOverview() {
     </div>
   `;
   statusBar.innerText = "全体図を表示中 (ダブルクリックで依存図へジャンプ)";
+}
+
+function graphPositionStorageKey(): string | null {
+  return currentResult ? `moduleloom-positions:${currentResult.root_path}` : null;
+}
+
+function saveGraphPositions() {
+  if (!cy || !currentResult) return;
+  const positions: Record<string, { x: number; y: number }> = {};
+  cy.nodes(":childless").forEach((node) => {
+    const position = node.position();
+    positions[node.id()] = { x: position.x, y: position.y };
+  });
+  const key = graphPositionStorageKey();
+  if (key) localStorage.setItem(key, JSON.stringify(positions));
+}
+
+function restoreGraphPositions() {
+  if (!cy) return;
+  const key = graphPositionStorageKey();
+  if (!key) return;
+  try {
+    const positions = JSON.parse(localStorage.getItem(key) || "{}") as Record<string, { x: number; y: number }>;
+    cy.nodes(":childless").forEach((node) => {
+      const position = positions[node.id()];
+      if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) node.position(position);
+    });
+    cy.fit(cy.elements().not(".hidden"), 40);
+  } catch {
+    localStorage.removeItem(key);
+  }
 }
 
 function updateOverviewButton() {
@@ -792,6 +900,18 @@ function toggleOverviewOrFileView() {
   } else {
     switchToOverview();
   }
+}
+
+function goBack() {
+  if (dependencyModal && !dependencyModal.classList.contains("hidden")) {
+    closeDependencyDialog();
+    return;
+  }
+  if (currentViewMode === "file") {
+    switchToOverview();
+    return;
+  }
+  statusBar.innerText = "これ以上戻る表示はありません";
 }
 
 function updateNodeFocus(selectedNode: cytoscape.NodeSingular) {
@@ -893,6 +1013,9 @@ function highlightTreeNode(moduleId: string, scroll = false) {
 
 function updateGraph(result: AnalysisResult) {
   if (!cy) return;
+  const history = readAnalysisHistory(result.root_path);
+  const previous = history.length > 0 ? history[history.length - 1].result : undefined;
+  lastBreakingChanges = compareAnalysisResults(previous, result);
   currentResult = result;
 
   const cycleNodeIds = new Set<string>();
@@ -915,6 +1038,8 @@ function updateGraph(result: AnalysisResult) {
     const classes: string[] = [];
     if (isCycle) classes.push("in-cycle");
     if (mod.is_oversized) classes.push("oversized");
+    if (gitChangedModuleIds.has(mod.id)) classes.push("git-changed");
+    if (gitChangedModuleIds.has(mod.id)) classes.push("git-changed");
 
     let parentId: string | undefined = undefined;
     if (groupPackages) {
@@ -941,6 +1066,7 @@ function updateGraph(result: AnalysisResult) {
         id: mod.id,
         label: label,
         loc: mod.loc,
+        coupling: (mod.afferent_coupling || 0) + (mod.efferent_coupling || 0),
         width,
         height,
         parent: parentId,
@@ -973,6 +1099,7 @@ function updateGraph(result: AnalysisResult) {
 
   renderTree(result);
   updateSummary(result);
+  recordAnalysisHistory(result);
 
   // Auto-display dependency diagram for key module as default view
   if (result.modules.length > 0) {
@@ -1254,6 +1381,14 @@ function renderInspector(mod: ModuleInfo) {
           <div style="color: var(--text-muted); font-size: 0.72rem;">クラス / 関数</div>
           <div style="font-size: 1.05rem; font-weight: bold;">${mod.class_count} / ${mod.function_count}</div>
         </div>
+        <div style="background: #181825; padding: 8px; border-radius: 4px;">
+          <div style="color: var(--text-muted); font-size: 0.72rem;">利用元 / 依存先</div>
+          <div style="font-size: 1.05rem; font-weight: bold;">${mod.afferent_coupling || 0} / ${mod.efferent_coupling || 0}</div>
+        </div>
+        <div style="background: #181825; padding: 8px; border-radius: 4px;">
+          <div style="color: var(--text-muted); font-size: 0.72rem;">循環的複雑度</div>
+          <div style="font-size: 1.05rem; font-weight: bold;">${mod.cyclomatic_complexity || 1}</div>
+        </div>
       </div>
 
       <button id="btn-jump-code" class="btn-jump" style="margin-top: 0; margin-bottom: 14px;">
@@ -1296,6 +1431,16 @@ function renderInspector(mod: ModuleInfo) {
                   .join("")
           }
         </ul>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-section-title">
+          <span>🌐 外部 / 未解決 import</span>
+          <span class="inspector-section-count">${mod.unresolved_imports?.length || 0} 件</span>
+        </div>
+        ${(mod.unresolved_imports?.length || 0) === 0
+          ? '<p style="color: var(--success-color); font-size: 0.78rem; padding: 4px;">ありません</p>'
+          : `<ul class="dep-list">${mod.unresolved_imports!.map((name) => `<li class="dep-item"><span class="dep-item-name">${escapeHtml(name)}</span></li>`).join("")}</ul>`}
       </div>
 
       <!-- 被インポート / 被依存モジュール (利用元) -->
@@ -1354,6 +1499,37 @@ function renderInspector(mod: ModuleInfo) {
         ${(mod.functions?.length || 0) > 0
           ? mod.functions!.map((fn) => `<div class="module-function-item" data-function-line="${fn.line}" style="cursor: pointer; padding: 5px 8px; border-bottom: 1px solid var(--border-color);">${escapeHtml(fn.name)} <span style="color: var(--text-muted);">L:${fn.line}</span></div>`).join("")
           : '<div style="color: var(--text-muted); font-size: 0.78rem; padding: 5px 8px;">関数なし</div>'}
+      </div>
+
+      <div class="inspector-section" style="margin-bottom: 12px;">
+        <div class="inspector-section-title">シンボル呼び出し (${mod.symbol_calls?.length || 0})</div>
+        ${(mod.symbol_calls?.length || 0) === 0
+          ? '<div style="color: var(--text-muted); font-size: 0.78rem; padding: 5px 8px;">呼び出しなし</div>'
+          : mod.symbol_calls!.map((call) => `<div class="module-function-item" data-symbol-line="${call.line}" style="cursor: pointer; padding: 5px 8px; border-bottom: 1px solid var(--border-color);">${escapeHtml(call.caller)} ➜ ${escapeHtml(call.callee)} <span style="color: var(--text-muted);">L:${call.line}</span></div>`).join("")}
+        <button id="btn-open-callgraph" class="btn-secondary btn-sm" style="margin-top:8px">コールグラフを表示</button>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-section-title">
+          <span>🏛 アーキテクチャルール違反</span>
+          <span class="inspector-section-count">${(currentResult.architecture_violations || []).filter((v) => v.source === mod.id).length} 件</span>
+        </div>
+        ${(() => {
+          const violations = (currentResult!.architecture_violations || []).filter((v) => v.source === mod.id);
+          return violations.length === 0
+            ? '<p style="color: var(--success-color); font-size: 0.78rem; padding: 4px;">違反はありません</p>'
+            : `<ul class="dep-list">${violations.map((v) => `<li class="dep-item" data-architecture-line="${v.line}" title="クリックして違反箇所を開く" style="cursor:pointer"><div><span class="dep-item-name">${escapeHtml(v.message)}</span><span class="dep-item-line">L:${v.line}</span></div><small style="color:var(--text-muted)">提案: ${escapeHtml(v.suggestion || "依存方向を見直してください")}</small></li>`).join("")}</ul>`;
+        })()}
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-section-title">
+          <span>🧹 未使用シンボル候補</span>
+          <span class="inspector-section-count">${mod.unused_symbol_candidates?.length || 0} 件</span>
+        </div>
+        ${(mod.unused_symbol_candidates?.length || 0) === 0
+          ? '<p style="color: var(--success-color); font-size: 0.78rem; padding: 4px;">候補はありません</p>'
+          : `<ul class="dep-list">${mod.unused_symbol_candidates!.map((name) => `<li class="dep-item"><span class="dep-item-name">${escapeHtml(name)}</span></li>`).join("")}</ul>`}
       </div>
 
       <!-- 循環インポートのグラフィカル可視化カード -->
@@ -1429,9 +1605,9 @@ function renderInspector(mod: ModuleInfo) {
               : mod.diagnostics
                   .map(
                     (d) => `
-                    <div style="background: #181825; padding: 6px 8px; border-radius: 4px; margin-bottom: 6px; border-left: 3px solid ${
+                    <div data-diagnostic-line="${d.line || 1}" title="クリックして該当行を開く" style="background: #181825; padding: 6px 8px; border-radius: 4px; margin-bottom: 6px; border-left: 3px solid ${
                       d.severity === "error" ? "var(--danger-color)" : "var(--warning-color)"
-                    }">
+                    }; cursor: pointer;">
                       <div style="font-weight: 500;">${d.message}</div>
                       <div style="color: var(--text-muted); font-size: 0.72rem;">
                         ${d.rule ? `[${d.rule}] ` : ""}${d.line ? `行: ${d.line}` : ""}
@@ -1451,6 +1627,16 @@ function renderInspector(mod: ModuleInfo) {
   });
   inspectorContent.querySelectorAll<HTMLElement>("[data-function-line]").forEach((el) => {
     el.addEventListener("click", () => jumpToEditor(mod.absolute_path, Number(el.dataset.functionLine) || 1));
+  });
+  inspectorContent.querySelectorAll<HTMLElement>("[data-symbol-line]").forEach((el) => {
+    el.addEventListener("click", () => jumpToEditor(mod.absolute_path, Number(el.dataset.symbolLine) || 1));
+  });
+  inspectorContent.querySelectorAll<HTMLElement>("[data-architecture-line]").forEach((el) => {
+    el.addEventListener("click", () => jumpToEditor(mod.absolute_path, Number(el.dataset.architectureLine) || 1));
+  });
+  document.getElementById("btn-open-callgraph")?.addEventListener("click", () => openCallGraph(mod));
+  inspectorContent.querySelectorAll<HTMLElement>("[data-diagnostic-line]").forEach((el) => {
+    el.addEventListener("click", () => jumpToEditor(mod.absolute_path, Number(el.dataset.diagnosticLine) || 1));
   });
   document.getElementById("btn-open-dep-dialog")?.addEventListener("click", () => {
     openDependencyDialog(mod);
@@ -1614,14 +1800,14 @@ function renderModalGraph(mod: ModuleInfo) {
 
     let displayLabel = labelName;
     let nodeClasses = "";
-    let width = Math.max(130, labelName.length * 9 + 30);
-    let height = 44;
+    let width = Math.max(140, labelName.length * 9.5 + 34);
+    let height = 48;
 
     if (isFocal) {
       displayLabel = `🎯 ${labelName}\n(起点モジュール)`;
       nodeClasses = "focal-node" + (isCycle ? " in-cycle" : "");
-      width = Math.max(160, labelName.length * 10 + 40);
-      height = 52;
+      width = Math.max(175, labelName.length * 10.5 + 44);
+      height = 58;
     } else if (isRoot) {
       displayLabel = `🌱 ${labelName}\n[ルーツ]`;
       nodeClasses = "root-node";
@@ -1688,9 +1874,9 @@ function renderModalGraph(mod: ModuleInfo) {
           shape: "round-rectangle",
           label: "data(label)",
           "text-wrap": "wrap",
-          "text-max-width": "150px",
+          "text-max-width": "180px",
           color: "#cdd6f4",
-          "font-size": "11px",
+          "font-size": "13px",
           "font-weight": 600,
           "text-valign": "center",
           "text-halign": "center",
@@ -1710,7 +1896,7 @@ function renderModalGraph(mod: ModuleInfo) {
           "border-color": "#f9e2af",
           "border-width": 4.0,
           color: "#f9e2af",
-          "font-size": "12px",
+          "font-size": "14px",
           "font-weight": 700,
           "z-index": 1200,
         },
@@ -1723,7 +1909,7 @@ function renderModalGraph(mod: ModuleInfo) {
           "border-color": "#a6e3a1",
           "border-width": 3.5,
           color: "#a6e3a1",
-          "font-size": "11.5px",
+          "font-size": "13px",
           "font-weight": 700,
           "z-index": 1100,
         },
@@ -1780,7 +1966,7 @@ function renderModalGraph(mod: ModuleInfo) {
           "control-point-step-size": 40,
           "arrow-scale": 1.45,
           label: "data(label)",
-          "font-size": "10px",
+          "font-size": "12px",
           color: "#cdd6f4",
           "text-background-opacity": 0.85,
           "text-background-color": "#11111b",
@@ -1818,7 +2004,7 @@ function renderModalGraph(mod: ModuleInfo) {
           "control-point-step-size": 55,
           "arrow-scale": 1.7,
           label: "data(label)",
-          "font-size": "10px",
+          "font-size": "12px",
           "font-weight": "bold",
           color: "#ff8599",
           "text-background-opacity": 0.95,
@@ -1911,8 +2097,127 @@ function runModalLayout() {
 function updateSummary(result: AnalysisResult) {
   const cycleCount = result.cycles.length;
   const bloatCount = result.modules.filter((m) => m.is_oversized).length;
-  metricsSummary.innerText = `モジュール数: ${result.modules.length} | 循環インポート: ${cycleCount} | 肥大化警告: ${bloatCount} | 総行数: ${result.total_loc}`;
-  statusBar.innerText = `解析完了 (${result.root_path})`;
+  const errorCount = result.analysis_errors?.length || 0;
+  const architectureCount = result.architecture_violations?.length || 0;
+  const packageCount = result.package_dependencies?.length || 0;
+  const unusedCount = result.modules.reduce((sum, module) => sum + (module.unused_symbol_candidates?.length || 0), 0);
+  metricsSummary.innerText = `モジュール数: ${result.modules.length} | 循環インポート: ${cycleCount} | 肥大化警告: ${bloatCount} | 設計違反: ${architectureCount} | パッケージ: ${packageCount} | 未使用候補: ${unusedCount} | 破壊的変更候補: ${lastBreakingChanges.length} | 解析エラー: ${errorCount} | 総行数: ${result.total_loc}`;
+  statusBar.innerText = errorCount > 0
+    ? `解析完了（${errorCount} ファイルを解析できませんでした） (${result.root_path})`
+    : `解析完了 (${result.root_path})`;
+}
+
+function openCallGraph(module: ModuleInfo) {
+  if (!currentResult || !callGraphModal || !callGraphContainer) return;
+  const edges = (currentResult.symbol_edges || []).filter((edge) =>
+    edge.source_module === module.id || edge.target_module === module.id
+  );
+  if (callGraphCy) callGraphCy.destroy();
+  const nodes = new Map<string, { id: string; label: string; module: string; symbol: string }>();
+  const graphEdges: cytoscape.ElementDefinition[] = [];
+  const addNode = (moduleId: string, symbol: string) => {
+    const id = `${moduleId}::${symbol}`;
+    if (!nodes.has(id)) nodes.set(id, { id, label: `${moduleId}\n${symbol}`, module: moduleId, symbol });
+    return id;
+  };
+  for (const edge of edges) {
+    const source = addNode(edge.source_module, edge.source_symbol);
+    const target = addNode(edge.target_module, edge.target_symbol);
+    graphEdges.push({ group: "edges", data: { id: `call-${graphEdges.length}`, source, target, line: edge.line } });
+  }
+  // Include local calls for the selected module so a small module still has a useful graph.
+  for (const call of module.symbol_calls || []) {
+    const source = addNode(module.id, call.caller);
+    const target = addNode(module.id, call.callee);
+    graphEdges.push({ group: "edges", data: { id: `call-${graphEdges.length}`, source, target, line: call.line } });
+  }
+  if (nodes.size === 0) {
+    callGraphContainer.innerHTML = '<p class="placeholder-text">解析できるシンボル間の呼び出しはありません</p>';
+  } else {
+    callGraphContainer.innerHTML = "";
+    callGraphCy = cytoscape({
+      container: callGraphContainer,
+      elements: [...Array.from(nodes.values()).map((node): cytoscape.ElementDefinition => ({ group: "nodes", data: node })), ...graphEdges],
+      style: [
+        { selector: "node", style: { "background-color": "#89b4fa", label: "data(label)", color: "#11111b", "text-valign": "center", "text-halign": "center", "font-size": 10, shape: "roundrectangle", padding: "8px", width: "label", height: 32 } },
+        { selector: `node[id^="${module.id}::"]`, style: { "background-color": "#a6e3a1" } },
+        { selector: "edge", style: { width: 2, "line-color": "#89b4fa", "target-arrow-color": "#89b4fa", "target-arrow-shape": "triangle", "curve-style": "bezier", label: "data(line)", "font-size": 8, color: "#a6adc8" } },
+      ],
+      layout: { name: "dagre", rankDir: "LR", nodeSep: 35, rankSep: 100, padding: 40, animate: false } as any,
+    });
+    callGraphCy.on("dblclick", "node", (event) => {
+      const node = event.target.data();
+      const targetModule = currentResult?.modules.find((item) => item.id === node.module);
+      const symbol = targetModule?.symbols?.find((item) => item.name === node.symbol || item.name.endsWith(`.${node.symbol}`));
+      if (targetModule) void jumpToEditor(targetModule.absolute_path, symbol?.line || 1);
+    });
+  }
+  if (callGraphTitle) callGraphTitle.textContent = `コールグラフ: ${module.id}`;
+  callGraphModal.classList.remove("hidden");
+}
+
+function closeCallGraph() {
+  callGraphModal?.classList.add("hidden");
+  callGraphCy?.destroy();
+  callGraphCy = null;
+}
+
+function historyKey(root: string): string {
+  return `moduleloom-history:${root}`;
+}
+
+function readAnalysisHistory(root: string): AnalysisSnapshot[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(historyKey(root)) || "[]");
+    return Array.isArray(value) ? value as AnalysisSnapshot[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function compareAnalysisResults(previous: AnalysisResult | undefined, current: AnalysisResult): string[] {
+  if (!previous) return [];
+  const changes: string[] = [];
+  const currentModules = new Map(current.modules.map((module) => [module.id, module]));
+  for (const oldModule of previous.modules) {
+    const nextModule = currentModules.get(oldModule.id);
+    if (!nextModule) {
+      changes.push(`モジュール削除: ${oldModule.id}`);
+      continue;
+    }
+    const nextSymbols = new Set((nextModule.symbols || []).map((symbol) => symbol.name));
+    for (const symbol of oldModule.symbols || []) {
+      if (!nextSymbols.has(symbol.name)) changes.push(`シンボル削除: ${oldModule.id}.${symbol.name}`);
+    }
+  }
+  const currentEdges = new Set(current.edges.map((edge) => `${edge.source}->${edge.target}`));
+  for (const edge of previous.edges) {
+    if (!currentEdges.has(`${edge.source}->${edge.target}`)) changes.push(`依存削除: ${edge.source} -> ${edge.target}`);
+  }
+  return changes;
+}
+
+function recordAnalysisHistory(result: AnalysisResult) {
+  const history = readAnalysisHistory(result.root_path);
+  history.push({ timestamp: new Date().toISOString(), result });
+  localStorage.setItem(historyKey(result.root_path), JSON.stringify(history.slice(-20)));
+}
+
+function showAnalysisHistory() {
+  if (!currentResult) {
+    statusBar.innerText = "先に解析を実行してください";
+    return;
+  }
+  const history = readAnalysisHistory(currentResult.root_path);
+  if (history.length === 0) {
+    statusBar.innerText = "解析履歴はありません";
+    return;
+  }
+  const lines = history.slice().reverse().map((snapshot) => {
+    const result = snapshot.result;
+    return `${new Date(snapshot.timestamp).toLocaleString()} : ${result.modules.length} modules / ${result.cycles.length} cycles / ${result.total_loc} LOC`;
+  });
+  window.alert(`解析履歴 (${history.length} 件)\n\n${lines.join("\n")}`);
 }
 
 async function jumpToEditor(filePath: string, line: number = 1) {
@@ -1941,9 +2246,142 @@ async function runAnalysis() {
   try {
     const result = await invokeCommand<AnalysisResult>("analyze_project", { path });
     updateGraph(result);
+    if (chkWatch.checked) {
+      await startWatching(path);
+    }
   } catch (err: any) {
     statusBar.innerText = `エラー: ${err.toString()}`;
   }
+}
+
+let watchTimer: number | null = null;
+let analysisRunning = false;
+
+async function startWatching(path: string) {
+  try {
+    await invokeCommand("watch_project", { path });
+    statusBar.innerText = `解析完了・自動更新中 (${path})`;
+  } catch (err: any) {
+    chkWatch.checked = false;
+    statusBar.innerText = `監視開始エラー: ${err.toString()}`;
+  }
+}
+
+async function stopWatching() {
+  try {
+    await invokeCommand("stop_watching");
+    if (watchTimer !== null) {
+      window.clearTimeout(watchTimer);
+      watchTimer = null;
+    }
+    statusBar.innerText = "自動更新を停止しました";
+  } catch (err: any) {
+    statusBar.innerText = `監視停止エラー: ${err.toString()}`;
+  }
+}
+
+function scheduleAnalysisFromFileChange() {
+  if (!chkWatch.checked || !pathInput.value.trim()) return;
+  if (watchTimer !== null) window.clearTimeout(watchTimer);
+  statusBar.innerText = "ファイル変更を検知しました。再解析を待機中...";
+  watchTimer = window.setTimeout(async () => {
+    watchTimer = null;
+    if (analysisRunning) return;
+    analysisRunning = true;
+    try {
+      statusBar.innerText = `変更を再解析中: ${pathInput.value.trim()}...`;
+      const result = await invokeCommand<AnalysisResult>("analyze_project", { path: pathInput.value.trim() });
+      updateGraph(result);
+      statusBar.innerText = `自動更新完了 (${new Date().toLocaleTimeString()})`;
+    } catch (err: any) {
+      statusBar.innerText = `自動再解析エラー: ${err.toString()}`;
+    } finally {
+      analysisRunning = false;
+    }
+  }, 500);
+}
+
+async function initFileWatcherEvents() {
+  if (typeof window === "undefined" || !(window as any).__TAURI_INTERNALS__) return;
+  const { listen } = await import("@tauri-apps/api/event");
+  await listen<string>("project-changed", () => scheduleAnalysisFromFileChange());
+}
+
+async function detectEditors() {
+  try {
+    const detected = await invokeCommand<string[]>("detect_editors");
+    const hasPycharm = detected.some((name) => name.startsWith("pycharm"));
+    const hasVscode = detected.includes("code");
+    for (const option of Array.from(editorSelect.options)) {
+      const available = option.value === "pycharm" ? hasPycharm : hasVscode;
+      option.title = available ? "検出済み" : "コマンドが PATH に見つかりません";
+    }
+  } catch {
+    // The editor can still be opened through URL schemes when CLI detection fails.
+  }
+}
+
+async function highlightGitChanges() {
+  if (!currentResult || !pathInput.value.trim()) return;
+  try {
+    const files = await invokeCommand<string[]>("git_changed_files", { path: pathInput.value.trim() });
+    highlightChangedFiles(files, "Git差分");
+  } catch (err: any) {
+    statusBar.innerText = `Git差分の取得エラー: ${err.toString()}`;
+  }
+}
+
+function highlightChangedFiles(files: string[], label: string) {
+  if (!currentResult) return;
+    const normalized = new Set(files.map((file) => file.split("\\").join("/").replace(/^\.\//, "")));
+    gitChangedModuleIds = new Set(
+      currentResult.modules.filter((mod) => normalized.has(mod.relative_path.split("\\").join("/"))).map((mod) => mod.id)
+    );
+    cy?.nodes().removeClass("git-changed");
+    for (const id of gitChangedModuleIds) cy?.$id(id).addClass("git-changed");
+    statusBar.innerText = gitChangedModuleIds.size === 0
+      ? `${label}に該当する Python ファイルはありません`
+      : `${label}: ${gitChangedModuleIds.size} モジュールを強調表示しました`;
+}
+
+async function highlightGitHistory() {
+  if (!currentResult || !pathInput.value.trim()) return;
+  const base = window.prompt("比較元コミット", "HEAD~1");
+  const head = window.prompt("比較先コミット", "HEAD");
+  if (!base || !head) return;
+  try {
+    const files = await invokeCommand<string[]>("git_diff_files", { path: pathInput.value.trim(), base, head });
+    highlightChangedFiles(files, `${base}..${head}`);
+  } catch (err: any) {
+    statusBar.innerText = `履歴差分の取得エラー: ${err.toString()}`;
+  }
+}
+
+function downloadFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportReport() {
+  if (!currentResult) {
+    statusBar.innerText = "先に解析を実行してください";
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  downloadFile(`moduleloom-report-${stamp}.json`, JSON.stringify(currentResult, null, 2), "application/json");
+  const dotNodes = currentResult.modules.map((mod) => `  "${mod.id}" [label="${mod.name.replace(/"/g, '\\"')}\\nLOC: ${mod.loc}"];`).join("\n");
+  const dotEdges = currentResult.edges.map((edge) => `  "${edge.source}" -> "${edge.target}"${edge.is_circular ? " [color=red,style=dashed]" : ""};`).join("\n");
+  downloadFile(`moduleloom-graph-${stamp}.dot`, `digraph ModuleLoom {\n  rankdir=LR;\n${dotNodes}\n${dotEdges}\n}\n`, "text/vnd.graphviz");
+  const rows = currentResult.modules.map((mod) => `<tr><td>${escapeHtml(mod.id)}</td><td>${mod.loc}</td><td>${mod.cyclomatic_complexity || 1}</td><td>${mod.afferent_coupling || 0}</td><td>${mod.efferent_coupling || 0}</td><td>${mod.is_oversized ? "肥大化" : ""}</td><td>${(mod.unresolved_imports || []).map(escapeHtml).join(", ")}</td></tr>`).join("");
+  const packages = (currentResult.package_dependencies || []).map((pkg) => `<li>${escapeHtml(pkg.name)} ${escapeHtml(pkg.version || "")} <small>(${escapeHtml(pkg.source)})</small></li>`).join("");
+  const html = `<!doctype html><meta charset="utf-8"><title>ModuleLoom Report</title><style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem;text-align:left}</style><h1>ModuleLoom Report</h1><p>Root: ${escapeHtml(currentResult.root_path)}</p><h2>Package dependencies</h2><ul>${packages || "<li>なし</li>"}</ul><table><tr><th>Module</th><th>LOC</th><th>複雑度</th><th>利用元</th><th>依存先</th><th>警告</th><th>外部 / 未解決 import</th></tr>${rows}</table>`;
+  downloadFile(`moduleloom-report-${stamp}.html`, html, "text/html");
+  statusBar.innerText = "JSON と HTML レポートを出力しました";
 }
 
 function getMockAnalysisResult(root: string): AnalysisResult {
@@ -2335,6 +2773,11 @@ function toggleTreePanel(forceState?: boolean) {
 }
 
 // Event Listeners
+document.getElementById("btn-git-diff")?.addEventListener("click", highlightGitChanges);
+document.getElementById("btn-git-history")?.addEventListener("click", highlightGitHistory);
+document.getElementById("btn-export-report")?.addEventListener("click", exportReport);
+document.getElementById("btn-history")?.addEventListener("click", showAnalysisHistory);
+document.getElementById("btn-back")?.addEventListener("click", goBack);
 btnShowOverview?.addEventListener("click", toggleOverviewOrFileView);
 btnAnalyze.addEventListener("click", runAnalysis);
 searchInput.addEventListener("input", applyFilters);
@@ -2378,6 +2821,13 @@ chkFocusMode.addEventListener("change", () => {
 chkDirectOnly?.addEventListener("change", () => {
   applyFilters();
 });
+chkWatch.addEventListener("change", () => {
+  if (chkWatch.checked && pathInput.value.trim()) {
+    void startWatching(pathInput.value.trim());
+  } else {
+    void stopWatching();
+  }
+});
 
 // Dependency Modal Listeners
 modalLayoutSelect?.addEventListener("change", runModalLayout);
@@ -2398,6 +2848,8 @@ btnModalZoomOut?.addEventListener("click", () => {
 });
 btnCloseModal?.addEventListener("click", closeDependencyDialog);
 btnModalCloseFooter?.addEventListener("click", closeDependencyDialog);
+document.getElementById("btn-close-callgraph")?.addEventListener("click", closeCallGraph);
+document.getElementById("btn-close-callgraph-footer")?.addEventListener("click", closeCallGraph);
 btnModalJumpEditor?.addEventListener("click", () => {
   if (currentModalModule) {
     jumpToEditor(currentModalModule.absolute_path, 1);
@@ -2408,9 +2860,15 @@ dependencyModal?.addEventListener("click", (e) => {
     closeDependencyDialog();
   }
 });
+callGraphModal?.addEventListener("click", (e) => {
+  if (e.target === callGraphModal) closeCallGraph();
+});
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !dependencyModal?.classList.contains("hidden")) {
     closeDependencyDialog();
+  }
+  if (e.key === "Escape" && !callGraphModal?.classList.contains("hidden")) {
+    closeCallGraph();
   }
 });
 
@@ -2448,6 +2906,8 @@ if (savedEditor && (savedEditor === "pycharm" || savedEditor === "vscode")) {
 // Initialize
 updateFlowDirectionButton();
 initGraph();
+void initFileWatcherEvents();
+void detectEditors();
 pathInput.value = localStorage.getItem("project_path") || "";
 if (pathInput.value) runAnalysis();
 else statusBar.innerText = "Python プロジェクトのパスを入力して解析を実行してください";

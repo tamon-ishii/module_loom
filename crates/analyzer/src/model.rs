@@ -6,6 +6,79 @@ fn default_true() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AnalysisConfig {
+    #[serde(default = "default_max_loc")]
+    pub max_loc: usize,
+    #[serde(default = "default_max_functions")]
+    pub max_functions: usize,
+    #[serde(default = "default_max_classes")]
+    pub max_classes: usize,
+    #[serde(default)]
+    pub architecture: ArchitectureConfig,
+}
+
+fn default_max_loc() -> usize {
+    300
+}
+fn default_max_functions() -> usize {
+    20
+}
+fn default_max_classes() -> usize {
+    10
+}
+
+impl Default for AnalysisConfig {
+    fn default() -> Self {
+        Self {
+            max_loc: 300,
+            max_functions: 20,
+            max_classes: 10,
+            architecture: ArchitectureConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct ArchitectureConfig {
+    #[serde(default)]
+    pub forbidden: Vec<ForbiddenImportRule>,
+    #[serde(default)]
+    pub independence: Vec<IndependenceRule>,
+    #[serde(default)]
+    pub layers: Vec<LayerRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ForbiddenImportRule {
+    pub name: String,
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IndependenceRule {
+    pub name: String,
+    pub modules: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LayerRule {
+    pub name: String,
+    pub layers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ArchitectureViolation {
+    pub rule: String,
+    pub name: String,
+    pub source: String,
+    pub target: String,
+    pub line: usize,
+    pub message: String,
+    pub suggestion: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImportStmt {
     pub module: String,
     pub is_from: bool,
@@ -18,20 +91,34 @@ pub struct ImportStmt {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModuleInfo {
-    pub id: String,               // e.g. "moduleloom.main"
-    pub name: String,             // e.g. "main"
-    pub relative_path: String,    // e.g. "main.py"
+    pub id: String,            // e.g. "moduleloom.main"
+    pub name: String,          // e.g. "main"
+    pub relative_path: String, // e.g. "main.py"
     pub absolute_path: PathBuf,
     #[serde(default)]
     pub docstring: Option<String>,
     pub loc: usize,
+    #[serde(default)]
+    pub cyclomatic_complexity: usize,
     pub class_count: usize,
     #[serde(default)]
     pub classes: Vec<ClassInfo>,
     pub function_count: usize,
     #[serde(default)]
     pub functions: Vec<FunctionInfo>,
+    #[serde(default)]
+    pub symbols: Vec<SymbolInfo>,
+    #[serde(default)]
+    pub symbol_calls: Vec<SymbolCall>,
+    #[serde(default)]
+    pub unused_symbol_candidates: Vec<String>,
     pub imports: Vec<ImportStmt>,
+    #[serde(default)]
+    pub unresolved_imports: Vec<String>,
+    #[serde(default)]
+    pub afferent_coupling: usize,
+    #[serde(default)]
+    pub efferent_coupling: usize,
     pub is_oversized: bool,
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -50,6 +137,36 @@ pub struct FunctionInfo {
     pub line: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_class_line: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SymbolInfo {
+    pub name: String,
+    pub kind: String,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SymbolCall {
+    pub caller: String,
+    pub callee: String,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SymbolEdge {
+    pub source_module: String,
+    pub source_symbol: String,
+    pub target_module: String,
+    pub target_symbol: String,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PackageDependency {
+    pub name: String,
+    pub version: Option<String>,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -91,4 +208,12 @@ pub struct AnalysisResult {
     pub edges: Vec<DependencyEdge>,
     pub cycles: Vec<CircularCycle>,
     pub total_loc: usize,
+    #[serde(default)]
+    pub analysis_errors: Vec<String>,
+    #[serde(default)]
+    pub architecture_violations: Vec<ArchitectureViolation>,
+    #[serde(default)]
+    pub symbol_edges: Vec<SymbolEdge>,
+    #[serde(default)]
+    pub package_dependencies: Vec<PackageDependency>,
 }

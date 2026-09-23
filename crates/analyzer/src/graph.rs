@@ -34,7 +34,9 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
                 }
 
                 if node_indices.contains_key(&target_id) {
-                    let entry = edge_map.entry((from_id.clone(), target_id)).or_insert((imp.line, 0, false));
+                    let entry = edge_map
+                        .entry((from_id.clone(), target_id))
+                        .or_insert((imp.line, 0, false));
                     entry.1 += 1;
                     if imp.is_top_level {
                         entry.2 = true;
@@ -83,17 +85,22 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
             for m in &cycle_mods {
                 circular_nodes.insert(m.clone());
             }
-            cycles.push(CircularCycle { modules: cycle_mods });
+            cycles.push(CircularCycle {
+                modules: cycle_mods,
+            });
         }
     }
 
     // Mark edges that connect nodes within circular cycles (only if the edge is top_level)
     for edge in &mut edges {
-        if edge.is_top_level && circular_nodes.contains(&edge.source) && circular_nodes.contains(&edge.target) {
+        if edge.is_top_level
+            && circular_nodes.contains(&edge.source)
+            && circular_nodes.contains(&edge.target)
+        {
             // Check if both nodes are in the same cycle
-            let in_same_cycle = cycles.iter().any(|c| {
-                c.modules.contains(&edge.source) && c.modules.contains(&edge.target)
-            });
+            let in_same_cycle = cycles
+                .iter()
+                .any(|c| c.modules.contains(&edge.source) && c.modules.contains(&edge.target));
             if in_same_cycle {
                 edge.is_circular = true;
             }
@@ -101,6 +108,36 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
     }
 
     (edges, cycles)
+}
+
+/// Returns imports that do not resolve to a module inside the analyzed project.
+/// These are usually standard-library or third-party dependencies.
+pub fn collect_unresolved_imports(modules: &[ModuleInfo]) -> HashMap<String, Vec<String>> {
+    let module_map: HashMap<String, &ModuleInfo> = modules
+        .iter()
+        .map(|module| (module.id.clone(), module))
+        .collect();
+    let mut result = HashMap::new();
+
+    for module in modules {
+        let mut imports = HashSet::new();
+        for import in &module.imports {
+            if resolve_import_target(import, &module.id, &module_map).is_empty() {
+                let name = if import.module.is_empty() {
+                    import.imported_names.join(", ")
+                } else if import.is_from && !import.imported_names.is_empty() {
+                    format!("{} ({})", import.module, import.imported_names.join(", "))
+                } else {
+                    import.module.clone()
+                };
+                imports.insert(name);
+            }
+        }
+        if !imports.is_empty() {
+            result.insert(module.id.clone(), imports.into_iter().collect());
+        }
+    }
+    result
 }
 
 fn resolve_import_target(
@@ -198,10 +235,14 @@ mod tests {
             absolute_path: PathBuf::from("/project/app/a.py"),
             docstring: None,
             loc: 10,
+            cyclomatic_complexity: 1,
             class_count: 0,
             classes: vec![],
             function_count: 0,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![ImportStmt {
                 module: "app.b".to_string(),
                 is_from: false,
@@ -210,6 +251,9 @@ mod tests {
                 imported_names: vec!["app.b".to_string()],
                 is_top_level: true,
             }],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: false,
             diagnostics: vec![],
         };
@@ -221,10 +265,14 @@ mod tests {
             absolute_path: PathBuf::from("/project/app/b.py"),
             docstring: None,
             loc: 15,
+            cyclomatic_complexity: 1,
             class_count: 0,
             classes: vec![],
             function_count: 0,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![ImportStmt {
                 module: "app.a".to_string(),
                 is_from: false,
@@ -233,6 +281,9 @@ mod tests {
                 imported_names: vec!["app.a".to_string()],
                 is_top_level: true,
             }],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: false,
             diagnostics: vec![],
         };
@@ -246,7 +297,10 @@ mod tests {
         assert!(cycles[0].modules.contains(&"app.b".to_string()));
 
         assert_eq!(edges.len(), 2);
-        assert!(edges.iter().all(|e| e.is_circular), "Both edges should be marked as circular");
+        assert!(
+            edges.iter().all(|e| e.is_circular),
+            "Both edges should be marked as circular"
+        );
     }
 
     #[test]
@@ -259,10 +313,14 @@ mod tests {
             absolute_path: PathBuf::from("/project/app/a.py"),
             docstring: None,
             loc: 10,
+            cyclomatic_complexity: 1,
             class_count: 0,
             classes: vec![],
             function_count: 1,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![ImportStmt {
                 module: "app.b".to_string(),
                 is_from: false,
@@ -271,6 +329,9 @@ mod tests {
                 imported_names: vec!["app.b".to_string()],
                 is_top_level: true,
             }],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: false,
             diagnostics: vec![],
         };
@@ -283,10 +344,14 @@ mod tests {
             absolute_path: PathBuf::from("/project/app/b.py"),
             docstring: None,
             loc: 15,
+            cyclomatic_complexity: 1,
             class_count: 0,
             classes: vec![],
             function_count: 1,
             functions: vec![],
+            symbols: vec![],
+            symbol_calls: vec![],
+            unused_symbol_candidates: vec![],
             imports: vec![ImportStmt {
                 module: "app.a".to_string(),
                 is_from: false,
@@ -295,6 +360,9 @@ mod tests {
                 imported_names: vec!["app.a".to_string()],
                 is_top_level: false, // Inside function!
             }],
+            unresolved_imports: vec![],
+            afferent_coupling: 0,
+            efferent_coupling: 0,
             is_oversized: false,
             diagnostics: vec![],
         };
@@ -303,8 +371,15 @@ mod tests {
         let (edges, cycles) = build_graph(&modules);
 
         // Since B's import is inside a function, no runtime cycle error occurs at module load time!
-        assert_eq!(cycles.len(), 0, "Function-level import must NOT produce circular cycle error");
+        assert_eq!(
+            cycles.len(),
+            0,
+            "Function-level import must NOT produce circular cycle error"
+        );
         assert_eq!(edges.len(), 2, "Edges still exist in dependency graph");
-        assert!(edges.iter().all(|e| !e.is_circular), "Neither edge should be marked as circular error");
+        assert!(
+            edges.iter().all(|e| !e.is_circular),
+            "Neither edge should be marked as circular error"
+        );
     }
 }
