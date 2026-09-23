@@ -2,8 +2,10 @@ import cytoscape, { Core, EventObject } from "cytoscape";
 // @ts-ignore
 import dagre from "cytoscape-dagre";
 import { escapeHtml } from "./utils";
+import { cycleGuidance, cyclePath, cycleSuggestion } from "./cycle-insights";
 import {
   compareAnalysisResults,
+  compareAnalysisIssues,
   readAnalysisHistory,
   recordAnalysisHistory,
 } from "./analysis-history";
@@ -23,6 +25,11 @@ let currentResult: AnalysisResult | null = null;
 let selectedModule: ModuleInfo | null = null;
 let gitChangedModuleIds = new Set<string>();
 let lastBreakingChanges: string[] = [];
+let clusterMemberOf = new Map<string, string>();
+let lastCollapseActive = false;
+interface FixToolInfo { id: string; label: string; kinds: string[] }
+let fixTools: FixToolInfo[] = [{ id: "ruff", label: "Ruff (TC001)", kinds: ["type_only"] }];
+let activeFixToolName = "Ruff";
 
 // DOM Elements
 const pathInput = document.getElementById("project-path-input") as HTMLInputElement;
@@ -33,6 +40,9 @@ const chkOnlyCycles = document.getElementById("chk-only-cycles") as HTMLInputEle
 const chkOnlyBloat = document.getElementById("chk-only-bloat") as HTMLInputElement;
 const chkGroupPackages = document.getElementById("chk-group-packages") as HTMLInputElement;
 const chkFocusMode = document.getElementById("chk-focus-mode") as HTMLInputElement;
+const chkExternals = document.getElementById("chk-externals") as HTMLInputElement;
+const graphRadius = document.getElementById("graph-radius") as HTMLSelectElement;
+const clusterLimit = document.getElementById("cluster-limit") as HTMLSelectElement;
 const chkDirectOnly = document.getElementById("chk-direct-only") as HTMLInputElement;
 const layoutSelect = document.getElementById("layout-select") as HTMLSelectElement;
 const btnFlowDirection = document.getElementById("btn-flow-direction") as HTMLButtonElement;
@@ -48,6 +58,13 @@ const editorSelect = document.getElementById("editor-select") as HTMLSelectEleme
 const inspectorContent = document.getElementById("inspector-content") as HTMLDivElement;
 const statusBar = document.getElementById("status-bar") as HTMLDivElement;
 const metricsSummary = document.getElementById("metrics-summary") as HTMLDivElement;
+const ruffFixModal = document.getElementById("ruff-fix-modal") as HTMLDivElement;
+const ruffFixFile = document.getElementById("ruff-fix-file") as HTMLElement;
+const ruffFixDiff = document.getElementById("ruff-fix-diff") as HTMLElement;
+const btnApplyRuffFix = document.getElementById("btn-apply-ruff-fix") as HTMLButtonElement;
+const fixToolSelect = document.getElementById("fix-tool-select") as HTMLSelectElement;
+const chainFrom = document.getElementById("chain-from") as HTMLInputElement;
+const chainTo = document.getElementById("chain-to") as HTMLInputElement;
 
 // Dependency Modal Elements & State
 let modalCy: Core | null = null;
@@ -107,6 +124,15 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
   if (cmd === "detect_editors") {
     return [] as T;
   }
+  if (cmd === "preview_cycle_fix" || cmd === "apply_cycle_fix") {
+    throw new Error("外部ツールによる修正はデスクトップ版で利用できます");
+  }
+  if (cmd === "generate_mkdocs") {
+    throw new Error("MkDocs 出力はデスクトップ版で利用できます");
+  }
+  if (cmd === "list_fix_tools") {
+    return fixTools as T;
+  }
   if (cmd === "git_changed_files") {
     return [] as T;
   }
@@ -144,6 +170,27 @@ function initGraph() {
         },
       },
       // Package compound parent node (Directory box)
+      {
+        selector: "node.external-node:childless",
+        style: {
+          "background-color": "#202b30",
+          "border-color": "#94e2d5",
+          "border-style": "dashed",
+          color: "#94e2d5",
+        },
+      },
+      {
+        selector: "node.cluster-node:childless",
+        style: { "background-color": "#32324a", "border-color": "#cba6f7", color: "#cba6f7", "border-width": 3 },
+      },
+      {
+        selector: "edge.cluster-edge",
+        style: { "line-color": "#cba6f7", "target-arrow-color": "#cba6f7", width: 3 },
+      },
+      {
+        selector: "edge.external-edge",
+        style: { "line-style": "dashed", "line-color": "#6fa99f", "target-arrow-color": "#6fa99f" },
+      },
       {
         selector: ":parent",
         style: {
@@ -468,8 +515,19 @@ function initGraph() {
     if (node.isParent()) return;
 
     const mod = currentResult?.modules.find((m) => m.id === node.id());
-    if (!mod) return;
+    if (!mod) {
+      if (node.hasClass("cluster-node")) {
+        statusBar.innerText = `集約パッケージ: ${node.data("label")}。ダブルクリックで展開します`;
+        return;
+      }
+      if (node.hasClass("external-node")) {
+        statusBar.innerText = `外部 / 未解決 import: ${node.data("label")}`;
+        updateNodeFocus(node);
+      }
+      return;
+    }
     if (currentViewMode === "overview") selectedModule = mod;
+    if (currentViewMode === "overview" && graphRadius.value !== "all") applyFilters();
     renderInspector(mod);
     highlightTreeNode(mod.id);
     updateNodeFocus(node);
@@ -480,6 +538,11 @@ function initGraph() {
     if (node.isParent()) return;
 
     const moduleId = node.id();
+    if (node.hasClass("cluster-node")) {
+      clusterLimit.value = "0";
+      if (currentResult) updateGraph(currentResult);
+      return;
+    }
     jumpToFileCentricDiagram(moduleId);
   });
 
@@ -861,6 +924,69 @@ function clearHighlights() {
   cy.elements().removeClass("highlighted highlighted-in highlighted-out highlighted-in-node highlighted-out-node faded focal-node root-node");
 }
 
+function findAndHighlightChain() {
+  if (!currentResult || !cy) {
+    statusBar.innerText = "先に解析を実行してください";
+    return;
+  }
+  const source = chainFrom.value.trim();
+  const target = chainTo.value.trim();
+  const known = new Set(currentResult.modules.map((module) => module.id));
+  if (!known.has(source) || !known.has(target)) {
+    statusBar.innerText = "出発と到着のモジュール名を一覧から選んでください";
+    return;
+  }
+  const queue = [source];
+  const previous = new Map<string, string | null>([[source, null]]);
+  while (queue.length > 0 && !previous.has(target)) {
+    const current = queue.shift()!;
+    for (const edge of currentResult.edges) {
+      if (edge.source === current && !previous.has(edge.target)) {
+        previous.set(edge.target, current);
+        queue.push(edge.target);
+      }
+    }
+  }
+  if (!previous.has(target)) {
+    statusBar.innerText = `依存経路がありません: ${source} → ${target}`;
+    return;
+  }
+  const path: string[] = [];
+  for (let cursor: string | null = target; cursor !== null; cursor = previous.get(cursor) ?? null) path.unshift(cursor);
+  switchToOverview();
+  searchInput.value = "";
+  chkOnlyCycles.checked = false;
+  chkOnlyBloat.checked = false;
+  applyFilters();
+  clearHighlights();
+  let active = cy.collection();
+  path.forEach((id, index) => {
+    active = active.merge(cy!.$id(id));
+    if (index + 1 < path.length) {
+      const edge = cy!.edges().filter((item) => item.source().id() === id && item.target().id() === path[index + 1]);
+      active = active.merge(edge);
+      edge.addClass("highlighted");
+    }
+  });
+  cy.elements().difference(active).addClass("faded");
+  active.parents().removeClass("faded");
+  cy.fit(active, 60);
+  statusBar.innerText = `最短 import 経路 (${path.length - 1} ホップ): ${path.join(" → ")}`;
+}
+
+function showDependencyIssues() {
+  if (!currentResult) {
+    statusBar.innerText = "先に解析を実行してください";
+    return;
+  }
+  const issues = currentResult.dependency_issues || [];
+  inspectorContent.innerHTML = `<div class="module-detail"><h3>依存宣言の問題 (${issues.length})</h3>
+    ${issues.length === 0 ? '<p>問題はありません</p>' : `<ul class="dep-list">${issues.map((issue) =>
+      `<li class="dep-item"><div><strong>${escapeHtml(issue.rule)} ${escapeHtml(issue.package)}</strong>: ${escapeHtml(issue.message)}</div>
+      ${issue.module ? `<small>参照元: ${escapeHtml(issue.module)}</small>` : ""}</li>`).join("")}</ul>`}</div>`;
+  statusBar.innerText = `依存宣言の問題: ${issues.length} 件`;
+}
+
 function jumpToFileCentricDiagram(moduleId: string) {
   if (!currentResult) return;
   const mod = currentResult.modules.find((m) => m.id === moduleId);
@@ -888,7 +1014,7 @@ function jumpToFileCentricDiagram(moduleId: string) {
   if (fileData.hasCrashingCycle) {
     const rootNames = fileData.roots.map((r) => r.split(".").pop()).join(", ") || "エントリポイント";
     const cyclePartners = [...fileData.cycleModules].map((m) => m.split(".").pop()).join(" ⟷ ");
-    statusBar.innerHTML = `🚨【クラッシュする循環参照】ルーツ [${rootNames}] からのインポート経路を描画中: [${cyclePartners}] で相互参照クラッシュ`;
+    statusBar.innerText = `⚠️ トップレベルの循環インポート: ルーツ [${rootNames}] から循環 [${cyclePartners}] までの経路を描画中`;
   } else {
     statusBar.innerText = `ファイル起点ダイアグラム: [${mod.name}] (全体図ボタンで全体図に戻る)`;
   }
@@ -924,10 +1050,17 @@ function highlightTreeNode(moduleId: string, scroll = false) {
 
 function updateGraph(result: AnalysisResult) {
   if (!cy) return;
-  const history = readAnalysisHistory(result.root_path);
-  const previous = history.length > 0 ? history[history.length - 1].result : undefined;
-  lastBreakingChanges = compareAnalysisResults(previous, result);
+  const previousSelectedId = selectedModule?.id;
+  const wasOverview = currentViewMode === "overview";
+  const freshAnalysis = result !== currentResult;
+  if (freshAnalysis) {
+    const history = readAnalysisHistory(result.root_path);
+    const previous = history.length > 0 ? history[history.length - 1].result : undefined;
+    lastBreakingChanges = compareAnalysisResults(previous, result);
+  }
   currentResult = result;
+  (document.getElementById("module-names") as HTMLDataListElement).innerHTML = result.modules
+    .map((module) => `<option value="${escapeHtml(module.id)}"></option>`).join("");
 
   const cycleNodeIds = new Set<string>();
   result.cycles.forEach((c) => c.modules.forEach((m) => cycleNodeIds.add(m)));
@@ -935,6 +1068,23 @@ function updateGraph(result: AnalysisResult) {
   const elements: cytoscape.ElementDefinition[] = [];
   const groupPackages = chkGroupPackages.checked;
   const packageParents = new Set<string>();
+  clusterMemberOf = new Map();
+  const clusterSize = Number(clusterLimit.value);
+  if (clusterSize > 0) {
+    const byPackage = new Map<string, string[]>();
+    for (const module of result.modules) {
+      const parts = module.id.split(".");
+      if (parts.length < 2) continue;
+      const pkg = parts.slice(0, -1).join(".");
+      byPackage.set(pkg, [...(byPackage.get(pkg) || []), module.id]);
+    }
+    for (const [pkg, members] of byPackage) {
+      if (members.length <= clusterSize) continue;
+      const clusterId = `cluster:${pkg}`;
+      members.forEach((member) => clusterMemberOf.set(member, clusterId));
+      elements.push({ group: "nodes", data: { id: clusterId, label: `▣ ${pkg} (${members.length})`, width: 150, height: 50 }, classes: "cluster-node" });
+    }
+  }
 
   // 1. Create nodes and package parents
   result.modules.forEach((mod) => {
@@ -985,6 +1135,29 @@ function updateGraph(result: AnalysisResult) {
     });
   });
 
+  if (chkExternals.checked) {
+    const internalRoots = new Set(result.modules.map((module) => module.id.split(".")[0]));
+    const externalRoots = new Set<string>();
+    const externalEdges = new Set<string>();
+    for (const mod of result.modules) {
+      for (const imp of mod.imports) {
+        if (imp.level !== 0) continue;
+        const root = imp.module.split(".")[0];
+        if (!root || internalRoots.has(root)) continue;
+        const id = `external:${root}`;
+        if (!externalRoots.has(root)) {
+          externalRoots.add(root);
+          elements.push({ group: "nodes", data: { id, label: `🌐 ${root}`, width: 125, height: 42 }, classes: "external-node" });
+        }
+        const edgeId = `external-edge:${mod.id}:${root}`;
+        if (!externalEdges.has(edgeId)) {
+          externalEdges.add(edgeId);
+          elements.push({ group: "edges", data: { id: edgeId, source: mod.id, target: id, line: imp.line, count: 1 }, classes: "external-edge" });
+        }
+      }
+    }
+  }
+
   // 2. Create edges
   result.edges.forEach((edge, idx) => {
     const classes: string[] = [];
@@ -1004,12 +1177,38 @@ function updateGraph(result: AnalysisResult) {
     });
   });
 
+  if (clusterMemberOf.size > 0) {
+    const aggregated = new Set<string>();
+    const ordinaryEdges = elements.filter((item) => item.group === "edges" && item.data);
+    for (const item of ordinaryEdges) {
+      const source = String(item.data!.source);
+      const target = String(item.data!.target);
+      const aggregateSource = clusterMemberOf.get(source) || source;
+      const aggregateTarget = clusterMemberOf.get(target) || target;
+      if (aggregateSource === source && aggregateTarget === target) continue;
+      if (aggregateSource === aggregateTarget) continue;
+      const key = `${aggregateSource}->${aggregateTarget}`;
+      if (aggregated.has(key)) continue;
+      aggregated.add(key);
+      elements.push({ group: "edges", data: { id: `cluster-edge:${key}`, source: aggregateSource, target: aggregateTarget, count: 1 }, classes: "cluster-edge" });
+    }
+  }
+
   cy.elements().remove();
   cy.add(elements);
 
   renderTree(result);
   updateSummary(result);
-  recordAnalysisHistory(result);
+  if (freshAnalysis) recordAnalysisHistory(result);
+
+  if (wasOverview) {
+    switchToOverview();
+    return;
+  }
+  if (previousSelectedId && result.modules.some((module) => module.id === previousSelectedId)) {
+    jumpToFileCentricDiagram(previousSelectedId);
+    return;
+  }
 
   // Auto-display dependency diagram for key module as default view
   if (result.modules.length > 0) {
@@ -1079,8 +1278,9 @@ function runLayout() {
     };
   }
 
-  cy.layout(options).run();
-  cy.fit(undefined, 40);
+  const visible = cy.elements().not(".hidden");
+  visible.layout(options).run();
+  cy.fit(visible, 40);
 }
 
 function applyFilters() {
@@ -1089,6 +1289,27 @@ function applyFilters() {
   const onlyCycles = chkOnlyCycles.checked;
   const onlyBloat = chkOnlyBloat.checked;
   const isFileMode = currentViewMode === "file" && selectedModule !== null;
+  const collapseActive = !isFileMode && clusterMemberOf.size > 0 && !onlyCycles && !onlyBloat && !searchTerm;
+  const radius = graphRadius.value === "all" ? Infinity : Number(graphRadius.value);
+  const distance = new Map<string, number>();
+  if (!isFileMode && selectedModule && Number.isFinite(radius)) {
+    const start = collapseActive ? clusterMemberOf.get(selectedModule.id) || selectedModule.id : selectedModule.id;
+    const queue = [start];
+    distance.set(start, 0);
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const depth = distance.get(current)!;
+      if (depth >= radius) continue;
+      cy.edges().forEach((edge) => {
+        if (collapseActive && !edge.hasClass("cluster-edge")
+          && (clusterMemberOf.has(edge.source().id()) || clusterMemberOf.has(edge.target().id()))) return;
+        if (!collapseActive && edge.hasClass("cluster-edge")) return;
+        const next = edge.source().id() === current ? edge.target().id()
+          : edge.target().id() === current ? edge.source().id() : null;
+        if (next && !distance.has(next)) { distance.set(next, depth + 1); queue.push(next); }
+      });
+    }
+  }
 
   const cycleNodeIds = new Set<string>();
   currentResult.cycles.forEach((c) => c.modules.forEach((m) => cycleNodeIds.add(m)));
@@ -1103,13 +1324,19 @@ function applyFilters() {
     const id = node.id();
     const idLower = id.toLowerCase();
     const mod = currentResult?.modules.find((m) => m.id === id);
-    const modName = mod ? mod.name : id.split(".").pop() || id;
+    const modName = mod ? mod.name : node.hasClass("external-node") ? `🌐 ${id.slice("external:".length)}`
+      : node.hasClass("cluster-node") ? String(node.data("label")) : id.split(".").pop() || id;
     const nameLower = modName.toLowerCase();
 
     let match = true;
     if (fileData && !fileData.allowedNodeIds.has(id)) {
       match = false;
     }
+    if (isFileMode && node.hasClass("external-node")) match = false;
+    if (isFileMode && node.hasClass("cluster-node")) match = false;
+    if (collapseActive && clusterMemberOf.has(id)) match = false;
+    if (!collapseActive && node.hasClass("cluster-node")) match = false;
+    if (!isFileMode && distance.size > 0 && !distance.has(id)) match = false;
     if (!isFileMode && searchTerm && !idLower.includes(searchTerm) && !nameLower.includes(searchTerm)) {
       match = false;
     }
@@ -1153,7 +1380,8 @@ function applyFilters() {
     const sourceNode = cy?.$id(sId);
     const targetNode = cy?.$id(tId);
 
-    if (sourceNode?.hasClass("hidden") || targetNode?.hasClass("hidden")) {
+    if ((!collapseActive && edge.hasClass("cluster-edge"))
+      || (sourceNode?.hasClass("hidden") || targetNode?.hasClass("hidden"))) {
       edge.addClass("hidden");
     } else {
       if (fileData) {
@@ -1177,6 +1405,11 @@ function applyFilters() {
       pNode.removeClass("hidden");
     }
   });
+
+  if (lastCollapseActive !== collapseActive) {
+    lastCollapseActive = collapseActive;
+    if (!isFileMode) runLayout();
+  }
 
   // 4. Layout visible modules in the chosen flow direction.
   if (isFileMode && selectedModule) {
@@ -1203,6 +1436,51 @@ function applyFilters() {
         cy.center(visibleEles);
       }
     }
+  }
+}
+
+function renderCyclePath(cycle: CircularCycle, currentId: string): string {
+  const path = currentResult ? cyclePath(cycle, currentResult.edges) : [];
+  if (!path.length || !currentResult) return cycle.modules.map(escapeHtml).join("・");
+  return path.map((id, index) => {
+    const pill = `<span class="cycle-pill ${id === currentId ? "current" : ""}" data-select-mod="${escapeHtml(id)}" title="${escapeHtml(id)}">${escapeHtml(id.split(".").pop() || id)}</span>`;
+    if (index === path.length - 1) return pill;
+    const edge = currentResult!.edges.find((item) => item.source === id && item.target === path[index + 1] && item.is_top_level !== false);
+    const source = currentResult!.modules.find((item) => item.id === id);
+    const arrow = edge && source
+      ? `<span class="cycle-arrow dep-item-line" data-jump-file="${escapeHtml(source.absolute_path)}" data-jump-line="${edge.line}" title="${escapeHtml(id)} → ${escapeHtml(path[index + 1])} の import 行を開く">➔ L:${edge.line}</span>`
+      : '<span class="cycle-arrow">➔</span>';
+    return pill + arrow;
+  }).join("");
+}
+
+function renderCycleSuggestion(cycle: CircularCycle): string {
+  if (!currentResult) return "";
+  const item = cycleSuggestion(cycle, currentResult.edges);
+  const source = item && currentResult.modules.find((module) => module.id === item.source);
+  if (!item || !source) return "";
+  const selectedTool = fixTools.find((tool) => tool.id === fixToolSelect.value);
+  const fixButton = cycle.suggestion && selectedTool?.kinds.includes(item.kind)
+    ? `<button class="btn-secondary btn-sm btn-preview-ruff-fix" data-cycle-source="${escapeHtml(item.source)}" data-cycle-line="${item.line}" style="margin-left:6px">${escapeHtml(selectedTool.label)} の差分</button>`
+    : "";
+  return `<div style="width:100%; font-size:0.72rem; color:var(--text-muted); margin-top:4px;">
+    改善候補: <span class="dep-item-line" data-jump-file="${escapeHtml(source.absolute_path)}" data-jump-line="${item.line}" title="import 行を開く">${escapeHtml(item.source)} → ${escapeHtml(item.target)} (L:${item.line})</span>。${escapeHtml(cycleGuidance(item.kind))}${fixButton} 変更後は自動更新または再解析で確認できます。
+  </div>`;
+}
+
+async function refreshFixTools(path: string): Promise<string | null> {
+  try {
+    const available = await invokeCommand<FixToolInfo[]>("list_fix_tools", { path });
+    fixTools = available;
+    const remembered = localStorage.getItem(`moduleloom-fix-tool:${path}`) || fixToolSelect.value;
+    fixToolSelect.innerHTML = available.map((tool) =>
+      `<option value="${escapeHtml(tool.id)}">${escapeHtml(tool.label)}</option>`).join("");
+    fixToolSelect.value = available.some((tool) => tool.id === remembered) ? remembered : available[0]?.id || "";
+    return null;
+  } catch (error: any) {
+    fixTools = [{ id: "ruff", label: "Ruff (TC001)", kinds: ["type_only"] }];
+    fixToolSelect.innerHTML = '<option value="ruff">Ruff (TC001)</option>';
+    return error.toString();
   }
 }
 
@@ -1234,9 +1512,9 @@ function renderInspector(mod: ModuleInfo) {
     cycleAlertHtml = `
       <div style="background:#3d141e; border:1.5px solid #ff4d4d; border-radius:6px; padding:8px 10px; margin-bottom:12px; font-size:0.75rem; color:#ff8099; line-height:1.45;">
         <div style="font-weight:bold; color:#ff4d4d; font-size:0.82rem; display:flex; align-items:center; gap:5px; margin-bottom:4px;">
-          <span>🚨 循環参照エラー検出</span>
+          <span>⚠️ トップレベルの循環インポート</span>
         </div>
-        <div>このモジュールは <b style="color:#ffffff;">[${cyclePartners}]</b> と相互に参照しています。<br>実行時の循環参照エラー（ImportError）の根本原因です。</div>
+        <div>このモジュールと <b style="color:#ffffff;">[${escapeHtml(cyclePartners)}]</b> の間に循環があります。初期化時の参照順によっては ImportError などの原因になります。</div>
       </div>
     `;
   }
@@ -1434,6 +1712,15 @@ function renderInspector(mod: ModuleInfo) {
 
       <div class="inspector-section">
         <div class="inspector-section-title">
+          <span>📦 依存宣言の問題</span>
+          <span class="inspector-section-count">${(currentResult.dependency_issues || []).filter((v) => v.module === mod.id).length} 件</span>
+        </div>
+        <ul class="dep-list">${(currentResult.dependency_issues || []).filter((v) => v.module === mod.id)
+          .map((v) => `<li class="dep-item"><span class="dep-item-name">${escapeHtml(v.rule)} ${escapeHtml(v.package)}: ${escapeHtml(v.message)}</span></li>`).join("") || '<li class="dep-item">問題はありません</li>'}</ul>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-section-title">
           <span>🧹 未使用シンボル候補</span>
           <span class="inspector-section-count">${mod.unused_symbol_candidates?.length || 0} 件</span>
         </div>
@@ -1458,16 +1745,10 @@ function renderInspector(mod: ModuleInfo) {
                 (c, cIdx) => `
               <div class="cycle-flow-row">
                 <div style="font-size: 0.72rem; color: var(--danger-color); font-weight: bold; width: 100%; margin-bottom: 2px;">
-                  [直接循環 #${cIdx + 1}]
+                  [直接循環 #${cIdx + 1}・代表経路]
                 </div>
-                ${c.modules
-                  .map(
-                    (mId) =>
-                      `<span class="cycle-pill ${mId === mod.id ? "current" : ""}" data-select-mod="${mId}" title="${mId}">${mId.split(".").pop()}</span>`
-                  )
-                  .join('<span class="cycle-arrow">➔</span>')}
-                <span class="cycle-arrow">➔</span>
-                <span class="cycle-pill ${c.modules[0] === mod.id ? "current" : ""}" data-select-mod="${c.modules[0]}" title="${c.modules[0]}">${c.modules[0].split(".").pop()}</span>
+                ${renderCyclePath(c, mod.id)}
+                ${renderCycleSuggestion(c)}
                 <div style="margin-left: auto;">
                   <button class="btn-cycle-focus" data-cycle-idx="${cIdx}" data-cycle-type="direct">強調表示</button>
                 </div>
@@ -1480,16 +1761,10 @@ function renderInspector(mod: ModuleInfo) {
                 (c, cIdx) => `
               <div class="cycle-flow-row" style="border-left-color: var(--warning-color);">
                 <div style="font-size: 0.72rem; color: var(--warning-color); font-weight: bold; width: 100%; margin-bottom: 2px;">
-                  [依存先の下流で循環 #${cIdx + 1}]
+                  [依存先の下流で循環 #${cIdx + 1}・代表経路]
                 </div>
-                ${c.modules
-                  .map(
-                    (mId) =>
-                      `<span class="cycle-pill" data-select-mod="${mId}" title="${mId}">${mId.split(".").pop()}</span>`
-                  )
-                  .join('<span class="cycle-arrow" style="color:var(--warning-color)">➔</span>')}
-                <span class="cycle-arrow" style="color:var(--warning-color)">➔</span>
-                <span class="cycle-pill" data-select-mod="${c.modules[0]}" title="${c.modules[0]}">${c.modules[0].split(".").pop()}</span>
+                ${renderCyclePath(c, mod.id)}
+                ${renderCycleSuggestion(c)}
                 <div style="margin-left: auto;">
                   <button class="btn-cycle-focus" data-cycle-idx="${cIdx}" data-cycle-type="dep">強調表示</button>
                 </div>
@@ -1598,6 +1873,61 @@ function renderInspector(mod: ModuleInfo) {
       }
     });
   });
+  inspectorContent.querySelectorAll(".btn-preview-ruff-fix").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const source = btn.getAttribute("data-cycle-source");
+      const line = Number(btn.getAttribute("data-cycle-line"));
+      if (source && line > 0) void previewRuffCycleFix(source, line);
+    });
+  });
+}
+
+async function previewRuffCycleFix(source: string, line: number) {
+  if (!currentResult) return;
+  const toolId = fixToolSelect.value;
+  statusBar.innerText = "外部ツールの修正差分を確認中...";
+  try {
+    const preview = await invokeCommand<{ file: string; diff: string; tool: string }>("preview_cycle_fix", {
+      path: currentResult.root_path, source, line, toolId,
+    });
+    if (!preview.diff.trim()) {
+      statusBar.innerText = `${preview.tool} は修正差分を提示しませんでした`;
+      return;
+    }
+    activeFixToolName = preview.tool;
+    (document.getElementById("ruff-fix-title") as HTMLElement).textContent = `${preview.tool} の修正差分`;
+    ruffFixFile.textContent = preview.file;
+    ruffFixDiff.textContent = preview.diff;
+    btnApplyRuffFix.disabled = false;
+    ruffFixModal.classList.remove("hidden");
+    statusBar.innerText = `${preview.tool} の差分を表示しています`;
+  } catch (error: any) {
+    statusBar.innerText = `外部ツールの差分確認に失敗: ${error.toString()}`;
+  }
+}
+
+function closeRuffFixModal() {
+  ruffFixModal.classList.add("hidden");
+}
+
+async function applyRuffCycleFix() {
+  btnApplyRuffFix.disabled = true;
+  const before = currentResult?.cycles.length ?? 0;
+  try {
+    const file = await invokeCommand<string>("apply_cycle_fix");
+    closeRuffFixModal();
+    const analyzed = await runAnalysis();
+    const after = currentResult?.cycles.length ?? 0;
+    statusBar.innerText = analyzed
+      ? `${activeFixToolName} の修正を適用しました: ${file}（循環 ${before} → ${after} 件）`
+      : `${activeFixToolName} の修正を適用しました: ${file}。再解析を実行してください`;
+  } catch (error: any) {
+    closeRuffFixModal();
+    statusBar.innerText = `外部ツールの修正に失敗: ${error.toString()}。差分を再表示してください`;
+  } finally {
+    btnApplyRuffFix.disabled = false;
+  }
 }
 
 function highlightCycleInGraph(cycleModules: string[]) {
@@ -1690,11 +2020,11 @@ function renderModalGraph(mod: ModuleInfo) {
     const rootNames = fileData.roots.map((r) => r.split(".").pop()).join(", ") || "エントリポイント";
     const cycleNames = [...fileData.cycleModules].map((id) => id.split(".").pop()).join(" ⟷ ");
     cycleFooterHtml = `
-      <span style="color: var(--danger-color); font-weight: bold;">🚨 クラッシュする循環参照検出:</span>
+      <span style="color: var(--danger-color); font-weight: bold;">⚠️ トップレベルの循環インポート:</span>
       <span style="color: var(--text-main);">ルーツ <b style="color:var(--success-color);">[${rootNames}]</b> からのインポート経路と循環ループ <b style="color:var(--danger-color);">[${cycleNames}]</b> を描画中</span>
     `;
   } else {
-    cycleFooterHtml = `<span style="color: var(--success-color);">✓ このモジュール周辺にクラッシュする循環インポートはありません</span>`;
+    cycleFooterHtml = `<span style="color: var(--success-color);">✓ このモジュール周辺にトップレベルの循環インポートはありません</span>`;
   }
   modalCyclesInfo.innerHTML = cycleFooterHtml;
 
@@ -2010,8 +2340,9 @@ function updateSummary(result: AnalysisResult) {
   const errorCount = result.analysis_errors?.length || 0;
   const architectureCount = result.architecture_violations?.length || 0;
   const packageCount = result.package_dependencies?.length || 0;
+  const dependencyIssueCount = result.dependency_issues?.length || 0;
   const unusedCount = result.modules.reduce((sum, module) => sum + (module.unused_symbol_candidates?.length || 0), 0);
-  metricsSummary.innerText = `モジュール数: ${result.modules.length} | 循環インポート: ${cycleCount} | 肥大化警告: ${bloatCount} | 設計違反: ${architectureCount} | パッケージ: ${packageCount} | 未使用候補: ${unusedCount} | 破壊的変更候補: ${lastBreakingChanges.length} | 解析エラー: ${errorCount} | 総行数: ${result.total_loc}`;
+  metricsSummary.innerText = `モジュール数: ${result.modules.length} | 循環インポート: ${cycleCount} | 肥大化警告: ${bloatCount} | 設計違反: ${architectureCount} | 依存宣言の問題: ${dependencyIssueCount} | パッケージ: ${packageCount} | 未使用候補: ${unusedCount} | 破壊的変更候補: ${lastBreakingChanges.length} | 解析エラー: ${errorCount} | 総行数: ${result.total_loc}`;
   statusBar.innerText = errorCount > 0
     ? `解析完了（${errorCount} ファイルを解析できませんでした） (${result.root_path})`
     : `解析完了 (${result.root_path})`;
@@ -2078,15 +2409,29 @@ function showAnalysisHistory() {
     return;
   }
   const history = readAnalysisHistory(currentResult.root_path);
-  if (history.length === 0) {
-    statusBar.innerText = "解析履歴はありません";
-    return;
-  }
+  const previousSnapshot = history.length >= 2 ? history[history.length - 2] : undefined;
   const lines = history.slice().reverse().map((snapshot) => {
     const result = snapshot.result;
     return `${new Date(snapshot.timestamp).toLocaleString()} : ${result.modules.length} modules / ${result.cycles.length} cycles / ${result.total_loc} LOC`;
   });
-  window.alert(`解析履歴 (${history.length} 件)\n\n${lines.join("\n")}`);
+  const comparison = previousSnapshot ? compareAnalysisIssues(previousSnapshot.result, currentResult) : null;
+  const statusSection = (title: string, status: "introduced" | "resolved" | "continuing", label: string) => {
+    if (!comparison) return "";
+    const issues = comparison[title as "cycles" | "architecture" | "dependencies"][status];
+    return `${label} (${issues.length})${issues.length ? `\n${issues.map((issue) => `  • ${issue}`).join("\n")}` : ""}`;
+  };
+  const sections = comparison ? [
+    "循環インポート",
+    ...(["introduced", "resolved", "continuing"] as const).map((status) => statusSection("cycles", status, { introduced: "新規", resolved: "解消", continuing: "継続" }[status])),
+    "設計ルール違反",
+    ...(["introduced", "resolved", "continuing"] as const).map((status) => statusSection("architecture", status, { introduced: "新規", resolved: "解消", continuing: "継続" }[status])),
+    "依存ルール違反",
+    ...(["introduced", "resolved", "continuing"] as const).map((status) => statusSection("dependencies", status, { introduced: "新規", resolved: "解消", continuing: "継続" }[status])),
+  ].join("\n") : "前回の解析がないため、差分はありません。次回の解析から新規・解消・継続を表示します。";
+  const comparisonHeader = previousSnapshot
+    ? `前回 (${new Date(previousSnapshot.timestamp).toLocaleString()}) と今回の比較\n\n`
+    : "前回との比較\n\n";
+  window.alert(`解析履歴 (${history.length} 件)\n\n${comparisonHeader}${sections}\n\n履歴一覧\n${lines.join("\n")}`);
 }
 
 async function jumpToEditor(filePath: string, line: number = 1) {
@@ -2108,27 +2453,49 @@ async function runAnalysis() {
   if (!path) {
     statusBar.innerText = "Python プロジェクトのパスを入力してください";
     pathInput.focus();
-    return;
+    return false;
   }
+  if (analysisRunning) {
+    manualAnalysisPending = true;
+    return false;
+  }
+  analysisRunning = true;
   localStorage.setItem("project_path", path);
   statusBar.innerText = `解析中: ${path}...`;
   try {
     const result = await invokeCommand<AnalysisResult>("analyze_project", { path });
+    const toolError = await refreshFixTools(path);
     updateGraph(result);
     if (chkWatch.checked) {
       await startWatching(path);
     }
+    if (toolError) statusBar.innerText = `修正ツールの設定エラー: ${toolError}`;
+    return true;
   } catch (err: any) {
     statusBar.innerText = `エラー: ${err.toString()}`;
+    return false;
+  } finally {
+    analysisRunning = false;
+    if (manualAnalysisPending) {
+      manualAnalysisPending = false;
+      void runAnalysis();
+    } else if (analysisPending && watchedPath) {
+      scheduleAnalysisFromFileChange();
+    }
   }
 }
 
 let watchTimer: number | null = null;
 let analysisRunning = false;
+let analysisPending = false;
+let manualAnalysisPending = false;
+let watchedPath = "";
+const pendingChangedFiles = new Set<string>();
 
 async function startWatching(path: string) {
   try {
     await invokeCommand("watch_project", { path });
+    watchedPath = path;
     statusBar.innerText = `解析完了・自動更新中 (${path})`;
   } catch (err: any) {
     chkWatch.checked = false;
@@ -2139,6 +2506,9 @@ async function startWatching(path: string) {
 async function stopWatching() {
   try {
     await invokeCommand("stop_watching");
+    watchedPath = "";
+    analysisPending = false;
+    pendingChangedFiles.clear();
     if (watchTimer !== null) {
       window.clearTimeout(watchTimer);
       watchTimer = null;
@@ -2149,23 +2519,39 @@ async function stopWatching() {
   }
 }
 
-function scheduleAnalysisFromFileChange() {
-  if (!chkWatch.checked || !pathInput.value.trim()) return;
+function scheduleAnalysisFromFileChange(paths: string[] = []) {
+  if (!chkWatch.checked || !watchedPath) return;
+  paths.forEach((path) => pendingChangedFiles.add(path));
+  analysisPending = true;
   if (watchTimer !== null) window.clearTimeout(watchTimer);
   statusBar.innerText = "ファイル変更を検知しました。再解析を待機中...";
   watchTimer = window.setTimeout(async () => {
     watchTimer = null;
     if (analysisRunning) return;
     analysisRunning = true;
+    analysisPending = false;
+    const changedFiles = [...pendingChangedFiles];
+    pendingChangedFiles.clear();
     try {
-      statusBar.innerText = `変更を再解析中: ${pathInput.value.trim()}...`;
-      const result = await invokeCommand<AnalysisResult>("analyze_project", { path: pathInput.value.trim() });
+      const path = watchedPath;
+      statusBar.innerText = `変更を再解析中: ${path}...`;
+      const result = await invokeCommand<AnalysisResult>("analyze_project", { path, changedFiles });
+      if (path !== watchedPath) return;
+      const toolError = await refreshFixTools(path);
       updateGraph(result);
-      statusBar.innerText = `自動更新完了 (${new Date().toLocaleTimeString()})`;
+      statusBar.innerText = toolError
+        ? `修正ツールの設定エラー: ${toolError}`
+        : `自動更新完了 (${new Date().toLocaleTimeString()})`;
     } catch (err: any) {
       statusBar.innerText = `自動再解析エラー: ${err.toString()}`;
     } finally {
       analysisRunning = false;
+      if (manualAnalysisPending) {
+        manualAnalysisPending = false;
+        void runAnalysis();
+      } else if (analysisPending && watchedPath) {
+        scheduleAnalysisFromFileChange();
+      }
     }
   }, 500);
 }
@@ -2173,7 +2559,7 @@ function scheduleAnalysisFromFileChange() {
 async function initFileWatcherEvents() {
   if (typeof window === "undefined" || !(window as any).__TAURI_INTERNALS__) return;
   const { listen } = await import("@tauri-apps/api/event");
-  await listen<string>("project-changed", () => scheduleAnalysisFromFileChange());
+  await listen<string[]>("project-changed", (event) => scheduleAnalysisFromFileChange(event.payload));
 }
 
 async function detectEditors() {
@@ -2248,9 +2634,28 @@ function exportReport() {
   downloadFile(`moduleloom-graph-${stamp}.dot`, `digraph ModuleLoom {\n  rankdir=LR;\n${dotNodes}\n${dotEdges}\n}\n`, "text/vnd.graphviz");
   const rows = currentResult.modules.map((mod) => `<tr><td>${escapeHtml(mod.id)}</td><td>${mod.loc}</td><td>${mod.cyclomatic_complexity || 1}</td><td>${mod.afferent_coupling || 0}</td><td>${mod.efferent_coupling || 0}</td><td>${mod.is_oversized ? "肥大化" : ""}</td><td>${(mod.unresolved_imports || []).map(escapeHtml).join(", ")}</td></tr>`).join("");
   const packages = (currentResult.package_dependencies || []).map((pkg) => `<li>${escapeHtml(pkg.name)} ${escapeHtml(pkg.version || "")} <small>(${escapeHtml(pkg.source)})</small></li>`).join("");
-  const html = `<!doctype html><meta charset="utf-8"><title>ModuleLoom Report</title><style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem;text-align:left}</style><h1>ModuleLoom Report</h1><p>Root: ${escapeHtml(currentResult.root_path)}</p><h2>Package dependencies</h2><ul>${packages || "<li>なし</li>"}</ul><table><tr><th>Module</th><th>LOC</th><th>複雑度</th><th>利用元</th><th>依存先</th><th>警告</th><th>外部 / 未解決 import</th></tr>${rows}</table>`;
+  const dependencyIssues = (currentResult.dependency_issues || []).map((issue) => `<li>${escapeHtml(issue.rule)} ${escapeHtml(issue.package)}: ${escapeHtml(issue.message)}</li>`).join("");
+  const html = `<!doctype html><meta charset="utf-8"><title>ModuleLoom Report</title><style>body{font-family:sans-serif;margin:2rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.4rem;text-align:left}</style><h1>ModuleLoom Report</h1><p>Root: ${escapeHtml(currentResult.root_path)}</p><h2>Package dependencies</h2><ul>${packages || "<li>なし</li>"}</ul><h2>依存宣言の問題</h2><ul>${dependencyIssues || "<li>なし</li>"}</ul><table><tr><th>Module</th><th>LOC</th><th>複雑度</th><th>利用元</th><th>依存先</th><th>警告</th><th>外部 / 未解決 import</th></tr>${rows}</table>`;
   downloadFile(`moduleloom-report-${stamp}.html`, html, "text/html");
   statusBar.innerText = "JSON と HTML レポートを出力しました";
+}
+
+async function exportMkDocs() {
+  if (!currentResult) {
+    statusBar.innerText = "先に解析を実行してください";
+    return;
+  }
+  const root = currentResult.root_path.replace(/[\\/]$/, "");
+  const separator = root.includes("\\") ? "\\" : "/";
+  const output = window.prompt("MkDocs プロジェクトの出力先", `${root}${separator}moduleloom-docs`)?.trim();
+  if (!output) return;
+  const lang = window.prompt("ドキュメントの言語 (auto / ja / en)", "auto")?.trim() || "auto";
+  try {
+    await invokeCommand<string>("generate_mkdocs", { path: currentResult.root_path, output, lang });
+    statusBar.innerText = `MkDocs ドキュメントを生成しました: ${output}`;
+  } catch (error: any) {
+    statusBar.innerText = `MkDocs 出力エラー: ${error.toString()}`;
+  }
 }
 
 function getMockAnalysisResult(root: string): AnalysisResult {
@@ -2637,13 +3042,25 @@ function toggleTreePanel(forceState?: boolean) {
 document.getElementById("btn-git-diff")?.addEventListener("click", highlightGitChanges);
 document.getElementById("btn-git-history")?.addEventListener("click", highlightGitHistory);
 document.getElementById("btn-export-report")?.addEventListener("click", exportReport);
+document.getElementById("btn-export-mkdocs")?.addEventListener("click", exportMkDocs);
 document.getElementById("btn-history")?.addEventListener("click", showAnalysisHistory);
+document.getElementById("btn-close-ruff-fix")?.addEventListener("click", closeRuffFixModal);
+btnApplyRuffFix.addEventListener("click", () => { void applyRuffCycleFix(); });
+fixToolSelect.addEventListener("change", () => {
+  if (currentResult) localStorage.setItem(`moduleloom-fix-tool:${currentResult.root_path}`, fixToolSelect.value);
+  if (selectedModule) renderInspector(selectedModule);
+});
+document.getElementById("btn-dependency-issues")?.addEventListener("click", showDependencyIssues);
+document.getElementById("btn-find-chain")?.addEventListener("click", findAndHighlightChain);
 document.getElementById("btn-back")?.addEventListener("click", goBack);
 btnShowOverview?.addEventListener("click", toggleOverviewOrFileView);
 btnAnalyze.addEventListener("click", runAnalysis);
 searchInput.addEventListener("input", applyFilters);
 chkOnlyCycles.addEventListener("change", applyFilters);
 chkOnlyBloat.addEventListener("change", applyFilters);
+graphRadius.addEventListener("change", applyFilters);
+clusterLimit.addEventListener("change", () => { if (currentResult) updateGraph(currentResult); });
+chkExternals.addEventListener("change", () => { if (currentResult) updateGraph(currentResult); });
 chkGroupPackages.addEventListener("change", () => {
   if (currentResult) updateGraph(currentResult);
 });

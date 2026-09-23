@@ -23,9 +23,9 @@ export interface ModuleInfo {
   loc: number;
   cyclomatic_complexity?: number;
   class_count: number;
-  classes?: { name: string; line: number }[];
+  classes?: { name: string; line: number; docstring?: string | null }[];
   function_count: number;
-  functions?: { name: string; line: number }[];
+  functions?: { name: string; line: number; docstring?: string | null }[];
   symbols?: { name: string; kind: string; line: number }[];
   symbol_calls?: { caller: string; callee: string; line: number }[];
   unused_symbol_candidates?: string[];
@@ -48,6 +48,13 @@ export interface DependencyEdge {
 
 export interface CircularCycle {
   modules: string[];
+  path?: string[];
+  suggestion?: {
+    source: string;
+    target: string;
+    line: number;
+    kind: "type_only" | "runtime" | "unknown";
+  } | null;
 }
 
 export interface SymbolEdge {
@@ -68,6 +75,13 @@ export interface ArchitectureViolation {
   suggestion?: string;
 }
 
+export interface DependencyIssue {
+  rule: string;
+  package: string;
+  module?: string | null;
+  message: string;
+}
+
 export interface AnalysisResult {
   root_path: string;
   modules: ModuleInfo[];
@@ -77,6 +91,7 @@ export interface AnalysisResult {
   analysis_errors?: string[];
   architecture_violations?: ArchitectureViolation[];
   package_dependencies?: { name: string; version?: string; source: string }[];
+  dependency_issues?: DependencyIssue[];
   symbol_edges?: SymbolEdge[];
 }
 

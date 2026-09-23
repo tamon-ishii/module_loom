@@ -6,13 +6,18 @@ pub mod dependencies;
 pub mod diagnostics;
 pub mod graph;
 pub mod metrics;
+pub mod mkdocs;
 pub mod model;
 pub mod parser;
+pub mod suggestions;
 
-use model::{AnalysisConfig, AnalysisResult, ForbiddenImportRule, IndependenceRule, LayerRule};
+use model::{
+    AcyclicSiblingsRule, AnalysisConfig, AnalysisResult, ForbiddenImportRule, IndependenceRule,
+    LayerRule, ProtectedRule,
+};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn analyze_directory(root: &Path) -> Result<AnalysisResult, String> {
     let config = load_config(root)?;
@@ -24,12 +29,69 @@ pub fn analyze_directory_with_config(
     config: &AnalysisConfig,
 ) -> Result<AnalysisResult, String> {
     let (modules, analysis_errors) = parser::scan_directory_with_config(root, config)?;
-    let (edges, cycles) = graph::build_graph(&modules);
+    Ok(assemble_result(root, config, modules, analysis_errors))
+}
+
+/// Reparse only changed Python files, then rebuild project-wide relationships from cached modules.
+/// Configuration changes and unknown paths fall back to a full scan.
+pub fn analyze_directory_incremental(
+    root: &Path,
+    previous: &AnalysisResult,
+    changed_files: &[PathBuf],
+) -> Result<AnalysisResult, String> {
+    if previous.root_path != root || changed_files.is_empty() {
+        return analyze_directory(root);
+    }
+    let config = load_config(root)?;
+    let paths: Vec<PathBuf> = changed_files
+        .iter()
+        .map(|path| {
+            if path.is_absolute() {
+                path.clone()
+            } else {
+                root.join(path)
+            }
+        })
+        .collect();
+    if paths.iter().any(|path| {
+        !path.starts_with(root)
+            || path.file_name().and_then(|name| name.to_str()) == Some("moduleloom.toml")
+            || path.extension().and_then(|ext| ext.to_str()) != Some("py")
+    }) {
+        return analyze_directory_with_config(root, &config);
+    }
+
+    let mut modules = previous.modules.clone();
+    let mut errors = previous.analysis_errors.clone();
+    for path in &paths {
+        modules.retain(|module| module.absolute_path != *path);
+        let prefix = format!("{}:", path.display());
+        errors.retain(|error| !error.starts_with(&prefix));
+        if path.is_file() {
+            match parser::parse_python_file_with_config(path, root, &config) {
+                Ok(module) => modules.push(module),
+                Err(error) => errors.push(format!("{}: {}", path.display(), error)),
+            }
+        }
+    }
+    modules.sort_by(|a, b| a.relative_path.cmp(&b.relative_path));
+    Ok(assemble_result(root, &config, modules, errors))
+}
+
+fn assemble_result(
+    root: &Path,
+    config: &AnalysisConfig,
+    modules: Vec<model::ModuleInfo>,
+    analysis_errors: Vec<String>,
+) -> AnalysisResult {
+    let (edges, mut cycles) = graph::build_graph(&modules);
+    suggestions::annotate_cycles(&mut cycles, &modules, &edges);
     let architecture_violations =
         architecture::check_architecture(&modules, &edges, &config.architecture);
     let symbol_edges = build_symbol_edges(&modules);
     let cross_file_references = build_cross_file_reference_index(&symbol_edges);
     let package_dependencies = dependencies::scan_package_dependencies(root);
+    let dependency_issues = dependencies::check_package_dependencies(root, &modules);
     let unresolved_imports = graph::collect_unresolved_imports(&modules);
     let total_loc: usize = modules.iter().map(|m| m.loc).sum();
 
@@ -64,7 +126,7 @@ pub fn analyze_directory_with_config(
             .collect();
     }
 
-    Ok(AnalysisResult {
+    AnalysisResult {
         root_path: root.to_path_buf(),
         modules,
         edges,
@@ -74,7 +136,8 @@ pub fn analyze_directory_with_config(
         architecture_violations,
         symbol_edges,
         package_dependencies,
-    })
+        dependency_issues,
+    }
 }
 
 fn build_symbol_edges(modules: &[model::ModuleInfo]) -> Vec<model::SymbolEdge> {
@@ -185,71 +248,98 @@ pub fn load_config(root: &Path) -> Result<AnalysisConfig, String> {
 }
 
 fn parse_architecture_config(content: &str, config: &mut AnalysisConfig) -> Result<(), String> {
-    let mut section = String::new();
-    let mut forbidden: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
-    let mut independence: HashMap<String, Vec<String>> = HashMap::new();
-    let mut layers: HashMap<String, Vec<String>> = HashMap::new();
-
-    for raw_line in content.lines() {
-        let line = raw_line.split('#').next().unwrap_or("").trim();
-        if line.is_empty() {
-            continue;
-        }
-        if line.starts_with('[') && line.ends_with(']') {
-            section = line[1..line.len() - 1].to_string();
-            continue;
-        }
-        let Some((key, raw_value)) = line.split_once('=') else {
-            continue;
-        };
-        let key = key.trim();
-        let value = raw_value.trim().trim_matches('"');
-        if let Some(name) = section.strip_prefix("architecture.forbidden.") {
-            let entry = forbidden.entry(name.to_string()).or_insert((None, None));
-            match key {
-                "source" => entry.0 = Some(value.to_string()),
-                "target" => entry.1 = Some(value.to_string()),
-                _ => {}
-            }
-        } else if let Some(name) = section.strip_prefix("architecture.independence.") {
-            if key == "modules" {
-                independence.insert(name.to_string(), split_list(value));
-            }
-        } else if let Some(name) = section.strip_prefix("architecture.layers.") {
-            if key == "layers" {
-                layers.insert(name.to_string(), split_list(value));
+    let document: toml::Value = content
+        .parse()
+        .map_err(|error| format!("Invalid moduleloom.toml: {error}"))?;
+    let Some(architecture) = document.get("architecture") else {
+        return Ok(());
+    };
+    config.architecture.ignore_imports = value_list(architecture.get("ignore_imports"));
+    if let Some(rules) = architecture
+        .get("forbidden")
+        .and_then(toml::Value::as_table)
+    {
+        for (name, value) in rules {
+            if let (Some(source), Some(target)) = (
+                value.get("source").and_then(toml::Value::as_str),
+                value.get("target").and_then(toml::Value::as_str),
+            ) {
+                config.architecture.forbidden.push(ForbiddenImportRule {
+                    name: name.clone(),
+                    source: source.into(),
+                    target: target.into(),
+                });
             }
         }
     }
-
-    config.architecture.forbidden = forbidden
-        .into_iter()
-        .filter_map(|(name, (source, target))| {
-            Some(ForbiddenImportRule {
-                name,
-                source: source?,
-                target: target?,
-            })
-        })
-        .collect();
-    config.architecture.independence = independence
-        .into_iter()
-        .map(|(name, modules)| IndependenceRule { name, modules })
-        .collect();
-    config.architecture.layers = layers
-        .into_iter()
-        .map(|(name, layers)| LayerRule { name, layers })
-        .collect();
+    if let Some(rules) = architecture
+        .get("independence")
+        .and_then(toml::Value::as_table)
+    {
+        for (name, value) in rules {
+            config.architecture.independence.push(IndependenceRule {
+                name: name.clone(),
+                modules: value_list(value.get("modules")),
+            });
+        }
+    }
+    if let Some(rules) = architecture.get("layers").and_then(toml::Value::as_table) {
+        for (name, value) in rules {
+            config.architecture.layers.push(LayerRule {
+                name: name.clone(),
+                layers: value_list(value.get("layers")),
+                closed: value_list(value.get("closed")),
+            });
+        }
+    }
+    if let Some(rules) = architecture
+        .get("protected")
+        .and_then(toml::Value::as_table)
+    {
+        for (name, value) in rules {
+            if let Some(module) = value.get("module").and_then(toml::Value::as_str) {
+                config.architecture.protected.push(ProtectedRule {
+                    name: name.clone(),
+                    module: module.into(),
+                    allowed: value_list(value.get("allowed")),
+                });
+            }
+        }
+    }
+    if let Some(rules) = architecture
+        .get("acyclic_siblings")
+        .and_then(toml::Value::as_table)
+    {
+        for (name, value) in rules {
+            if let Some(parent) = value.get("parent").and_then(toml::Value::as_str) {
+                config
+                    .architecture
+                    .acyclic_siblings
+                    .push(AcyclicSiblingsRule {
+                        name: name.clone(),
+                        parent: parent.into(),
+                    });
+            }
+        }
+    }
     Ok(())
 }
 
-fn split_list(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|item| !item.is_empty())
-        .map(str::to_string)
-        .collect()
+fn value_list(value: Option<&toml::Value>) -> Vec<String> {
+    match value {
+        Some(toml::Value::Array(items)) => items
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .map(str::to_string)
+            .collect(),
+        Some(toml::Value::String(value)) => value
+            .split(',')
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .map(str::to_string)
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 #[cfg(test)]
@@ -339,5 +429,67 @@ mod tests {
             res.architecture_violations[0].rule,
             "architecture-forbidden"
         );
+    }
+
+    #[test]
+    fn incremental_analysis_updates_changed_modules_and_global_cycles() {
+        let dir = tempdir().unwrap();
+        let a = dir.path().join("a.py");
+        let b = dir.path().join("b.py");
+        fs::write(
+            &a,
+            "from __future__ import annotations\nfrom b import B\ndef use(value: B):\n    pass\n",
+        )
+        .unwrap();
+        fs::write(&b, "from a import use\nclass B:\n    pass\n").unwrap();
+        let initial = analyze_directory(dir.path()).unwrap();
+        assert_eq!(initial.cycles.len(), 1);
+        assert_eq!(
+            initial.cycles[0].suggestion.as_ref().unwrap().kind,
+            model::CycleSuggestionKind::TypeOnly
+        );
+
+        fs::write(&a, "from b import B\ndef use():\n    return B()\n").unwrap();
+        let updated = analyze_directory_incremental(dir.path(), &initial, &[a.clone()]).unwrap();
+        assert_eq!(
+            updated.cycles[0].suggestion.as_ref().unwrap().kind,
+            model::CycleSuggestionKind::Runtime
+        );
+        assert_eq!(updated.modules.len(), 2);
+
+        fs::write(&b, "class B:\n    pass\n").unwrap();
+        let resolved = analyze_directory_incremental(dir.path(), &updated, &[b.clone()]).unwrap();
+        let full = analyze_directory(dir.path()).unwrap();
+        assert!(resolved.cycles.is_empty());
+        assert_eq!(resolved.edges.len(), full.edges.len());
+        assert_eq!(
+            resolved
+                .modules
+                .iter()
+                .map(|module| module.loc)
+                .sum::<usize>(),
+            full.total_loc
+        );
+
+        let c = dir.path().join("c.py");
+        fs::write(&c, "from a import use\n").unwrap();
+        let added = analyze_directory_incremental(dir.path(), &resolved, &[c.clone()]).unwrap();
+        assert_eq!(added.modules.len(), 3);
+        fs::remove_file(&c).unwrap();
+        let removed = analyze_directory_incremental(dir.path(), &added, &[c]).unwrap();
+        assert_eq!(removed.modules.len(), 2);
+
+        fs::write(
+            dir.path().join("moduleloom.toml"),
+            "[thresholds]\nmax_loc = 1\n",
+        )
+        .unwrap();
+        let configured = analyze_directory_incremental(
+            dir.path(),
+            &removed,
+            &[dir.path().join("moduleloom.toml")],
+        )
+        .unwrap();
+        assert!(configured.modules.iter().all(|module| module.is_oversized));
     }
 }

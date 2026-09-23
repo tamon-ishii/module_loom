@@ -38,7 +38,7 @@ max_functions = 30
 max_classes = 15
 ```
 
-アーキテクチャルールも設定できます。`forbidden` は依存禁止、`independence` は相互依存禁止、`layers` は上位レイヤーから下位レイヤーへの一方向依存を検査します。
+アーキテクチャルールも設定できます。`forbidden` は依存禁止、`independence` は相互依存禁止、`layers` は上位レイヤーから下位レイヤーへの一方向依存を検査します。`protected` は指定モジュールの import 元を許可リストに制限し、`acyclic_siblings` は同じ親の直下にあるパッケージ間の循環を検査します。`ignore_imports` に指定した辺はルール検査から除外し、一致しなくなった例外は違反として報告します。`*` は１階層、`**` は任意の深さに一致します。
 
 ```toml
 [architecture.forbidden.api_db]
@@ -50,15 +50,71 @@ modules = "app.web, app.domain"
 
 [architecture.layers.app]
 layers = "app.presentation, app.application, app.domain, app.infrastructure"
+closed = ["app.application"]
+
+[architecture.protected.internal]
+module = "app.internal"
+allowed = ["app.api", "app.tests.*"]
+
+[architecture.acyclic_siblings.features]
+parent = "app.features"
+
+[architecture]
+ignore_imports = ["app.legacy -> app.internal"]
+```
+
+`closed` に挙げた層を飛ばして、その下の層を上位層から直接 import すると違反になります。例外は `source -> target` の形式で、モジュール名にワイルドカードを使えます。
+
+依存宣言と import の食い違いも検査します。DEP001（未宣言）、DEP002（未使用）、DEP003（推移的依存の直接利用）、DEP004（開発用依存の本番利用）、DEP005（標準ライブラリの宣言）を解析結果へ含めます。対象は `requirements.txt`、`pyproject.toml` の標準依存・uv の dev グループ・Poetry 依存、および `uv.lock` です。import 名と配布パッケージ名が異なる場合や意図的な依存は次の設定で調整できます。
+
+```toml
+[dependencies]
+ignore = ["pytest"]
+
+[dependencies.import_map]
+google = "google-cloud-storage"
 ```
 
 設定を変更した後は、次回の解析または自動更新時から反映されます。
 
-CI では `--check` を付けると、アーキテクチャルール違反がある場合に終了コード 1 になります。
+デスクトップ版は「自動更新」がオンの間、OS のファイル変更通知で対象プロジェクト内の Python ファイルと `moduleloom.toml` を監視します。PyCharm プラグインもツールウィンドウの「自動更新」がオンの間、保存・追加・削除後に再解析します。VS Code 拡張はグラフを開いている間、自動で更新します。連続した変更は短時間まとめて処理し、変更された Python ファイルだけを読み直してから依存関係を再計算します。設定ファイルやフォルダ構成の変更時は全体を再解析します。
+
+CI では `--check` を付けると、アーキテクチャルール違反または依存宣言の問題がある場合に終了コード 1 になります。
 
 解析結果にはシンボル、関数呼び出し、循環依存、未使用候補、複雑度、結合度、セキュリティ診断、パッケージ依存も含まれます。モジュール詳細の「コールグラフを表示」から、選択モジュールに関係するシンボル呼び出しを確認できます。ノードのダブルクリックで定義位置を開けます。
 
+循環インポートでは実在する代表経路と import 行を表示します。改善候補は、型注釈のみの直接参照、実行時の参照、判定できない参照を区別します。候補は確認の起点であり、複数の経路を持つ循環では1か所の変更だけで解消しない場合があります。
+
+デスクトップ版では「修正ツール」で外部ツールを選べます。標準の Ruff は、型注釈専用と判定した改善候補に対して TC001 の差分を提示します。差分を確認してから適用し、循環を再解析します。Ruff はプロジェクトの `.venv` / `venv` または `PATH` にインストールしてください。TC001 は import の実行時期を変える可能性があり、Ruff では unsafe fix に分類されています。
+
+ほかの修正ツールは `moduleloom.toml` へ登録できます。次の例の `tools/fix-cycle` はユーザーが用意する実行ファイルです。
+
+```toml
+[fix_tools.my_fixer]
+label = "My fixer"
+command = "tools/fix-cycle"
+preview_args = ["--diff", "{file}", "{source}", "{target}", "{line}"]
+apply_args = ["--write", "{file}", "{source}", "{target}", "{line}"]
+kinds = ["type_only", "runtime", "unknown"]
+```
+
+プレビュー用コマンドはファイルを変更せず、差分を標準出力へ出してください。適用用コマンドは修正を書き込みます。引数はシェルを経由せずに渡され、作業ディレクトリはプロジェクトのルートです。`{project}` も引数に使えます。適用前には対象ファイルとプレビュー差分が変わっていないことを確認します。独自ツールが対象ファイル以外も編集する場合は、表示された差分の範囲を確認してください。
+
 「レポート出力」では JSON、HTML、Graphviz DOT を保存できます。解析結果はプロジェクトごとに直近 20 件までブラウザ内へ保存され、履歴表示とシンボル・依存関係の削除候補比較に使われます。
+
+## MkDocs マニュアル生成
+
+デスクトップ版または PyCharm プラグインの「MkDocs 出力」、あるいは CLI の `--mkdocs` で、全体依存図とモジュール別ページを含む MkDocs プロジェクトを生成できます。PyCharm では ModuleLoom ツールウィンドウ上部のボタンから出力先ディレクトリを選びます。各モジュールページの先頭に直接の依存・被依存図を置き、モジュール・クラス・関数の docstring をマニュアル本文に使います。全体図のノードと一覧からモジュールページへ移動できます。
+
+```sh
+moduleloom-analyze --mkdocs ./moduleloom-docs ./my-project
+cd moduleloom-docs
+mkdocs serve
+```
+
+生成した `mkdocs.yml` は Material for MkDocs と Mermaid 用に設定されています。表示には `mkdocs-material` が必要です。図のノードをクリック可能にするため、生成サイトは Mermaid の JavaScript モジュールを CDN から読み込みます。出力先は空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを指定してください。再生成時は生成ページが更新され、不要になった生成ページは削除されます。
+
+全体図では「外部ノード」でプロジェクト外への import を表示でき、モジュール選択後に「表示範囲」で 1～3 ホップへ絞れます。「集約」は指定件数を超える同一パッケージ内のモジュールを１ノードにまとめ、ダブルクリックで展開できます。「経路検索」は２モジュール間の最短 import 経路を強調表示します。CLI でも `moduleloom-analyze --chain app.api app.db ./my-project` で照会できます（`--json` も併用可能）。
 
 ```sh
 moduleloom-analyze --check ./my-project

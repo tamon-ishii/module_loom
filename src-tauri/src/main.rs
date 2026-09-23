@@ -1,26 +1,109 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ruff_fix;
+
 use moduleloom_analyzer::model::AnalysisResult;
-use std::collections::HashMap;
-use std::fs;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
-use std::sync::{mpsc, Mutex};
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
 struct WatchState {
-    stop_sender: Mutex<Option<mpsc::Sender<()>>>,
+    watcher: Mutex<Option<RecommendedWatcher>>,
+    cached_result: Mutex<Option<AnalysisResult>>,
 }
 
 #[tauri::command]
-fn analyze_project(path: String) -> Result<AnalysisResult, String> {
+fn preview_cycle_fix(
+    path: String,
+    source: String,
+    line: usize,
+    tool_id: String,
+    state: State<'_, WatchState>,
+    fix_state: State<'_, ruff_fix::FixState>,
+) -> Result<ruff_fix::FixPreview, String> {
+    let result = state
+        .cached_result
+        .lock()
+        .map_err(|_| "解析結果を取得できません")?
+        .clone()
+        .ok_or("先に解析を実行してください")?;
+    ruff_fix::preview(
+        std::path::Path::new(&path),
+        &result,
+        &source,
+        line,
+        &tool_id,
+        &fix_state,
+    )
+}
+
+#[tauri::command]
+fn list_fix_tools(path: String) -> Result<Vec<ruff_fix::FixToolInfo>, String> {
+    ruff_fix::list_tools(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+fn apply_cycle_fix(
+    state: State<'_, WatchState>,
+    fix_state: State<'_, ruff_fix::FixState>,
+) -> Result<String, String> {
+    let file = ruff_fix::apply(&fix_state)?;
+    *state
+        .cached_result
+        .lock()
+        .map_err(|_| "解析キャッシュを更新できません")? = None;
+    Ok(file)
+}
+
+#[tauri::command]
+fn analyze_project(
+    path: String,
+    changed_files: Option<Vec<PathBuf>>,
+    state: State<'_, WatchState>,
+) -> Result<AnalysisResult, String> {
     let p = PathBuf::from(path);
     if !p.exists() {
         return Err("Path does not exist".to_string());
     }
-    moduleloom_analyzer::analyze_directory(&p)
+    let mut cached = state
+        .cached_result
+        .lock()
+        .map_err(|_| "Analysis cache is unavailable")?;
+    let result = match (cached.as_ref(), changed_files.as_deref()) {
+        (Some(previous), Some(changed)) if !changed.is_empty() && previous.root_path == p => {
+            moduleloom_analyzer::analyze_directory_incremental(&p, previous, changed)
+                .or_else(|_| moduleloom_analyzer::analyze_directory(&p))?
+        }
+        _ => moduleloom_analyzer::analyze_directory(&p)?,
+    };
+    *cached = Some(result.clone());
+    Ok(result)
+}
+
+#[tauri::command]
+fn generate_mkdocs(
+    path: String,
+    output: String,
+    lang: Option<String>,
+    state: State<'_, WatchState>,
+) -> Result<String, String> {
+    let result = state
+        .cached_result
+        .lock()
+        .map_err(|_| "解析結果を取得できません")?
+        .clone()
+        .ok_or("先に解析を実行してください")?;
+    if result.root_path != PathBuf::from(&path) {
+        return Err("表示中のプロジェクトと解析結果が一致しません".into());
+    }
+    moduleloom_analyzer::mkdocs::generate_with_lang(
+        &result,
+        std::path::Path::new(&output),
+        lang.as_deref().unwrap_or("auto"),
+    )?;
+    Ok(output)
 }
 
 #[tauri::command]
@@ -30,53 +113,91 @@ fn watch_project(path: String, app: AppHandle, state: State<'_, WatchState>) -> 
         return Err("Project path must be a directory".to_string());
     }
 
-    let (stop_sender, stop_receiver) = mpsc::channel();
-    {
-        let mut current_sender = state
-            .stop_sender
-            .lock()
-            .map_err(|_| "Watcher state is unavailable".to_string())?;
-        if let Some(previous) = current_sender.take() {
-            let _ = previous.send(());
-        }
-        *current_sender = Some(stop_sender);
-    }
-
-    thread::spawn(move || {
-        let mut previous = collect_python_files(&project_path);
-        loop {
-            if stop_receiver
-                .recv_timeout(Duration::from_millis(700))
-                .is_ok()
-            {
-                break;
+    let root = project_path.clone();
+    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        if let Ok(event) = event {
+            if !matches!(
+                event.kind,
+                notify::EventKind::Create(_)
+                    | notify::EventKind::Modify(_)
+                    | notify::EventKind::Remove(_)
+            ) {
+                return;
             }
-            let current = collect_python_files(&project_path);
-            if current != previous {
-                let changed_path = current.keys().next().or_else(|| previous.keys().next());
-                if let Some(changed_path) = changed_path {
-                    let _ = app.emit(
-                        "project-changed",
-                        changed_path.to_string_lossy().to_string(),
-                    );
-                }
-                previous = current;
+            if matches!(
+                event.kind,
+                notify::EventKind::Modify(notify::event::ModifyKind::Metadata(_))
+            ) {
+                return;
+            }
+            let structural = matches!(
+                event.kind,
+                notify::EventKind::Create(notify::event::CreateKind::Folder)
+                    | notify::EventKind::Remove(notify::event::RemoveKind::Folder)
+                    | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
+            );
+            let removed_or_renamed = matches!(
+                event.kind,
+                notify::EventKind::Remove(_)
+                    | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
+            );
+            let paths: Vec<PathBuf> = event
+                .paths
+                .into_iter()
+                .filter(|path| should_refresh(path, &root, structural, removed_or_renamed))
+                .collect();
+            if !paths.is_empty() {
+                let _ = app.emit("project-changed", paths);
             }
         }
-    });
+    })
+    .map_err(|error| error.to_string())?;
+    watcher
+        .watch(&project_path, RecursiveMode::Recursive)
+        .map_err(|error| error.to_string())?;
+    let mut current = state
+        .watcher
+        .lock()
+        .map_err(|_| "Watcher state is unavailable")?;
+    *current = Some(watcher);
     Ok(())
 }
 
 #[tauri::command]
 fn stop_watching(state: State<'_, WatchState>) -> Result<(), String> {
-    let mut sender = state
-        .stop_sender
+    let mut watcher = state
+        .watcher
         .lock()
         .map_err(|_| "Watcher state is unavailable".to_string())?;
-    if let Some(sender) = sender.take() {
-        let _ = sender.send(());
-    }
+    watcher.take();
     Ok(())
+}
+
+fn should_refresh(
+    path: &PathBuf,
+    root: &PathBuf,
+    structural: bool,
+    removed_or_renamed: bool,
+) -> bool {
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+    if relative.as_os_str().is_empty() {
+        return false;
+    }
+    if relative.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy();
+        name.starts_with('.')
+            || matches!(
+                name.as_ref(),
+                "__pycache__" | "venv" | ".venv" | "node_modules" | "target"
+            )
+    }) {
+        return false;
+    }
+    path.extension().and_then(|ext| ext.to_str()) == Some("py")
+        || relative == std::path::Path::new("moduleloom.toml")
+        || (structural && (path.is_dir() || path.extension().is_none() || removed_or_renamed))
 }
 
 #[tauri::command]
@@ -141,42 +262,6 @@ fn detect_editors() -> Vec<String> {
         .collect()
 }
 
-fn collect_python_files(root: &PathBuf) -> HashMap<PathBuf, Option<SystemTime>> {
-    let mut files = HashMap::new();
-    collect_python_files_recursive(root, &mut files);
-    files
-}
-
-fn collect_python_files_recursive(
-    root: &PathBuf,
-    files: &mut HashMap<PathBuf, Option<SystemTime>>,
-) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
-            n.starts_with('.')
-                || n == "__pycache__"
-                || n == "venv"
-                || n == ".venv"
-                || n == "node_modules"
-                || n == "target"
-        }) {
-            continue;
-        }
-        if path.is_dir() {
-            collect_python_files_recursive(&path, files);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("py") {
-            files.insert(
-                path.clone(),
-                fs::metadata(&path).ok().and_then(|m| m.modified().ok()),
-            );
-        }
-    }
-}
-
 #[tauri::command]
 fn open_in_editor(editor: String, file_path: String, line: Option<usize>) -> Result<(), String> {
     let line_num = line.unwrap_or(1);
@@ -226,10 +311,16 @@ fn open_in_editor(editor: String, file_path: String, line: Option<usize>) -> Res
 fn main() {
     tauri::Builder::default()
         .manage(WatchState {
-            stop_sender: Mutex::new(None),
+            watcher: Mutex::new(None),
+            cached_result: Mutex::new(None),
         })
+        .manage(ruff_fix::FixState::default())
         .invoke_handler(tauri::generate_handler![
             analyze_project,
+            generate_mkdocs,
+            list_fix_tools,
+            preview_cycle_fix,
+            apply_cycle_fix,
             watch_project,
             stop_watching,
             git_changed_files,

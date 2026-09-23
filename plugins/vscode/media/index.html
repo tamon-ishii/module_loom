@@ -538,6 +538,7 @@
   </style>
   <script src="cytoscape.min.js"></script>
   <script src="cytoscape-dagre.min.js"></script>
+  <script src="cycle-insights.js"></script>
 </head>
 <body>
   <div class="toolbar">
@@ -714,6 +715,8 @@
 
     // Called from Java/Kotlin side via executeJavaScript
     window.renderModuleGraph = function(result) {
+      const previousMode = currentViewMode;
+      const previousNodeId = selectedNodeId;
       currentResult = result;
       document.getElementById("status-info").textContent = "解析完了: " + (result.root_path || "");
       document.getElementById("metrics-summary").textContent =
@@ -730,6 +733,8 @@
         setTimeout(() => {
           window.openModuleByFilePath(pending.filePath, pending.openDiagram);
         }, 100);
+      } else if (previousMode === "file" && previousNodeId && result.modules.some(m => m.id === previousNodeId)) {
+        jumpToFileCentricDiagram(previousNodeId);
       }
     };
 
@@ -1400,7 +1405,7 @@
         const rootNames = fileData.roots.map(r => r.split(".").pop()).join(", ") || "エントリポイント";
         const cyclePartners = [...fileData.cycleModules].map(m => m.split(".").pop()).join(" ⟷ ");
         document.getElementById("status-info").innerHTML =
-          `<span style="color:var(--cycle-color); font-weight:bold;">🚨【クラッシュする循環参照】</span> ルーツ [${rootNames}] からのインポート経路と循環 [${cyclePartners}] を描画中`;
+          `<span style="color:var(--cycle-color); font-weight:bold;">⚠️【トップレベルの循環インポート】</span> ルーツ [${rootNames}] からのインポート経路と循環 [${cyclePartners}] を描画中`;
       } else {
         document.getElementById("status-info").textContent =
           `ファイル起点依存図: [${mod.name}] (全体図ボタンで全体図に戻る)`;
@@ -1866,12 +1871,20 @@
           .flatMap(c => c.modules)
           .filter(m => m !== mod.id);
         const cyclePartners = [...new Set(cycleMods)].map(m => m.split(".").pop()).join(", ");
+        const suggestion = currentResult.cycles
+          .filter(c => c.modules.includes(mod.id))
+          .map(c => ModuleLoomCycles.suggestion(c, currentResult.edges))
+          .find(Boolean);
+        const suggestionText = suggestion
+          ? `改善候補: ${ModuleLoomCycles.escapeHtml(suggestion.source)} → ${ModuleLoomCycles.escapeHtml(suggestion.target)} (L:${suggestion.line}): ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.guidance(suggestion.kind))}`
+          : "";
         cycleAlertHtml = `
           <div style="background:#3d141e; border:1.5px solid #ff4d4d; border-radius:6px; padding:8px 10px; margin-top:8px; font-size:11px; color:#ff8099; line-height:1.45;">
             <div style="font-weight:bold; color:#ff4d4d; font-size:12px; display:flex; align-items:center; gap:5px; margin-bottom:4px;">
-              <span>🚨 循環参照エラー検出</span>
+              <span>⚠️ トップレベルの循環インポート</span>
             </div>
-            <div>このモジュールは <b style="color:#ffffff;">[${cyclePartners}]</b> と相互に参照しています。<br>実行時の循環参照エラー（ImportError）の根本原因です。</div>
+            <div>このモジュールは <b style="color:#ffffff;">[${ModuleLoomCycles.escapeHtml(cyclePartners)}]</b> と循環しています。初期化時の参照順によっては ImportError などの原因になります。</div>
+            <div style="margin-top:5px;">${suggestionText} 変更後は自動更新または再解析で確認できます。</div>
           </div>
         `;
       }
@@ -2086,14 +2099,14 @@
       if (directCycles.length > 0) {
         cycleFooterHtml += `<span style="color:var(--cycle-color); font-weight:bold;">🔄 直接の循環インポート (${directCycles.length}件):</span> `;
         cycleFooterHtml += directCycles.map(c =>
-          `<span style="background:rgba(243,139,168,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--cycle-color); margin-right:4px;">${c.modules.map(id => id.split(".").pop()).join(" ➔ ")} ➔ ${c.modules[0].split(".").pop()}</span>`
+          `<span style="background:rgba(243,139,168,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--cycle-color); margin-right:4px;">代表経路: ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.summary(c, currentResult.edges))}</span>`
         ).join(" ");
       }
       if (depCycles.length > 0) {
         if (cycleFooterHtml) cycleFooterHtml += " | ";
         cycleFooterHtml += `<span style="color:var(--bloat-color); font-weight:bold;">⚠️ 依存先での循環 (${depCycles.length}件):</span> `;
         cycleFooterHtml += depCycles.map(c =>
-          `<span style="background:rgba(250,179,135,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--bloat-color); margin-right:4px;">${c.modules.map(id => id.split(".").pop()).join(" ➔ ")} ➔ ${c.modules[0].split(".").pop()}</span>`
+          `<span style="background:rgba(250,179,135,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--bloat-color); margin-right:4px;">代表経路: ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.summary(c, currentResult.edges))}</span>`
         ).join(" ");
       }
       if (!cycleFooterHtml) {

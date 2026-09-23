@@ -35,6 +35,50 @@ export function compareAnalysisResults(previous: AnalysisResult | undefined, cur
   return changes;
 }
 
+export interface IssueComparison {
+  introduced: string[];
+  resolved: string[];
+  continuing: string[];
+}
+
+export interface AnalysisIssueComparison {
+  cycles: IssueComparison;
+  architecture: IssueComparison;
+  dependencies: IssueComparison;
+}
+
+function compareIssueSets(previous: Map<string, string>, current: Map<string, string>): IssueComparison {
+  return {
+    introduced: [...current].filter(([key]) => !previous.has(key)).map(([, label]) => label).sort(),
+    resolved: [...previous].filter(([key]) => !current.has(key)).map(([, label]) => label).sort(),
+    continuing: [...current].filter(([key]) => previous.has(key)).map(([, label]) => label).sort(),
+  };
+}
+
+/** Compare stable issue identities; line numbers and representative cycle paths may change between runs. */
+export function compareAnalysisIssues(previous: AnalysisResult, current: AnalysisResult): AnalysisIssueComparison {
+  const cycleSet = (result: AnalysisResult) => new Map((result.cycles || []).map((cycle) => {
+    const modules = [...new Set(cycle.modules)].sort();
+    const key = modules.join("\u0000");
+    return [key, modules.join(" ↔ ")] as const;
+  }));
+  const architectureSet = (result: AnalysisResult) => new Map((result.architecture_violations || []).map((issue) => {
+    const key = [issue.rule, issue.name, issue.source, issue.target].join("\u0000");
+    return [key, `${issue.rule}: ${issue.source} → ${issue.target} (${issue.message})`] as const;
+  }));
+  const dependencySet = (result: AnalysisResult) => new Map((result.dependency_issues || []).map((issue) => {
+    const module = issue.module || "";
+    const key = [issue.rule, issue.package.toLowerCase(), module].join("\u0000");
+    return [key, `${issue.rule}: ${issue.package}${module ? ` (${module})` : ""} — ${issue.message}`] as const;
+  }));
+
+  return {
+    cycles: compareIssueSets(cycleSet(previous), cycleSet(current)),
+    architecture: compareIssueSets(architectureSet(previous), architectureSet(current)),
+    dependencies: compareIssueSets(dependencySet(previous), dependencySet(current)),
+  };
+}
+
 export function recordAnalysisHistory(result: AnalysisResult): void {
   const history = readAnalysisHistory(result.root_path);
   history.push({ timestamp: new Date().toISOString(), result });

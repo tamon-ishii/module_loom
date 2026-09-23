@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Build a VSIX with only Python's standard library."""
 import json
+import shutil
 from pathlib import Path
 from xml.sax.saxutils import escape
 from zipfile import ZIP_DEFLATED, ZipFile
 
 root = Path(__file__).resolve().parent.parent
 extension = root / "plugins" / "vscode"
+shutil.copy2(root / "shared" / "cycle-insights.js", extension / "media" / "cycle-insights.js")
 manifest = json.loads((extension / "package.json").read_text(encoding="utf-8"))
 output_dir = root / "target" / "vscode-extension"
 output_dir.mkdir(parents=True, exist_ok=True)

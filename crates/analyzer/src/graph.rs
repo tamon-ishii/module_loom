@@ -1,7 +1,58 @@
 use crate::model::*;
 use petgraph::algo::tarjan_scc;
 use petgraph::Directed;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
+
+/// Return the shortest directed chain, including both endpoints.
+pub fn shortest_chain(edges: &[DependencyEdge], source: &str, target: &str) -> Option<Vec<String>> {
+    let pairs: Vec<_> = edges
+        .iter()
+        .map(|edge| (edge.source.as_str(), edge.target.as_str()))
+        .collect();
+    shortest_chain_pairs(&pairs, source, target)
+}
+
+pub fn shortest_chain_pairs(
+    edges: &[(&str, &str)],
+    source: &str,
+    target: &str,
+) -> Option<Vec<String>> {
+    let mut queue = VecDeque::from([source.to_string()]);
+    let mut previous: HashMap<String, Option<String>> = HashMap::from([(source.to_string(), None)]);
+    while let Some(current) = queue.pop_front() {
+        if current == target {
+            let mut path = Vec::new();
+            let mut cursor = Some(current);
+            while let Some(node) = cursor {
+                cursor = previous.get(&node)?.clone();
+                path.push(node);
+            }
+            path.reverse();
+            return Some(path);
+        }
+        for (_, next) in edges.iter().filter(|(from, _)| *from == current) {
+            if !previous.contains_key(*next) {
+                previous.insert((*next).to_string(), Some(current.clone()));
+                queue.push_back((*next).to_string());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod shortest_chain_tests {
+    use super::shortest_chain_pairs;
+    #[test]
+    fn picks_the_shortest_directed_path() {
+        let edges = [("a", "b"), ("b", "c"), ("c", "d"), ("a", "d")];
+        assert_eq!(
+            shortest_chain_pairs(&edges, "a", "d"),
+            Some(vec!["a".into(), "d".into()])
+        );
+        assert_eq!(shortest_chain_pairs(&edges, "d", "a"), None);
+    }
+}
 
 pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<CircularCycle>) {
     let mut module_map = HashMap::new();
@@ -39,6 +90,9 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
                         .or_insert((imp.line, 0, false));
                     entry.1 += 1;
                     if imp.is_top_level {
+                        if !entry.2 {
+                            entry.0 = imp.line;
+                        }
                         entry.2 = true;
                     }
                 }
@@ -85,8 +139,11 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
             for m in &cycle_mods {
                 circular_nodes.insert(m.clone());
             }
+            let path = find_cycle_path(&cycle_mods, &top_level_graph);
             cycles.push(CircularCycle {
                 modules: cycle_mods,
+                path,
+                suggestion: None,
             });
         }
     }
@@ -108,6 +165,60 @@ pub fn build_graph(modules: &[ModuleInfo]) -> (Vec<DependencyEdge>, Vec<Circular
     }
 
     (edges, cycles)
+}
+
+fn find_cycle_path(
+    modules: &[String],
+    graph: &petgraph::Graph<String, usize, Directed>,
+) -> Vec<String> {
+    let members: HashSet<&str> = modules.iter().map(String::as_str).collect();
+    let mut adjacency: HashMap<&str, Vec<&str>> = HashMap::new();
+    for edge in graph.raw_edges() {
+        let source = graph[edge.source()].as_str();
+        let target = graph[edge.target()].as_str();
+        if members.contains(source) && members.contains(target) {
+            adjacency.entry(source).or_default().push(target);
+        }
+    }
+    for neighbors in adjacency.values_mut() {
+        neighbors.sort_unstable();
+        neighbors.dedup();
+    }
+
+    fn visit<'a>(
+        current: &'a str,
+        start: &'a str,
+        adjacency: &HashMap<&'a str, Vec<&'a str>>,
+        path: &mut Vec<&'a str>,
+        seen: &mut HashSet<&'a str>,
+    ) -> bool {
+        for &next in adjacency.get(current).into_iter().flatten() {
+            if next == start && path.len() > 1 {
+                path.push(start);
+                return true;
+            }
+            if seen.insert(next) {
+                path.push(next);
+                if visit(next, start, adjacency, path, seen) {
+                    return true;
+                }
+                path.pop();
+                seen.remove(next);
+            }
+        }
+        false
+    }
+
+    let mut starts: Vec<&str> = members.into_iter().collect();
+    starts.sort_unstable();
+    for start in starts {
+        let mut path = vec![start];
+        let mut seen = HashSet::from([start]);
+        if visit(start, start, &adjacency, &mut path, &mut seen) {
+            return path.into_iter().map(str::to_string).collect();
+        }
+    }
+    Vec::new()
 }
 
 /// Returns imports that do not resolve to a module inside the analyzed project.
@@ -243,14 +354,24 @@ mod tests {
             symbols: vec![],
             symbol_calls: vec![],
             unused_symbol_candidates: vec![],
-            imports: vec![ImportStmt {
-                module: "app.b".to_string(),
-                is_from: false,
-                level: 0,
-                line: 2,
-                imported_names: vec!["app.b".to_string()],
-                is_top_level: true,
-            }],
+            imports: vec![
+                ImportStmt {
+                    module: "app.b".to_string(),
+                    is_from: false,
+                    level: 0,
+                    line: 8,
+                    imported_names: vec!["app.b".to_string()],
+                    is_top_level: false,
+                },
+                ImportStmt {
+                    module: "app.b".to_string(),
+                    is_from: false,
+                    level: 0,
+                    line: 2,
+                    imported_names: vec!["app.b".to_string()],
+                    is_top_level: true,
+                },
+            ],
             unresolved_imports: vec![],
             afferent_coupling: 0,
             efferent_coupling: 0,
@@ -297,10 +418,44 @@ mod tests {
         assert!(cycles[0].modules.contains(&"app.b".to_string()));
 
         assert_eq!(edges.len(), 2);
+        assert_eq!(
+            edges
+                .iter()
+                .find(|edge| edge.source == "app.a")
+                .unwrap()
+                .line,
+            2
+        );
         assert!(
             edges.iter().all(|e| e.is_circular),
             "Both edges should be marked as circular"
         );
+        assert_eq!(cycles[0].path.first(), cycles[0].path.last());
+        for pair in cycles[0].path.windows(2) {
+            assert!(edges
+                .iter()
+                .any(|edge| edge.source == pair[0] && edge.target == pair[1]));
+        }
+    }
+
+    #[test]
+    fn representative_path_uses_real_edges_in_branching_component() {
+        let mut graph = petgraph::Graph::<String, usize, Directed>::new();
+        let a = graph.add_node("a".into());
+        let b = graph.add_node("b".into());
+        let c = graph.add_node("c".into());
+        graph.add_edge(a, b, 1);
+        graph.add_edge(b, a, 2);
+        graph.add_edge(b, c, 3);
+        graph.add_edge(c, b, 4);
+        let modules = vec!["a".into(), "b".into(), "c".into()];
+        let path = find_cycle_path(&modules, &graph);
+        assert_eq!(path, vec!["a", "b", "a"]);
+        assert!(path
+            .windows(2)
+            .all(|pair| graph.raw_edges().iter().any(|edge| {
+                graph[edge.source()] == pair[0] && graph[edge.target()] == pair[1]
+            })));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 package com.moduleloom;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -11,6 +12,12 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.vfs.newvfs.BulkFileListener;
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.openapi.wm.ToolWindowManager;
@@ -39,6 +46,10 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,6 +62,16 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         public volatile boolean syncOnDoubleClick = true;
         public volatile String currentAnalyzePath;
         public volatile String pendingFilePath;
+        public volatile boolean autoRefresh = true;
+        public Timer refreshTimer;
+        public boolean analysisRunning;
+        public boolean analysisPending;
+        public String pendingAnalyzePath;
+        public String pendingAnalyzeTarget;
+        public boolean pendingFullAnalysis;
+        public final Set<String> pendingChangedFiles = new HashSet<>();
+        public volatile String lastResultJson;
+        public volatile String lastResultRoot;
     }
 
     private static final Map<Project, ToolWindowHolder> activeHolders = new ConcurrentHashMap<>();
@@ -108,7 +129,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         // Top Toolbar
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        JButton btnAnalyze = new JButton("⟳ 再解析");
+        JButton btnMkdocs = new JButton("MkDocs 出力");
         JComboBox<String> targetCombo = new JComboBox<>();
         String projBase = project.getBasePath() != null ? project.getBasePath() : "";
         Path samplePath = Path.of(projBase, "sample_project");
@@ -120,12 +141,15 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
 
         JCheckBox chkDoubleClickSync = new JCheckBox("ダブルクリック連動", true);
+        JCheckBox chkAutoRefresh = new JCheckBox("自動更新", true);
+        chkAutoRefresh.setToolTipText("Python ファイルや moduleloom.toml の保存・追加・削除後に再解析します");
         chkDoubleClickSync.setToolTipText("PyCharm側でファイルをダブルクリックして開いた時、自動で依存図を開きます (ModuleLoomからのオープン時は反応しません)");
 
         toolbarPanel.add(new JLabel("解析対象:"));
         toolbarPanel.add(targetCombo);
-        toolbarPanel.add(btnAnalyze);
+        toolbarPanel.add(btnMkdocs);
         toolbarPanel.add(chkDoubleClickSync);
+        toolbarPanel.add(chkAutoRefresh);
         mainPanel.add(toolbarPanel, BorderLayout.NORTH);
 
         // Setup JCEF Browser
@@ -140,6 +164,17 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         chkDoubleClickSync.addActionListener(e -> {
             holder.syncOnDoubleClick = chkDoubleClickSync.isSelected();
+        });
+        holder.refreshTimer = new Timer(500, e -> ApplicationManager.getApplication().executeOnPooledThread(() ->
+                runAnalyze(project, holder, holder.currentAnalyzePath, null, drainChangedFiles(holder))));
+        holder.refreshTimer.setRepeats(false);
+        Disposer.register(toolWindow.getContentManager(), () -> {
+            holder.refreshTimer.stop();
+            activeHolders.remove(project, holder);
+        });
+        chkAutoRefresh.addActionListener(e -> {
+            holder.autoRefresh = chkAutoRefresh.isSelected();
+            if (!holder.autoRefresh) holder.refreshTimer.stop();
         });
 
         // Extract bundled web assets to user cache directory
@@ -165,8 +200,27 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             }
         }, browser.getCefBrowser());
 
-        btnAnalyze.addActionListener(e -> {
-            ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, null, null));
+        btnMkdocs.addActionListener(e -> {
+            String basePath = project.getBasePath();
+            if (basePath == null) return;
+            Path suggested = Path.of(basePath, "moduleloom-docs");
+            JFileChooser chooser = new JFileChooser(basePath);
+            chooser.setDialogTitle("MkDocs 出力先を選択");
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            chooser.setAcceptAllFileFilterUsed(false);
+            chooser.setToolTipText("空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを選択してください (推奨: " + suggested + ")");
+            if (chooser.showSaveDialog(mainPanel) == JFileChooser.APPROVE_OPTION) {
+                Path output = chooser.getSelectedFile().toPath().toAbsolutePath().normalize();
+                String lang = JOptionPane.showInputDialog(mainPanel,
+                        "ドキュメントの言語 (auto / ja / en)", "auto");
+                if (lang == null) return;
+                lang = lang.trim();
+                if (lang.isEmpty()) lang = "auto";
+                String analysisPath = selectedAnalysisPath(project, targetCombo);
+                String selectedLang = lang;
+                ApplicationManager.getApplication().executeOnPooledThread(() ->
+                        generateMkDocs(project, holder, analysisPath, output, selectedLang));
+            }
         });
 
         targetCombo.addActionListener(e -> {
@@ -195,6 +249,27 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 if (file != null) {
                     handleUserFileActivation(project, file);
                 }
+            }
+        });
+        busConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkFileListener() {
+            @Override
+            public void after(@NotNull List<? extends VFileEvent> events) {
+                if (!holder.autoRefresh || holder.currentAnalyzePath == null) return;
+                String root = holder.currentAnalyzePath.replace('\\', '/');
+                boolean changed = false;
+                for (VFileEvent event : events) {
+                    String path = event.getPath().replace('\\', '/');
+                    boolean structural = event instanceof VFileDeleteEvent || event instanceof VFileMoveEvent
+                            || (event instanceof VFileCreateEvent && Files.isDirectory(Path.of(path)));
+                    if ((path.endsWith(".py") || path.endsWith("/moduleloom.toml") || structural)
+                            && path.startsWith(root + "/")) {
+                        synchronized (holder) { holder.pendingChangedFiles.add(path); }
+                        changed = true;
+                    }
+                }
+                if (changed) SwingUtilities.invokeLater(() -> {
+                    if (holder.autoRefresh) holder.refreshTimer.restart();
+                });
             }
         });
 
@@ -323,7 +398,123 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
     }
 
+    private static String selectedAnalysisPath(Project project, JComboBox<String> targetCombo) {
+        String basePath = project.getBasePath();
+        if (basePath == null) return null;
+        String selected = targetCombo != null ? (String) targetCombo.getSelectedItem() : null;
+        if ("sample_project".equals(selected) || selected == null) {
+            Path samplePath = Path.of(basePath, "sample_project");
+            if (Files.isDirectory(samplePath)) return samplePath.toString();
+        }
+        return basePath;
+    }
+
+    private static void generateMkDocs(Project project, ToolWindowHolder holder, String analysisPath, Path output, String lang) {
+        if (analysisPath == null) return;
+        setStatus(holder, "MkDocs を生成中...");
+        String binaryPath = findAnalyzerBinary(project);
+        if (binaryPath == null) {
+            setStatus(holder, "解析エンジンが見つかりません");
+            return;
+        }
+        String message;
+        int messageType;
+        try {
+            Process process = new ProcessBuilder(binaryPath, "--mkdocs", output.toString(), "--lang", lang, analysisPath)
+                    .redirectErrorStream(true).start();
+            StringBuilder outputText = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) outputText.append(line).append('\n');
+            }
+            int exitCode = process.waitFor();
+            boolean generated = exitCode == 0
+                    && Files.isRegularFile(output.resolve("mkdocs.yml"))
+                    && Files.isRegularFile(output.resolve("docs/index.md"));
+            if (generated) {
+                message = "MkDocs マニュアルを生成しました。\n\n" + output;
+                messageType = JOptionPane.INFORMATION_MESSAGE;
+                setStatus(holder, "MkDocs 生成完了: " + output);
+            } else {
+                String detail = outputText.toString().trim();
+                message = "MkDocs の生成に失敗しました (終了コード " + exitCode + ")" +
+                        (exitCode == 0 ? "\n指定先に MkDocs ファイルが見つかりません。解析エンジンが古い可能性があります。" : "") +
+                        (detail.isEmpty() ? "" : "\n\n" + detail);
+                messageType = JOptionPane.ERROR_MESSAGE;
+                setStatus(holder, "MkDocs 生成に失敗しました");
+            }
+        } catch (Exception ex) {
+            message = "MkDocs の生成に失敗しました: " + ex.getMessage();
+            messageType = JOptionPane.ERROR_MESSAGE;
+            setStatus(holder, "MkDocs 生成に失敗しました");
+        }
+        final String dialogMessage = message;
+        final int dialogType = messageType;
+        ApplicationManager.getApplication().invokeLater(() ->
+                JOptionPane.showMessageDialog(holder.browser.getComponent(), dialogMessage, "ModuleLoom", dialogType));
+    }
+
+    private static void setStatus(ToolWindowHolder holder, String text) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (holder.browser == null || holder.browser.getCefBrowser() == null) return;
+            String js = "document.getElementById('status-info').textContent = '" + escapeJs(text) + "';";
+            holder.browser.getCefBrowser().executeJavaScript(js, holder.browser.getCefBrowser().getURL(), 0);
+        });
+    }
+
+    private static List<String> drainChangedFiles(ToolWindowHolder holder) {
+        synchronized (holder) {
+            List<String> paths = new ArrayList<>(holder.pendingChangedFiles);
+            holder.pendingChangedFiles.clear();
+            return paths;
+        }
+    }
+
     private static void runAnalyze(Project project, ToolWindowHolder holder, @Nullable String overridePath, @Nullable String targetFileToOpen) {
+        runAnalyze(project, holder, overridePath, targetFileToOpen, null);
+    }
+
+    private static void runAnalyze(Project project, ToolWindowHolder holder, @Nullable String overridePath, @Nullable String targetFileToOpen, @Nullable List<String> changedFiles) {
+        synchronized (holder) {
+            if (holder.analysisRunning) {
+                holder.analysisPending = true;
+                if (changedFiles == null) {
+                    holder.pendingFullAnalysis = true;
+                    holder.pendingAnalyzePath = overridePath;
+                    holder.pendingAnalyzeTarget = targetFileToOpen;
+                } else {
+                    holder.pendingChangedFiles.addAll(changedFiles);
+                    if (!holder.pendingFullAnalysis) holder.pendingAnalyzePath = overridePath;
+                }
+                if (targetFileToOpen != null) holder.pendingFilePath = targetFileToOpen;
+                return;
+            }
+            holder.analysisRunning = true;
+        }
+        try {
+            performAnalyze(project, holder, overridePath, targetFileToOpen, changedFiles);
+        } finally {
+            boolean pending;
+            String pendingPath;
+            String pendingTarget;
+            List<String> pendingChanges;
+            synchronized (holder) {
+                holder.analysisRunning = false;
+                pending = holder.analysisPending;
+                pendingPath = holder.pendingAnalyzePath;
+                pendingTarget = holder.pendingAnalyzeTarget;
+                pendingChanges = holder.pendingFullAnalysis ? null : new ArrayList<>(holder.pendingChangedFiles);
+                holder.analysisPending = false;
+                holder.pendingFullAnalysis = false;
+                holder.pendingAnalyzePath = null;
+                holder.pendingAnalyzeTarget = null;
+                holder.pendingChangedFiles.clear();
+            }
+            if (pending) runAnalyze(project, holder, pendingPath, pendingTarget, pendingChanges);
+        }
+    }
+
+    private static void performAnalyze(Project project, ToolWindowHolder holder, @Nullable String overridePath, @Nullable String targetFileToOpen, @Nullable List<String> changedFiles) {
         String basePath = overridePath;
         if (basePath == null) {
             basePath = project.getBasePath();
@@ -349,7 +540,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
 
         // Path to analyze CLI binary
-        String binaryPath = findAnalyzerBinary();
+        String binaryPath = findAnalyzerBinary(project);
         if (binaryPath == null) {
             String errorJs = "document.getElementById('status-info').textContent = 'Error: analyze binary not found';";
             holder.browser.getCefBrowser().executeJavaScript(errorJs, holder.browser.getCefBrowser().getURL(), 0);
@@ -357,9 +548,23 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
 
         try {
-            ProcessBuilder pb = new ProcessBuilder(binaryPath, "--json", basePath);
+            boolean incremental = changedFiles != null && !changedFiles.isEmpty()
+                    && basePath.equals(holder.lastResultRoot) && holder.lastResultJson != null;
+            ProcessBuilder pb = incremental
+                    ? new ProcessBuilder(binaryPath, "--json", "--incremental", basePath)
+                    : new ProcessBuilder(binaryPath, "--json", basePath);
             pb.redirectErrorStream(false);
             Process process = pb.start();
+            try (var writer = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8)) {
+                if (incremental) {
+                    writer.write("{\"previous\":" + holder.lastResultJson + ",\"changed_files\":[");
+                    for (int i = 0; i < changedFiles.size(); i++) {
+                        if (i > 0) writer.write(",");
+                        writer.write(jsonQuote(changedFiles.get(i)));
+                    }
+                    writer.write("]}");
+                }
+            }
 
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
@@ -372,6 +577,8 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             int exitCode = process.waitFor();
             if (exitCode == 0) {
                 String jsonResult = sb.toString();
+                holder.lastResultJson = jsonResult;
+                holder.lastResultRoot = basePath;
                 ApplicationManager.getApplication().invokeLater(() -> {
                     String pendingJs = "";
                     if (holder.pendingFilePath != null) {
@@ -382,6 +589,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                     holder.browser.getCefBrowser().executeJavaScript(jsCall, holder.browser.getCefBrowser().getURL(), 0);
                 });
             } else {
+                if (incremental) {
+                    performAnalyze(project, holder, basePath, targetFileToOpen, null);
+                    return;
+                }
                 String errJs = "document.getElementById('status-info').textContent = 'Analysis exited with code " + exitCode + "';";
                 holder.browser.getCefBrowser().executeJavaScript(errJs, holder.browser.getCefBrowser().getURL(), 0);
             }
@@ -392,7 +603,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
     }
 
-    private static String findAnalyzerBinary() {
+    private static String findAnalyzerBinary(Project project) {
         String osName = System.getProperty("os.name", "").toLowerCase();
         String architecture = System.getProperty("os.arch", "").toLowerCase();
         boolean arm64 = architecture.equals("aarch64") || architecture.equals("arm64");
@@ -420,9 +631,13 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             }
         }
 
-        Path localPath = Path.of("/home/ishii/PycharmProjects/pymodulemgr/target/release/analyze");
-        if (Files.exists(localPath)) {
-            return localPath.toString();
+        String projectBase = project.getBasePath();
+        if (projectBase != null) {
+            // Prefer the debug build while developing the plugin; it tracks the current source.
+            Path debugPath = Path.of(projectBase, "target", "debug", osName.contains("win") ? "analyze.exe" : "analyze");
+            if (Files.isRegularFile(debugPath)) return debugPath.toString();
+            Path releasePath = Path.of(projectBase, "target", "release", osName.contains("win") ? "analyze.exe" : "analyze");
+            if (Files.isRegularFile(releasePath)) return releasePath.toString();
         }
         return "analyze";
     }
@@ -432,7 +647,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             Path targetDir = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "web");
             Files.createDirectories(targetDir);
 
-            String[] files = {"index.html", "cytoscape.min.js", "cytoscape-dagre.min.js"};
+            String[] files = {"index.html", "cytoscape.min.js", "cytoscape-dagre.min.js", "cycle-insights.js"};
             for (String file : files) {
                 try (InputStream is = getClass().getResourceAsStream("/web/" + file)) {
                     if (is != null) {
@@ -459,5 +674,18 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     private static String escapeJs(String str) {
         if (str == null) return "";
         return str.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ");
+    }
+
+    private static String jsonQuote(String value) {
+        StringBuilder result = new StringBuilder("\"");
+        for (char ch : value.toCharArray()) {
+            if (ch == '"' || ch == '\\') result.append('\\').append(ch);
+            else if (ch == '\n') result.append("\\n");
+            else if (ch == '\r') result.append("\\r");
+            else if (ch == '\t') result.append("\\t");
+            else if (ch < 0x20) result.append(String.format("\\u%04x", (int) ch));
+            else result.append(ch);
+        }
+        return result.append('"').toString();
     }
 }

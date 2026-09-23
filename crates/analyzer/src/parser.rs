@@ -83,16 +83,7 @@ pub fn parse_python_source_with_config(
     let ast = ast::Suite::parse(content, &rel_str)
         .map_err(|e| format!("Parse error in {}: {:?}", rel_str, e))?;
 
-    let docstring = match ast.first() {
-        Some(Stmt::Expr(expr)) => match expr.value.as_ref() {
-            ast::Expr::Constant(value) => match &value.value {
-                ast::Constant::Str(text) => Some(text.clone()),
-                _ => None,
-            },
-            _ => None,
-        },
-        _ => None,
-    };
+    let docstring = body_docstring(&ast);
 
     let index = LineIndex::from_source_text(content);
 
@@ -162,6 +153,19 @@ pub fn parse_python_source_with_config(
         is_oversized,
         diagnostics,
     })
+}
+
+fn body_docstring(body: &[Stmt]) -> Option<String> {
+    match body.first() {
+        Some(Stmt::Expr(expr)) => match expr.value.as_ref() {
+            ast::Expr::Constant(value) => match &value.value {
+                ast::Constant::Str(text) => Some(text.clone()),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 struct ComplexityVisitor {
@@ -351,6 +355,7 @@ fn collect_stmt_info(
                 name: class_def.name.to_string(),
                 line,
                 parent_class_line,
+                docstring: body_docstring(&class_def.body),
             });
             for inner in &class_def.body {
                 collect_stmt_info(
@@ -372,6 +377,7 @@ fn collect_stmt_info(
                 name: fn_def.name.to_string(),
                 line: index.line_index(fn_def.range.start()).get() as usize,
                 parent_class_line,
+                docstring: body_docstring(&fn_def.body),
             });
             for inner in &fn_def.body {
                 collect_stmt_info(
@@ -393,6 +399,7 @@ fn collect_stmt_info(
                 name: fn_def.name.to_string(),
                 line: index.line_index(fn_def.range.start()).get() as usize,
                 parent_class_line,
+                docstring: body_docstring(&fn_def.body),
             });
             for inner in &fn_def.body {
                 collect_stmt_info(
@@ -590,7 +597,8 @@ def top_function():
             vec![ClassInfo {
                 name: "MyClass".to_string(),
                 line: 8,
-                parent_class_line: None
+                parent_class_line: None,
+                docstring: None,
             }]
         );
         assert_eq!(mod_info.function_count, 2); // 1 method + 1 top function
@@ -600,12 +608,14 @@ def top_function():
                 FunctionInfo {
                     name: "method".to_string(),
                     line: 9,
-                    parent_class_line: Some(8)
+                    parent_class_line: Some(8),
+                    docstring: None,
                 },
                 FunctionInfo {
                     name: "top_function".to_string(),
                     line: 12,
-                    parent_class_line: None
+                    parent_class_line: None,
+                    docstring: None,
                 },
             ]
         );
@@ -721,7 +731,8 @@ class MyClass:
             vec![FunctionInfo {
                 name: "fetch".to_string(),
                 line: 1,
-                parent_class_line: None
+                parent_class_line: None,
+                docstring: None,
             }]
         );
     }

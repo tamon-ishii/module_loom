@@ -100,3 +100,127 @@ def func2(y):
         "Should generate type check diagnostic for untyped argument y"
     );
 }
+
+#[test]
+fn reports_dependency_manifest_mismatches() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(
+        base.join("main.py"),
+        "import requests\nimport certifi\nimport pytest\n",
+    )
+    .unwrap();
+    fs::write(
+        base.join("pyproject.toml"),
+        "[project]\ndependencies = [\"httpx\", \"os\"]\n[dependency-groups]\ndev = [\"pytest\"]\n",
+    )
+    .unwrap();
+    fs::write(
+        base.join("uv.lock"),
+        "[[package]]\nname = \"certifi\"\nversion = \"1.0\"\n",
+    )
+    .unwrap();
+    let result = analyze_directory(base).unwrap();
+    let rules: Vec<_> = result
+        .dependency_issues
+        .iter()
+        .map(|issue| issue.rule.as_str())
+        .collect();
+    for rule in ["DEP001", "DEP002", "DEP003", "DEP004", "DEP005"] {
+        assert!(rules.contains(&rule), "missing {rule}: {rules:?}");
+    }
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .arg("--check")
+        .arg(base)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("DEP001"));
+}
+
+#[test]
+fn custom_import_mapping_and_ignore_avoid_false_positives() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(
+        base.join("main.py"),
+        "import yaml\nimport typing_extensions\n",
+    )
+    .unwrap();
+    fs::write(
+        base.join("pyproject.toml"),
+        "[project]\ndependencies = [\"PyYAML\"]\n",
+    )
+    .unwrap();
+    fs::write(base.join("moduleloom.toml"), "[dependencies]\nignore = [\"typing-extensions\"]\n[dependencies.import_map]\ntyping_extensions = \"typing-extensions\"\n").unwrap();
+    let result = analyze_directory(base).unwrap();
+    assert!(
+        result.dependency_issues.is_empty(),
+        "{:?}",
+        result.dependency_issues
+    );
+}
+
+#[test]
+fn extended_architecture_rules_load_from_project_config() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::create_dir_all(base.join("app")).unwrap();
+    fs::write(
+        base.join("app/api.py"),
+        "import app.internal\nimport app.domain\n",
+    )
+    .unwrap();
+    fs::write(base.join("app/internal.py"), "").unwrap();
+    fs::write(base.join("app/domain.py"), "").unwrap();
+    fs::write(
+        base.join("moduleloom.toml"),
+        r#"
+[architecture]
+ignore_imports = ["app.api -> app.internal"]
+[architecture.protected.private]
+module = "app.internal"
+allowed = ["app.trusted"]
+[architecture.layers.app]
+layers = ["app.api", "app.service", "app.domain"]
+closed = ["app.service"]
+"#,
+    )
+    .unwrap();
+    let result = analyze_directory(base).unwrap();
+    assert!(result
+        .architecture_violations
+        .iter()
+        .any(|issue| issue.rule == "architecture-closed-layer"));
+    assert!(!result
+        .architecture_violations
+        .iter()
+        .any(|issue| issue.rule == "architecture-protected"));
+    assert!(!result
+        .architecture_violations
+        .iter()
+        .any(|issue| issue.rule == "architecture-unused-ignore"));
+}
+
+#[test]
+fn cli_reports_shortest_import_chain() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(base.join("a.py"), "import b\n").unwrap();
+    fs::write(base.join("b.py"), "import c\n").unwrap();
+    fs::write(base.join("c.py"), "").unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .args(["--chain", "a", "c"])
+        .arg(base)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "a -> b -> c"
+    );
+}

@@ -22,6 +22,7 @@ JAVAC_BIN = os.environ.get("JAVAC_BIN", os.path.join(PYCHARM_HOME, "jbr", "bin",
 
 def build():
     print("=== Building PyCharm Plugin for ModuleLoom ===")
+    shutil.copy2(os.path.join(PROJECT_ROOT, "shared", "cycle-insights.js"), os.path.join(SRC_RES, "web", "cycle-insights.js"))
     plugin_version = os.environ.get("MODULELOOM_VERSION") or datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M%S")
     if os.path.exists(CLASSES_DIR):
         shutil.rmtree(CLASSES_DIR)

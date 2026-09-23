@@ -25,6 +25,9 @@
             <label title="LOCや関数数が肥大化したモジュールのみ表示"><input type="checkbox" id="chk-only-bloat" /> 肥大化のみ</label>
             <label title="ディレクトリ階層ごとに枠で囲む"><input type="checkbox" id="chk-group-packages" checked /> パッケージ枠</label>
             <label title="選択ノードの直接の依存関係のみハイライト"><input type="checkbox" id="chk-focus-mode" checked /> フォーカス</label>
+            <label title="標準ライブラリや外部パッケージなど、プロジェクト外への import を全体図に表示"><input type="checkbox" id="chk-externals" /> 外部ノード</label>
+            <label title="全体図で選択モジュールから表示する距離">表示範囲 <select id="graph-radius"><option value="all">全体</option><option value="1">1ホップ</option><option value="2">2ホップ</option><option value="3">3ホップ</option></select></label>
+            <label title="全体図で一定数を超えるモジュールをパッケージごとにまとめる">集約 <select id="cluster-limit"><option value="0">なし</option><option value="5">6件以上</option><option value="10">11件以上</option><option value="20">21件以上</option></select></label>
             <label title="選択モジュールの直接の依存・被依存のみ表示（深層の依存を非表示）"><input type="checkbox" id="chk-direct-only" checked /> 直接依存のみ</label>
           </div>
         </div>
@@ -34,7 +37,15 @@
           <button id="btn-git-diff" class="btn-secondary" title="Git の変更ファイルをグラフ上で強調">Git差分</button>
           <button id="btn-git-history" class="btn-secondary" title="base..head のコミット差分を強調">履歴差分</button>
           <button id="btn-export-report" class="btn-secondary" title="解析結果を JSON / HTML で保存">レポート出力</button>
+          <button id="btn-export-mkdocs" class="btn-secondary" title="全体図とモジュール別マニュアルを MkDocs 用に生成">MkDocs 出力</button>
           <button id="btn-history" class="btn-secondary" title="解析履歴を表示">履歴</button>
+          <label for="fix-tool-select">修正ツール:</label>
+          <select id="fix-tool-select" title="循環インポートの修正に使う外部ツール"><option value="ruff">Ruff (TC001)</option></select>
+          <button id="btn-dependency-issues" class="btn-secondary" title="依存宣言と import の食い違いを表示">依存問題</button>
+          <input id="chain-from" list="module-names" placeholder="経路: 出発モジュール" aria-label="経路の出発モジュール" style="width:155px" />
+          <input id="chain-to" list="module-names" placeholder="到着モジュール" aria-label="経路の到着モジュール" style="width:135px" />
+          <datalist id="module-names"></datalist>
+          <button id="btn-find-chain" class="btn-secondary" title="最短の import 経路を表示">経路検索</button>
           <button id="btn-toggle-tree" class="btn-secondary active" title="ソースツリーの表示/非表示">📁 ツリー</button>
           <label for="layout-select">レイアウト:</label>
           <select id="layout-select">
@@ -115,6 +126,21 @@
         </div>
         <div class="modal-body"><div class="modal-legend"><div class="legend-item">緑: 選択モジュール</div><div class="legend-item">ノードをダブルクリック: 定義位置を開く</div></div><div id="callgraph-cy-container" class="modal-graph-canvas"></div></div>
         <div class="modal-footer"><div></div><button id="btn-close-callgraph-footer" class="btn-secondary btn-sm">閉じる</button></div>
+      </div>
+    </div>
+
+    <div id="ruff-fix-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ruff-fix-title">
+      <div class="modal-container">
+        <div class="modal-header">
+          <strong id="ruff-fix-title">外部ツールの修正差分</strong>
+          <button id="btn-close-ruff-fix" class="btn-icon modal-close" aria-label="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="display:block; overflow:auto; padding:16px">
+          <p id="ruff-fix-file" style="margin-bottom:10px; overflow-wrap:anywhere"></p>
+          <p style="margin-bottom:10px; color:var(--warning-color)">選択したツールは候補以外の箇所も変更する場合があります。読み込み時の副作用や注釈の実行時参照への影響を含め、差分を確認してください。</p>
+          <pre id="ruff-fix-diff" style="white-space:pre-wrap; overflow-wrap:anywhere; user-select:text"></pre>
+        </div>
+        <div class="modal-footer"><button id="btn-apply-ruff-fix" class="btn-primary">差分を適用</button></div>
       </div>
     </div>
 

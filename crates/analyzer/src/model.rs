@@ -46,6 +46,25 @@ pub struct ArchitectureConfig {
     pub independence: Vec<IndependenceRule>,
     #[serde(default)]
     pub layers: Vec<LayerRule>,
+    #[serde(default)]
+    pub protected: Vec<ProtectedRule>,
+    #[serde(default)]
+    pub acyclic_siblings: Vec<AcyclicSiblingsRule>,
+    #[serde(default)]
+    pub ignore_imports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProtectedRule {
+    pub name: String,
+    pub module: String,
+    pub allowed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AcyclicSiblingsRule {
+    pub name: String,
+    pub parent: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +84,8 @@ pub struct IndependenceRule {
 pub struct LayerRule {
     pub name: String,
     pub layers: Vec<String>,
+    #[serde(default)]
+    pub closed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -129,6 +150,8 @@ pub struct ClassInfo {
     pub line: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_class_line: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docstring: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -137,6 +160,8 @@ pub struct FunctionInfo {
     pub line: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_class_line: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docstring: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -170,6 +195,14 @@ pub struct PackageDependency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DependencyIssue {
+    pub rule: String,
+    pub package: String,
+    pub module: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Diagnostic {
     pub severity: DiagnosticSeverity,
     pub message: String,
@@ -199,6 +232,27 @@ pub struct DependencyEdge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CircularCycle {
     pub modules: Vec<String>,
+    /// One real, closed path through top-level imports. The first module is repeated at the end.
+    #[serde(default)]
+    pub path: Vec<String>,
+    #[serde(default)]
+    pub suggestion: Option<CycleSuggestion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CycleSuggestionKind {
+    TypeOnly,
+    Runtime,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CycleSuggestion {
+    pub source: String,
+    pub target: String,
+    pub line: usize,
+    pub kind: CycleSuggestionKind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,4 +270,6 @@ pub struct AnalysisResult {
     pub symbol_edges: Vec<SymbolEdge>,
     #[serde(default)]
     pub package_dependencies: Vec<PackageDependency>,
+    #[serde(default)]
+    pub dependency_issues: Vec<DependencyIssue>,
 }
