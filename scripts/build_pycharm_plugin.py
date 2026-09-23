@@ -2,6 +2,7 @@
 import glob
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -22,7 +23,12 @@ JAVAC_BIN = os.environ.get("JAVAC_BIN", os.path.join(PYCHARM_HOME, "jbr", "bin",
 
 def build():
     print("=== Building PyCharm Plugin for ModuleLoom ===")
-    shutil.copy2(os.path.join(PROJECT_ROOT, "shared", "cycle-insights.js"), os.path.join(SRC_RES, "web", "cycle-insights.js"))
+    shutil.rmtree(os.path.expanduser("~/.cache/moduleloom/web"), ignore_errors=True)
+    subprocess.run(["npm", "run", "build"], cwd=PROJECT_ROOT, check=True)
+    web_resources = os.path.join(SRC_RES, "web")
+    shutil.rmtree(web_resources, ignore_errors=True)
+    shutil.copytree(os.path.join(PROJECT_ROOT, "dist"), web_resources)
+    stage_local_analyzer()
     plugin_version = os.environ.get("MODULELOOM_VERSION") or datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M%S")
     if os.path.exists(CLASSES_DIR):
         shutil.rmtree(CLASSES_DIR)
@@ -96,6 +102,39 @@ def build():
             os.remove(temp_jar)
 
     print(f"Plugin JAR created successfully: version {plugin_version} ({os.path.getsize(JAR_OUTPUT)} bytes).")
+
+def stage_local_analyzer():
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    arm64 = machine in ("aarch64", "arm64")
+    if system == "windows" and not arm64:
+        platform_name, filename = "windows-x64", "analyze.exe"
+    elif system == "linux" and not arm64:
+        platform_name, filename = "linux-x64", "analyze"
+    elif system == "darwin":
+        platform_name, filename = ("macos-arm64" if arm64 else "macos-x64"), "analyze"
+    else:
+        print(f"No local analyzer bundle target for {system}/{machine}.")
+        return
+
+    destination = os.path.join(SRC_RES, "bin", platform_name, filename)
+    candidates = [
+        os.path.join(PROJECT_ROOT, "target", "release", filename),
+        os.path.join(PROJECT_ROOT, "target", "debug", filename),
+    ]
+    valid_candidates = [path for path in candidates if os.path.isfile(path)]
+    source = max(valid_candidates, key=os.path.getmtime) if valid_candidates else None
+    if source is None:
+        if os.path.isfile(destination):
+            print(f"Keeping existing local analyzer: {destination}")
+            return
+        print(f"No local analyzer found for {platform_name}; the plugin will use PATH fallback.")
+        return
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    shutil.copy2(source, destination)
+    if system != "windows":
+        os.chmod(destination, 0o755)
+    print(f"Bundled latest local analyzer: {destination} (from {source})")
 
 def validate_jar(path):
     with zipfile.ZipFile(path) as jar:

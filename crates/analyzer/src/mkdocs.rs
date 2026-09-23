@@ -604,7 +604,7 @@ mod tests {
         fs::write(project.path().join("b.py"), "\"\"\"Second module.\"\"\"\n").unwrap();
         let result = analyze_directory(project.path()).unwrap();
         let output = tempdir().unwrap();
-        generate(&result, output.path()).unwrap();
+        super::generate_with_lang(&result, output.path(), "en").unwrap();
 
         let index = fs::read_to_string(output.path().join("docs/index.md")).unwrap();
         let page = fs::read_to_string(output.path().join("docs/modules/0000.md")).unwrap();

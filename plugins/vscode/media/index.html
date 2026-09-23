@@ -1,2462 +1,326 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ModuleLoom - VS Code</title>
-  <style>
-    :root {
-      --bg-base: #1e1e2e;
-      --bg-surface: #181825;
-      --bg-overlay: #313244;
-      --border-color: #45475a;
-      --text-main: #cdd6f4;
-      --text-muted: #a6adc8;
-      --accent: #89b4fa;
-      --accent-hover: #b4befe;
-      --cycle-color: #f38ba8;
-      --bloat-color: #fab387;
-      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: var(--font-stack);
-      background-color: var(--bg-base);
-      color: var(--text-main);
-      overflow: hidden;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      user-select: none;
-    }
-
-    /* Toolbar */
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background-color: var(--bg-surface);
-      border-bottom: 1px solid var(--border-color);
-      flex-wrap: wrap;
-      z-index: 10;
-    }
-
-    .btn {
-      background-color: var(--bg-overlay);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: background 0.15s;
-    }
-
-    .btn:hover {
-      background-color: var(--accent);
-      color: #11111b;
-      border-color: var(--accent);
-    }
-
-    .btn.active {
-      background-color: var(--accent);
-      color: #11111b;
-      font-weight: 600;
-      border-color: var(--accent);
-    }
-
-    .btn-primary {
-      background-color: var(--accent);
-      color: #11111b;
-      font-weight: 600;
-      border-color: var(--accent);
-    }
-
-    .btn-primary:hover {
-      background-color: var(--accent-hover);
-    }
-
-    .input-search {
-      background-color: var(--bg-base);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      width: 110px;
-    }
-
-    .input-search:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .select {
-      background-color: var(--bg-overlay);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-    }
-
-    .chk-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 11px;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    /* Main Container */
-    .main-content {
-      display: flex;
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Tree Panel */
-    .tree-panel {
-      width: 240px;
-      background-color: var(--bg-surface);
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      flex-shrink: 0;
-      z-index: 10;
-      font-size: 11px;
-    }
-
-    .tree-panel.collapsed {
-      display: none;
-    }
-
-    .tree-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 10px;
-      border-bottom: 1px solid var(--border-color);
-      font-weight: bold;
-      font-size: 11px;
-    }
-
-    .tree-actions {
-      display: flex;
-      gap: 2px;
-    }
-
-    .tree-search-box {
-      padding: 5px 8px;
-      border-bottom: 1px solid var(--border-color);
-      background-color: var(--bg-base);
-    }
-
-    .tree-search-box input {
-      width: 100%;
-      background-color: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      color: var(--text-main);
-      padding: 3px 6px;
-      border-radius: 3px;
-      font-size: 10px;
-    }
-
-    .tree-search-box input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .tree-body {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 6px 4px;
-    }
-
-    .tree-item-row {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 4px;
-      border-radius: 3px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .tree-item-row:hover {
-      background-color: var(--bg-overlay);
-    }
-
-    .tree-item-row.selected {
-      background-color: var(--bg-overlay);
-      color: var(--accent);
-      font-weight: bold;
-      border-left: 2px solid var(--accent);
-    }
-
-    .tree-arrow {
-      display: inline-block;
-      width: 12px;
-      font-size: 8px;
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    .tree-arrow.expanded {
-      transform: rotate(90deg);
-    }
-
-    .tree-label {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .tree-meta {
-      font-size: 9px;
-      color: var(--text-muted);
-      margin-left: auto;
-    }
-
-    .tree-children {
-      padding-left: 12px;
-    }
-
-    .tree-children.collapsed {
-      display: none;
-    }
-
-    #cy-container {
-      flex: 1;
-      height: 100%;
-      background-color: var(--bg-base);
-    }
-
-    /* Floating Zoom Controls */
-    .floating-controls {
-      position: absolute;
-      bottom: 24px;
-      left: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      z-index: 20;
-    }
-
-    .floating-btn {
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-      border-radius: 4px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    }
-
-    /* Inspector Panel */
-    .inspector {
-      width: 280px;
-      background-color: var(--bg-surface);
-      border-left: 1px solid var(--border-color);
-      padding: 12px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      font-size: 12px;
-    }
-
-    .inspector.empty {
-      color: var(--text-muted);
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
-
-    .inspector:not(.empty) > * {
-      flex-shrink: 0;
-    }
-
-    .module-title {
-      font-size: 13px;
-      font-weight: bold;
-      word-break: break-all;
-      color: var(--accent);
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    .module-path {
-      font-size: 10px;
-      color: var(--text-muted);
-      word-break: break-all;
-      margin-bottom: 6px;
-    }
-
-    .symbol-tree-group {
-      border-left: 1px solid var(--border-color);
-      margin-left: 5px;
-      padding-left: 8px;
-    }
-
-    .symbol-tree-group > summary {
-      cursor: pointer;
-      padding: 4px 0;
-      font-size: 11px;
-    }
-
-    .symbol-tree-children {
-      margin-left: 8px;
-    }
-
-    .symbol-tree-function {
-      display: block;
-      width: 100%;
-      padding: 4px 0 4px 8px;
-      border: 0;
-      background: transparent;
-      color: var(--text-main);
-      text-align: left;
-      cursor: pointer;
-      font-size: 11px;
-    }
-
-    .symbol-tree-line {
-      color: var(--text-muted);
-      font-size: 10px;
-    }
-
-    .symbol-tree-open {
-      border: 0;
-      background: transparent;
-      color: var(--accent);
-      cursor: pointer;
-    }
-
-    .stat-badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-size: 10px;
-      font-weight: 600;
-      margin-right: 4px;
-      margin-bottom: 4px;
-    }
-
-    .badge-cycle {
-      background-color: rgba(243, 139, 168, 0.2);
-      color: var(--cycle-color);
-      border: 1px solid var(--cycle-color);
-    }
-
-    .badge-bloat {
-      background-color: rgba(250, 179, 135, 0.2);
-      color: var(--bloat-color);
-      border: 1px solid var(--bloat-color);
-    }
-
-    .stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin: 6px 0;
-    }
-
-    .stat-box {
-      background-color: var(--bg-base);
-      padding: 6px;
-      border-radius: 4px;
-      border: 1px solid var(--border-color);
-    }
-
-    .stat-box-title {
-      font-size: 9px;
-      color: var(--text-muted);
-    }
-
-    .stat-box-val {
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .import-list {
-      list-style: none;
-      max-height: 180px;
-      overflow-y: auto;
-      background-color: var(--bg-base);
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 4px;
-    }
-
-    .import-item {
-      padding: 3px 6px;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 11px;
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-main);
-    }
-
-    .import-item:hover {
-      background-color: var(--bg-overlay);
-      color: var(--accent);
-    }
-
-    /* Footer status */
-    .footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 10px;
-      background-color: var(--bg-surface);
-      border-top: 1px solid var(--border-color);
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-
-    /* Cytoscape element fade/hide */
-    .faded {
-      opacity: 0.1 !important;
-    }
-    .hidden {
-      display: none !important;
-    }
-
-    /* Dependency Modal Styles */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-overlay.hidden {
-      display: none !important;
-    }
-    .modal-container {
-      width: 90vw;
-      max-width: 1050px;
-      height: 85vh;
-      max-height: 800px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-      overflow: hidden;
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 14px;
-      background: var(--bg-overlay);
-      border-bottom: 1px solid var(--border-color);
-    }
-    .modal-body {
-      flex: 1;
-      position: relative;
-      background: var(--bg-base);
-      overflow: hidden;
-    }
-    .modal-legend {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 10;
-      background: rgba(24, 24, 37, 0.92);
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 6px 10px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .legend-box {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      display: inline-block;
-    }
-    .inbound-box {
-      background: #1e2e24;
-      border: 1.5px solid #a6e3a1;
-    }
-    .focal-box {
-      background: #2c281e;
-      border: 2px solid #f9e2af;
-    }
-    .outbound-box {
-      background: #182438;
-      border: 1.5px solid #89b4fa;
-    }
-    .legend-line {
-      width: 16px;
-      height: 2px;
-      display: inline-block;
-    }
-    .cycle-line {
-      background: #f38ba8;
-    }
-    .modal-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 14px;
-      background: var(--bg-overlay);
-      border-top: 1px solid var(--border-color);
-    }
-  </style>
-  <script src="cytoscape.min.js"></script>
-  <script src="cytoscape-dagre.min.js"></script>
-  <script src="cycle-insights.js"></script>
-</head>
-<body>
-  <div class="toolbar">
-    <button class="btn btn-primary" id="btn-show-overview" title="全モジュールの全体図を表示">🌐 全体図</button>
-    <button class="btn" id="btn-analyze" title="アクティブプロジェクトを再解析">⟳ 再解析</button>
-    <button class="btn active" id="btn-toggle-tree" title="ソースツリー表示切替">📁 ツリー</button>
-    <button class="btn" id="btn-fit" title="画面に全体を収める">Fit</button>
-    <input type="text" class="input-search" id="input-search" placeholder="モジュール検索...">
-
-    <label class="chk-label">
-      <input type="checkbox" id="chk-group-pkg" checked> パッケージ枠
-    </label>
-    <label class="chk-label">
-      <input type="checkbox" id="chk-focus" checked> フォーカス
-    </label>
-    <label class="chk-label">
-      <input type="checkbox" id="chk-only-cycle"> 循環のみ
-    </label>
-    <label class="chk-label">
-      <input type="checkbox" id="chk-only-bloat"> 肥大のみ
-    </label>
-
-    <select class="select" id="select-layout">
-      <option value="dagre">Dagre (階層)</option>
-      <option value="breadthfirst">幅優先</option>
-      <option value="concentric">同心円</option>
-      <option value="grid">グリッド</option>
-    </select>
-    <button class="btn" id="btn-flow-direction" title="依存図の流れを縦方向に切り替え">↔ 横表示</button>
-  </div>
-
-  <div class="main-content">
-    <div class="tree-panel" id="tree-panel">
-      <div class="tree-header">
-        <span>🐍 ソースツリー (.py)</span>
-        <div class="tree-actions">
-          <button class="btn" id="btn-tree-collapse" style="padding: 2px 5px; font-size: 10px;" title="すべて折りたたむ">&minus;</button>
-          <button class="btn" id="btn-tree-expand" style="padding: 2px 5px; font-size: 10px;" title="すべて展開">&#43;</button>
-        </div>
-      </div>
-      <div class="tree-search-box">
-        <input type="text" id="tree-search" placeholder="Python ファイル絞り込み...">
-      </div>
-      <div class="tree-body" id="tree-body">
-        <div style="color:var(--text-muted); text-align:center; padding:12px;">準備完了</div>
-      </div>
-    </div>
-
-    <div id="cy-container"></div>
-
-    <div class="floating-controls">
-      <button class="btn floating-btn" id="btn-zoom-in" title="拡大">+</button>
-      <button class="btn floating-btn" id="btn-zoom-out" title="縮小">−</button>
-      <button class="btn floating-btn" id="btn-zoom-reset" title="リセット">⊙</button>
-    </div>
-
-    <div class="inspector empty" id="inspector">
-      モジュールをクリックすると詳細を表示します。<br>
-      ダブルクリックで依存ダイアログ図を表示します。
-    </div>
-  </div>
-
-  <div class="footer">
-    <span id="status-info">準備完了</span>
-    <span id="metrics-summary">モジュール: 0 | エッジ: 0 | 循環: 0</span>
-  </div>
-
-  <!-- 依存関係ダイアログ図 モーダル -->
-  <div id="dependency-modal" class="modal-overlay hidden">
-    <div class="modal-container">
-      <div class="modal-header">
-        <div class="modal-title-area">
-          <span style="font-size:1.15rem;">📊</span>
-          <span style="font-weight:bold; font-size:12px;">依存ダイアログ図: <span id="modal-module-title" style="color:var(--accent);">module</span></span>
-          <div id="modal-header-badges" style="display:flex; gap:4px; margin-left:8px;"></div>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <label for="modal-layout-select" style="font-size:10px; color:var(--text-muted);">配置:</label>
-          <select id="modal-layout-select" class="select" style="font-size:10px; padding:2px 4px;">
-            <option value="dagre-lr">階層フロー (利用元 ➔ 指定 ➔ 利用先)</option>
-            <option value="dagre-tb">階層フロー (上 ➔ 下)</option>
-            <option value="cose">力学モデル</option>
-          </select>
-          <button id="btn-modal-fit" class="btn" style="padding:2px 6px; font-size:10px;" title="全体表示">全体表示</button>
-          <button id="btn-modal-zoom-in" class="btn" style="padding:2px 6px; font-size:10px;" title="拡大">&#43;</button>
-          <button id="btn-modal-zoom-out" class="btn" style="padding:2px 6px; font-size:10px;" title="縮小">&minus;</button>
-          <button id="btn-close-modal" class="btn" style="padding:2px 8px; font-weight:bold;" title="閉じる">&times;</button>
-        </div>
-      </div>
-
-      <div class="modal-body">
-        <div class="modal-legend">
-          <div class="legend-item"><span class="legend-box inbound-box"></span> 被依存モジュール (利用元)</div>
-          <div class="legend-item"><span class="legend-box focal-box"></span> 指定モジュール</div>
-          <div class="legend-item"><span class="legend-box outbound-box"></span> 依存モジュール (利用先)</div>
-          <div class="legend-item"><span class="legend-line cycle-line"></span> 循環インポート</div>
-        </div>
-        <div id="modal-cy-container" style="width:100%; height:100%;"></div>
-      </div>
-
-      <div class="modal-footer">
-        <div id="modal-cycles-info" style="flex:1; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
-        <div style="display:flex; gap:6px;">
-          <button id="btn-modal-jump-editor" class="btn btn-primary" style="font-size:11px;">PyCharmで開く</button>
-          <button id="btn-modal-close-footer" class="btn" style="font-size:11px;">閉じる</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    if (window.cytoscapeDagre) {
-      cytoscape.use(window.cytoscapeDagre);
-    }
-
-    let cy = null;
-    let currentResult = null;
-    let selectedNodeId = null;
-
-    // JCEF bridge
-    function jumpToEditor(filePath, line) {
-      if (window.cefQuery) {
-        window.cefQuery({
-          request: JSON.stringify({
-            type: "open_file",
-            path: filePath,
-            line: line || 1
-          }),
-          onSuccess: function(res) {},
-          onFailure: function(errCode, errMsg) {
-            console.error("Jump failed:", errMsg);
-          }
-        });
-      } else {
-        console.log("[Mock Jump]", filePath, line);
-      }
-    }
-
-    function triggerAnalyze() {
-      document.getElementById("status-info").textContent = "プロジェクトを解析中...";
-      if (window.cefQuery) {
-        window.cefQuery({
-          request: JSON.stringify({ type: "analyze" }),
-          onSuccess: function(res) {},
-          onFailure: function(errCode, errMsg) {
-            document.getElementById("status-info").textContent = "解析エラー: " + errMsg;
-          }
-        });
-      }
-    }
-
-    // Called from Java side to focus or open diagram for a specific file (e.g. from right-click menu)
-    window.openModuleByFilePath = function(filePath, openDiagram) {
-      if (!currentResult || !currentResult.modules) {
-        window._pendingOpenFilePath = { filePath, openDiagram: openDiagram !== false };
-        return;
-      }
-      const normPath = filePath.replace(/\\/g, "/");
-      const mod = currentResult.modules.find(m => {
-        const mAbs = (m.absolute_path || "").replace(/\\/g, "/");
-        const mRel = (m.relative_path || "").replace(/\\/g, "/");
-        return mAbs === normPath || normPath.endsWith("/" + mRel) || normPath.endsWith(mRel);
-      });
-      if (mod) {
-        if (openDiagram !== false) {
-          jumpToFileCentricDiagram(mod.id);
-        } else {
-          highlightModule(mod.id, true);
-        }
-      } else {
-        console.warn("Module not found for path: " + filePath);
-      }
-    };
-
-    // Called from Java/Kotlin side via executeJavaScript
-    window.renderModuleGraph = function(result) {
-      const previousMode = currentViewMode;
-      const previousNodeId = selectedNodeId;
-      currentResult = result;
-      document.getElementById("status-info").textContent = "解析完了: " + (result.root_path || "");
-      document.getElementById("metrics-summary").textContent =
-        `モジュール: ${result.modules.length} | エッジ: ${result.edges.length} | 循環: ${result.cycles.length} | 総LOC: ${result.total_loc}`;
-
-      currentViewMode = "overview";
-      selectedNodeId = null;
-      renderGraph(result);
-      switchToOverview();
-
-      if (window._pendingOpenFilePath) {
-        const pending = window._pendingOpenFilePath;
-        window._pendingOpenFilePath = null;
-        setTimeout(() => {
-          window.openModuleByFilePath(pending.filePath, pending.openDiagram);
-        }, 100);
-      } else if (previousMode === "file" && previousNodeId && result.modules.some(m => m.id === previousNodeId)) {
-        jumpToFileCentricDiagram(previousNodeId);
-      }
-    };
-
-    function initCytoscape() {
-      const container = document.getElementById("cy-container");
-      cy = cytoscape({
-        container: container,
-        style: [
-          // Standard module box card (no more circle/round nodes)
-          {
-            selector: "node:childless",
-            style: {
-              shape: "round-rectangle",
-              "background-color": "#181825",
-              "border-color": "#89b4fa",
-              "border-width": 2,
-              label: "data(label)",
-              color: "#cdd6f4",
-              "font-size": "11px",
-              "font-weight": 600,
-              "text-valign": "center",
-              "text-halign": "center",
-              "text-wrap": "wrap",
-              "text-max-width": "120px",
-              width: "data(width)",
-              height: "data(height)",
-              padding: "6px"
-            }
-          },
-          {
-            selector: ":parent",
-            style: {
-              shape: "round-rectangle",
-              "background-color": "#313244",
-              "background-opacity": 0.15,
-              "border-color": "#585b70",
-              "border-width": 1.5,
-              "border-style": "dashed",
-              label: "data(label)",
-              color: "#a6adc8",
-              "font-size": "12px",
-              "font-weight": "bold",
-              "text-valign": "top",
-              "text-halign": "center",
-              "text-margin-y": 6,
-              padding: "16px"
-            }
-          },
-          {
-            selector: "node.file-mode-package",
-            style: {
-              "background-opacity": 0,
-              "border-width": 0,
-              label: "",
-              padding: "0px"
-            }
-          },
-          {
-            selector: "node.in-cycle:childless",
-            style: {
-              "border-color": "#ff4d4d",
-              "border-width": 4,
-              "background-color": "#38141e",
-              color: "#ff8099",
-              "font-weight": "bold",
-              "z-index": 500
-            }
-          },
-          {
-            selector: "node.oversized:childless",
-            style: {
-              "border-color": "#fab387",
-              "border-width": 3,
-              "background-color": "#2e2520",
-              color: "#fab387"
-            }
-          },
-          {
-            selector: "node:selected",
-            style: {
-              "border-color": "#f9e2af",
-              "border-width": 4,
-              "background-color": "#363a4f",
-              color: "#f9e2af",
-              "font-weight": "bold",
-              "z-index": 900
-            }
-          },
-          {
-            selector: "node.in-cycle:selected",
-            style: {
-              "border-color": "#ff2222",
-              "border-width": 5,
-              "background-color": "#521626",
-              color: "#ffffff",
-              "font-weight": "bold",
-              "z-index": 950
-            }
-          },
-          {
-            selector: "node.highlighted-in-node:childless",
-            style: {
-              "border-color": "#a6e3a1",
-              "border-width": 3.5,
-              "background-color": "#1e2e24",
-              color: "#a6e3a1",
-              "font-weight": "bold",
-              "z-index": 800
-            }
-          },
-          {
-            selector: "node.highlighted-out-node:childless",
-            style: {
-              "border-color": "#89b4fa",
-              "border-width": 3.5,
-              "background-color": "#182438",
-              color: "#89b4fa",
-              "font-weight": "bold",
-              "z-index": 800
-            }
-          },
-          // Circular nodes keep strong red border & background even when highlighted as inbound or outbound
-          {
-            selector: "node.in-cycle.highlighted-in-node:childless, node.in-cycle.highlighted-out-node:childless",
-            style: {
-              "border-color": "#ff3333",
-              "border-width": 4.5,
-              "background-color": "#4a1525",
-              color: "#ffffff",
-              "font-weight": "bold",
-              "z-index": 960
-            }
-          },
-          {
-            selector: "edge",
-            style: {
-              width: "mapData(count, 1, 5, 2.0, 3.5)",
-              "line-color": "#6c7086",
-              "target-arrow-color": "#89b4fa",
-              "target-arrow-shape": "triangle",
-              "curve-style": "bezier",
-              "control-point-step-size": 40,
-              opacity: 0.85,
-              "arrow-scale": 1.35
-            }
-          },
-          {
-            selector: "edge.highlighted-in",
-            style: {
-              width: 3.5,
-              "line-color": "#a6e3a1",
-              "target-arrow-color": "#a6e3a1",
-              opacity: 1.0,
-              "z-index": 700
-            }
-          },
-          {
-            selector: "edge.highlighted-out",
-            style: {
-              width: 3.5,
-              "line-color": "#89b4fa",
-              "target-arrow-color": "#89b4fa",
-              opacity: 1.0,
-              "z-index": 700
-            }
-          },
-          // Circular edges: Red dashed line with high visibility, wide curve and prominent warning label
-          {
-            selector: "edge.cycle-edge",
-            style: {
-              width: 4.5,
-              "line-color": "#ff4d4d",
-              "target-arrow-color": "#ff4d4d",
-              "target-arrow-shape": "triangle",
-              "line-style": "dashed",
-              "line-dash-pattern": [6, 4],
-              "curve-style": "bezier",
-              "control-point-step-size": 55,
-              "arrow-scale": 1.7,
-              opacity: 1.0,
-              label: "data(cycleLabel)",
-              "font-size": "10px",
-              "font-weight": "bold",
-              color: "#ff8599",
-              "text-background-opacity": 0.95,
-              "text-background-color": "#1e1e2e",
-              "text-background-padding": "3px",
-              "text-background-shape": "roundrectangle",
-              "text-border-color": "#ff4d4d",
-              "text-border-width": 1,
-              "text-border-opacity": 0.8,
-              "z-index": 1000
-            }
-          },
-          // Never let normal highlighted-in/out override circular danger edges
-          {
-            selector: "edge.cycle-edge.highlighted-in, edge.cycle-edge.highlighted-out",
-            style: {
-              width: 5.5,
-              "line-color": "#ff2222",
-              "target-arrow-color": "#ff2222",
-              "target-arrow-shape": "triangle",
-              "line-style": "dashed",
-              "line-dash-pattern": [6, 4],
-              "curve-style": "bezier",
-              "control-point-step-size": 60,
-              "arrow-scale": 2.0,
-              opacity: 1.0,
-              label: "data(cycleLabel)",
-              "font-size": "11px",
-              "font-weight": "bold",
-              color: "#ffffff",
-              "text-background-opacity": 1.0,
-              "text-background-color": "#4a121d",
-              "text-background-padding": "4px",
-              "text-background-shape": "roundrectangle",
-              "text-border-color": "#ff3333",
-              "text-border-width": 1.5,
-              "z-index": 1200
-            }
-          },
-          {
-            selector: ".faded",
-            style: {
-              opacity: 0.12,
-              "text-opacity": 0.15
-            }
-          },
-          {
-            selector: "edge.faded",
-            style: {
-              opacity: 0.04
-            }
-          },
-          {
-            selector: ".hidden",
-            style: {
-              display: "none"
-            }
-          },
-          {
-            selector: "node.focal-node",
-            style: {
-              "border-color": "#a6e3a1",
-              "border-width": 3,
-              "background-color": "#1e3a29",
-              color: "#a6e3a1",
-              "font-size": "12px",
-              "font-weight": "bold",
-              "z-index": 999
-            }
-          },
-          {
-            selector: "node.root-node",
-            style: {
-              "border-color": "#94e2d5",
-              "border-width": 2.5,
-              "background-color": "#182a30",
-              color: "#94e2d5",
-              "font-size": "11px",
-              "font-weight": "bold",
-              "z-index": 998
-            }
-          }
-        ]
-      });
-
-      // Single tap focuses the module within the overview; double tap opens its dependency diagram.
-      cy.on("tap", "node:childless", function(evt) {
-        const node = evt.target;
-        highlightModule(node.id(), false);
-      });
-
-      cy.on("dbltap", "node:childless", function(evt) {
-        const node = evt.target;
-        jumpToFileCentricDiagram(node.id());
-      });
-
-      cy.on("tap", function(evt) {
-        if (evt.target === cy) {
-          clearHighlights();
-          selectedNodeId = null;
-          document.querySelectorAll("#tree-body .tree-item-row.selected").forEach(el => el.classList.remove("selected"));
-          if (currentViewMode === "overview") {
-            const inspector = document.getElementById("inspector");
-            inspector.className = "inspector empty";
-            inspector.innerHTML = `
-              <div style="text-align:center; padding:20px 8px; color:var(--text-muted);">
-                <div style="font-size:1.5rem; margin-bottom:8px;">🌐 全体図</div>
-                <p style="font-size:11px; line-height:1.6;">
-                  モジュールを<b>クリック</b>で詳細表示<br>
-                  <b style="color:var(--accent);">ダブルクリックでそのファイルの依存図へジャンプ</b>します。
-                </p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ModuleLoom</title>
+    <script defer src="./assets/index.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="controls-area">
+          <input type="text" id="project-path-input" placeholder="Python プロジェクトのパス (/path/to/project)" />
+          <button id="btn-analyze" class="btn-primary">解析実行</button>
+          <div class="primary-actions">
+            <button id="btn-back" class="btn-secondary" title="前の表示に戻る">← 戻る</button>
+            <button id="btn-show-overview" class="btn-secondary" title="プロジェクト全モジュールの全体図を表示">全体図</button>
+          </div>
+          <div class="search-box-header">
+            <input type="text" id="search-input" placeholder="図内のモジュールを検索..." />
+            <button id="btn-search-issues" class="btn-secondary" title="問題・エラー一覧を表示">問題一覧</button>
+          </div>
+          <div class="toolbar-menus">
+            <details class="toolbar-menu">
+              <summary>表示</summary>
+              <div class="toolbar-menu-content">
+                <div class="menu-actions">
+                  <button id="btn-toggle-tree" class="btn-secondary active" title="ソースツリーの表示/非表示">ソースツリー</button>
+                  <button id="btn-toggle-inspector" class="btn-secondary active" title="モジュール詳細の表示/非表示">モジュール詳細</button>
+                </div>
+                <div class="filter-controls">
+                  <label title="LOCや関数数が肥大化したモジュールのみ表示"><input type="checkbox" id="chk-only-bloat" /> 肥大化のみ</label>
+                  <label title="選択モジュールの直接の依存・被依存のみ表示"><input type="checkbox" id="chk-direct-only" checked /> 直接依存のみ</label>
+                  <label title="ディレクトリ階層ごとに枠で囲む"><input type="checkbox" id="chk-group-packages" checked /> パッケージ枠</label>
+                  <label title="選択ノードの直接の依存関係のみハイライト"><input type="checkbox" id="chk-focus-mode" checked /> フォーカス</label>
+                  <label title="プロジェクト外への import を全体図に表示"><input type="checkbox" id="chk-externals" /> 外部ノード</label>
+                  <label title="全体図で選択モジュールから表示する距離">表示範囲 <select id="graph-radius"><option value="all">全体</option><option value="1">1ホップ</option><option value="2">2ホップ</option><option value="3">3ホップ</option></select></label>
+                  <label title="全体図でモジュールをパッケージごとにまとめる">集約 <select id="cluster-limit"><option value="0">なし</option><option value="5">6件以上</option><option value="10">11件以上</option><option value="20">21件以上</option></select></label>
+                  <label>レイアウト <select id="layout-select"><option value="dagre">階層フロー</option><option value="breadthfirst">幅優先ツリー</option><option value="cose">力学モデル</option><option value="concentric">同心円</option></select></label>
+                </div>
               </div>
-            `;
-          }
-        }
-      });
-    }
-
-    let currentViewMode = "overview"; // "overview" | "file"
-    let fileDiagramModuleId = null;
-    let flowDirection = localStorage.getItem("flow_direction") === "TB" ? "TB" : "LR";
-
-    function updateFlowDirectionButton() {
-      const button = document.getElementById("btn-flow-direction");
-      button.textContent = flowDirection === "LR" ? "↔ 横表示" : "↕ 縦表示";
-      button.title = flowDirection === "LR" ? "依存図の流れを縦方向に切り替え" : "依存図の流れを横方向に切り替え";
-    }
-
-    function toggleFlowDirection() {
-      flowDirection = flowDirection === "LR" ? "TB" : "LR";
-      localStorage.setItem("flow_direction", flowDirection);
-      updateFlowDirectionButton();
-      if (currentViewMode === "file" && fileDiagramModuleId) {
-        const inspectedModuleId = selectedNodeId;
-        jumpToFileCentricDiagram(fileDiagramModuleId);
-        if (inspectedModuleId && inspectedModuleId !== fileDiagramModuleId) highlightModule(inspectedModuleId, false);
-      } else {
-        document.getElementById("select-layout").value = "dagre";
-        runLayout();
-      }
-    }
-
-    function switchToOverview() {
-      if (!cy || !currentResult) return;
-      currentViewMode = "overview";
-      selectedNodeId = null;
-      fileDiagramModuleId = null;
-
-      // Clear tree selections
-      document.querySelectorAll("#tree-body .tree-item-row.selected").forEach(el => el.classList.remove("selected"));
-
-      // Unhide all elements & clear highlights
-      cy.elements().removeClass("hidden faded highlighted-in highlighted-out highlighted-in-node highlighted-out-node");
-      applyFilters();
-      runLayout();
-      updateOverviewButton();
-
-      const inspector = document.getElementById("inspector");
-      inspector.className = "inspector empty";
-      inspector.innerHTML = `
-        <div style="text-align:center; padding:20px 8px; color:var(--text-muted);">
-          <div style="font-size:1.5rem; margin-bottom:8px;">🌐 全体図</div>
-          <p style="font-size:11px; line-height:1.6;">
-            モジュールを<b>クリック</b>で詳細表示<br>
-            <b style="color:var(--accent);">ダブルクリックでそのファイルの依存図へジャンプ</b>します。
-          </p>
+            </details>
+            <details class="toolbar-menu">
+              <summary>分析</summary>
+              <div class="toolbar-menu-content">
+                <div class="menu-actions">
+                  <button id="btn-git-history" class="btn-secondary" title="変更された Python ファイルを依存図で強調">変更ファイルを強調</button>
+                  <button id="btn-history" class="btn-secondary" title="解析履歴を表示">解析履歴</button>
+                </div>
+                <label id="fix-tool-control" hidden>循環解消ツール <select id="fix-tool-select"><option value="ruff">Ruff (TC001)</option></select></label>
+                <div class="chain-controls">
+                  <span>import 経路検索</span>
+                  <select id="chain-from" aria-label="経路の出発モジュール"><option value="">出発モジュール</option></select>
+                  <select id="chain-to" aria-label="経路の到着モジュール"><option value="">到着モジュール</option></select>
+                  <button id="btn-find-chain" class="btn-secondary" title="最短の import 経路を表示">検索</button>
+                </div>
+              </div>
+            </details>
+            <details class="toolbar-menu">
+              <summary>出力</summary>
+              <div class="toolbar-menu-content">
+                <div class="menu-actions">
+                  <button id="btn-export-report" class="btn-secondary" title="現在の解析結果を JSON で保存">解析データを JSON で保存</button>
+                  <button id="btn-export-mkdocs" class="btn-secondary" title="全体図とモジュール別マニュアルを MkDocs 用に生成">MkDocs 出力</button>
+                </div>
+              </div>
+            </details>
+          </div>
+          <input type="checkbox" id="chk-watch" checked hidden />
+          <input type="checkbox" id="chk-only-cycles" hidden />
         </div>
-      `;
-
-      document.getElementById("status-info").textContent = "全体図を表示中 (ダブルクリックで依存図へジャンプ)";
-    }
-
-    // Single click: highlights module, connections, tree item and updates inspector WITHOUT jumping diagram
-    function highlightModule(moduleId, focusGraph) {
-      if (!cy || !currentResult) return;
-      const mod = currentResult.modules.find(m => m.id === moduleId);
-      if (!mod) return;
-
-      selectedNodeId = moduleId;
-      renderInspector(mod);
-      highlightTreeNode(moduleId);
-
-      const node = cy.$id(moduleId);
-      if (node.length > 0 && !node.hasClass("hidden")) {
-        highlightConnections(node);
-        if (focusGraph) {
-          cy.animate({
-            center: { eles: node },
-            zoom: Math.max(cy.zoom(), 1.05),
-            duration: 250
-          });
-        }
-      }
-
-      document.getElementById("status-info").textContent =
-        node.hasClass("hidden") && currentViewMode === "file"
-          ? `選択中: [${mod.name}] は現在の依存図に含まれません (ダブルクリックで依存図を表示)`
-          : `選択中: [${mod.name}] (ダブルクリックでこのファイルの依存図へジャンプ)`;
-    }
-
-    function calculateFileCentricGraph(selectedMod, result) {
-      const selectedModId = selectedMod.id;
-      const allOutMap = new Map();
-      const allInMap = new Map();
-      const topOutMap = new Map();
-      const topInMap = new Map();
-
-      result.modules.forEach(m => {
-        allOutMap.set(m.id, []);
-        allInMap.set(m.id, []);
-        topOutMap.set(m.id, []);
-        topInMap.set(m.id, []);
-      });
-
-      result.edges.forEach(e => {
-        allOutMap.get(e.source)?.push(e.target);
-        allInMap.get(e.target)?.push(e.source);
-        if (!e.is_deferred && !e.is_type_checking) {
-          topOutMap.get(e.source)?.push(e.target);
-          topInMap.get(e.target)?.push(e.source);
-        }
-      });
-
-      const crashingCycles = result.cycles || [];
-      const relevantCycles = [];
-      const cycleModules = new Set();
-
-      for (const cycle of crashingCycles) {
-        const cycleNodes = new Set(cycle.modules);
-        if (cycleNodes.has(selectedModId)) {
-          relevantCycles.push(cycle);
-          cycle.modules.forEach(m => cycleModules.add(m));
-          continue;
-        }
-
-        let reachesCycle = false;
-        const visitedFwd = new Set([selectedModId]);
-        const queueFwd = [selectedModId];
-        while (queueFwd.length > 0) {
-          const curr = queueFwd.shift();
-          if (cycleNodes.has(curr)) {
-            reachesCycle = true;
-            break;
-          }
-          for (const next of topOutMap.get(curr) || []) {
-            if (!visitedFwd.has(next)) {
-              visitedFwd.add(next);
-              queueFwd.push(next);
-            }
-          }
-        }
-        if (reachesCycle) {
-          relevantCycles.push(cycle);
-          cycle.modules.forEach(m => cycleModules.add(m));
-          continue;
-        }
-
-        let reachedFromCycle = false;
-        for (const cNode of cycle.modules) {
-          const visitedBwd = new Set([cNode]);
-          const queueBwd = [cNode];
-          while (queueBwd.length > 0) {
-            const curr = queueBwd.shift();
-            if (curr === selectedModId) {
-              reachedFromCycle = true;
-              break;
-            }
-            for (const next of topOutMap.get(curr) || []) {
-              if (!visitedBwd.has(next)) {
-                visitedBwd.add(next);
-                queueBwd.push(next);
-              }
-            }
-          }
-          if (reachedFromCycle) break;
-        }
-        if (reachedFromCycle) {
-          relevantCycles.push(cycle);
-          cycle.modules.forEach(m => cycleModules.add(m));
-        }
-      }
-
-      const allowedNodeIds = new Set();
-      const allowedEdgeKeys = new Set();
-      allowedNodeIds.add(selectedModId);
-      (allOutMap.get(selectedModId) || []).forEach(tgt => {
-        allowedNodeIds.add(tgt);
-        allowedEdgeKeys.add(`${selectedModId}->${tgt}`);
-      });
-      (allInMap.get(selectedModId) || []).forEach(src => {
-        allowedNodeIds.add(src);
-        allowedEdgeKeys.add(`${src}->${selectedModId}`);
-      });
-
-      const rootsList = [];
-      const rootPaths = [];
-
-      if (relevantCycles.length > 0) {
-        for (const cycle of relevantCycles) {
-          const cycleNodes = new Set(cycle.modules);
-          cycle.modules.forEach(m => allowedNodeIds.add(m));
-
-          result.edges.forEach(e => {
-            if (cycleNodes.has(e.source) && cycleNodes.has(e.target)) {
-              allowedEdgeKeys.add(`${e.source}->${e.target}`);
-            }
-          });
-
-          const ancestors = new Set();
-          const queue = [...cycle.modules];
-          const visitedRev = new Set(cycle.modules);
-
-          while (queue.length > 0) {
-            const curr = queue.shift();
-            for (const parent of topInMap.get(curr) || []) {
-              if (!visitedRev.has(parent)) {
-                visitedRev.add(parent);
-                ancestors.add(parent);
-                queue.push(parent);
-              }
-            }
-          }
-
-          const roots = [...ancestors].filter(mId => {
-            const ins = topInMap.get(mId) || [];
-            return ins.length === 0 || ins.every(p => !ancestors.has(p));
-          });
-          roots.forEach(r => rootsList.push(r));
-
-          for (const root of roots) {
-            const q = [{ curr: root, path: [root] }];
-            const seen = new Set([root]);
-            let foundPath = false;
-
-            while (q.length > 0) {
-              const item = q.shift();
-              if (cycleNodes.has(item.curr)) {
-                rootPaths.push(item.path);
-                item.path.forEach(p => allowedNodeIds.add(p));
-                for (let k = 0; k < item.path.length - 1; k++) {
-                  allowedEdgeKeys.add(`${item.path[k]}->${item.path[k + 1]}`);
-                }
-                foundPath = true;
-                break;
-              }
-              for (const next of topOutMap.get(item.curr) || []) {
-                if (ancestors.has(next) && !seen.has(next)) {
-                  seen.add(next);
-                  q.push({ curr: next, path: [...item.path, next] });
-                }
-              }
-            }
-            if (!foundPath) {
-              ancestors.forEach(a => allowedNodeIds.add(a));
-            }
-          }
-
-          if (!cycleNodes.has(selectedModId)) {
-            const traceQueue = [selectedModId];
-            const traceVisited = new Set([selectedModId]);
-            while (traceQueue.length > 0) {
-              const curr = traceQueue.shift();
-              for (const next of topOutMap.get(curr) || []) {
-                if (visitedRev.has(next)) {
-                  allowedNodeIds.add(next);
-                  allowedEdgeKeys.add(`${curr}->${next}`);
-                  if (!traceVisited.has(next)) {
-                    traceVisited.add(next);
-                    traceQueue.push(next);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return {
-        allowedNodeIds,
-        allowedEdgeKeys,
-        hasCrashingCycle: relevantCycles.length > 0,
-        roots: [...new Set(rootsList)],
-        cycleModules,
-        rootPaths,
-      };
-    }
-
-    // Jumps to the file-centric dependency diagram for the selected module
-    function jumpToFileCentricDiagram(moduleId) {
-      if (!cy || !currentResult) return;
-      const mod = currentResult.modules.find(m => m.id === moduleId);
-      if (!mod) return;
-
-      currentViewMode = "file";
-      selectedNodeId = moduleId;
-      fileDiagramModuleId = moduleId;
-
-      const fileData = calculateFileCentricGraph(mod, currentResult);
-
-      // 1. Filter nodes
-      cy.nodes(":childless").forEach(n => {
-        const id = n.id();
-        const m = currentResult.modules.find(x => x.id === id);
-        const name = m ? m.name : id.split(".").pop();
-        if (fileData.allowedNodeIds.has(id)) {
-          n.removeClass("hidden");
-          n.removeClass("focal-node root-node");
-          if (id === moduleId) {
-            n.addClass("focal-node");
-            n.data("label", `🎯 ${name}\n[起点モジュール]`);
-          } else if (fileData.roots.includes(id)) {
-            n.addClass("root-node");
-            n.data("label", `🌱 ${name}\n[ルーツ]`);
-          } else if (fileData.cycleModules.has(id)) {
-            n.data("label", `🚨 ${name}\n[循環]`);
-          } else {
-            n.data("label", name);
-          }
-        } else {
-          n.addClass("hidden");
-        }
-      });
-
-      // 2. Filter edges
-      cy.edges().forEach(e => {
-        const sId = e.source().id();
-        const tId = e.target().id();
-        const edgeKey = `${sId}->${tId}`;
-        if (fileData.allowedNodeIds.has(sId) && fileData.allowedNodeIds.has(tId) && fileData.allowedEdgeKeys.has(edgeKey)) {
-          e.removeClass("hidden");
-        } else {
-          e.addClass("hidden");
-        }
-      });
-
-      // 3. Keep package parents visible so their child modules remain visible.
-      cy.nodes(":parent").forEach(p => {
-        p.addClass("file-mode-package");
-        if (p.children().not(".hidden").length > 0) p.removeClass("hidden");
-        else p.addClass("hidden");
-      });
-
-      // 4. Layout visible elements
-      const visibleNodes = cy.nodes(":childless").not(".hidden");
-      const visibleEdges = cy.edges().not(".hidden");
-      const visibleEles = visibleNodes.union(visibleEdges);
-
-      if (visibleNodes.length > 0) {
-        visibleEles.layout({
-          name: "dagre",
-          rankDir: flowDirection,
-          nodeSep: 50,
-          rankSep: 140,
-          edgeSep: 35,
-          padding: 50,
-          animate: false
-        }).run();
-        cy.fit(visibleEles, 50);
-        if (cy.zoom() > 1.2) {
-          cy.zoom(1.2);
-          cy.center(visibleEles);
-        }
-      }
-
-      // 5. Highlights
-      clearHighlights();
-      const node = cy.$id(moduleId);
-      if (node.length > 0) {
-        const inEdges = node.incomers("edge").not(".hidden");
-        const outEdges = node.outgoers("edge").not(".hidden");
-        const inNodes = inEdges.sources("node:childless").not(".hidden");
-        const outNodes = outEdges.targets("node:childless").not(".hidden");
-
-        inEdges.addClass("highlighted-in");
-        outEdges.addClass("highlighted-out");
-        inNodes.addClass("highlighted-in-node");
-        outNodes.addClass("highlighted-out-node");
-      }
-
-      // 6. Update inspector, tree, and button state
-      renderInspector(mod);
-      highlightTreeNode(moduleId);
-      updateOverviewButton();
-
-      if (fileData.hasCrashingCycle) {
-        const rootNames = fileData.roots.map(r => r.split(".").pop()).join(", ") || "エントリポイント";
-        const cyclePartners = [...fileData.cycleModules].map(m => m.split(".").pop()).join(" ⟷ ");
-        document.getElementById("status-info").innerHTML =
-          `<span style="color:var(--cycle-color); font-weight:bold;">⚠️【トップレベルの循環インポート】</span> ルーツ [${rootNames}] からのインポート経路と循環 [${cyclePartners}] を描画中`;
-      } else {
-        document.getElementById("status-info").textContent =
-          `ファイル起点依存図: [${mod.name}] (全体図ボタンで全体図に戻る)`;
-      }
-    }
-
-    function selectModuleById(moduleId, focusGraph) {
-      jumpToFileCentricDiagram(moduleId);
-    }
-
-    function updateOverviewButton() {
-      const btn = document.getElementById("btn-show-overview");
-      if (!btn) return;
-      if (currentViewMode === "overview") {
-        btn.className = "btn btn-primary active";
-        btn.innerHTML = "🌐 全体図 (表示中)";
-        btn.title = "現在全体図を表示しています";
-      } else {
-        btn.className = "btn btn-primary";
-        btn.innerHTML = "🌐 全体図";
-        btn.title = "全モジュールの全体図を表示します";
-      }
-    }
-
-    function highlightTreeNode(moduleId) {
-      const treeBody = document.getElementById("tree-body");
-      if (!treeBody) return;
-      treeBody.querySelectorAll(".tree-item-row.selected").forEach(el => el.classList.remove("selected"));
-      const row = treeBody.querySelector(`.tree-item-row[data-module-id="${moduleId}"]`);
-      if (row) {
-        row.classList.add("selected");
-        let parent = row.closest(".tree-children");
-        while (parent) {
-          parent.classList.remove("collapsed");
-          const parentNode = parent.parentElement;
-          const arrow = parentNode?.querySelector(":scope > .tree-item-row .tree-arrow");
-          if (arrow) arrow.classList.add("expanded");
-          parent = parentNode?.parentElement?.closest(".tree-children") || null;
-        }
-        row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
-    }
-
-    function highlightConnections(node) {
-      if (!cy || node.hasClass("hidden")) return;
-      clearHighlights();
-      const focusMode = document.getElementById("chk-focus").checked;
-
-      const inEdges = node.incomers("edge");
-      const outEdges = node.outgoers("edge");
-      const inNodes = inEdges.sources("node:childless");
-      const outNodes = outEdges.targets("node:childless");
-
-      inEdges.addClass("highlighted-in");
-      outEdges.addClass("highlighted-out");
-      inNodes.addClass("highlighted-in-node");
-      outNodes.addClass("highlighted-out-node");
-
-      if (focusMode) {
-        const active = node.union(inNodes).union(outNodes).union(inEdges).union(outEdges).union(node.parents());
-        cy.elements().difference(active).addClass("faded");
-      }
-    }
-
-    function clearHighlights() {
-      if (!cy) return;
-      cy.elements().removeClass("highlighted-in highlighted-out highlighted-in-node highlighted-out-node faded");
-    }
-
-    function renderGraph(result) {
-      if (!cy) initCytoscape();
-
-      const cycleNodeIds = new Set();
-      result.cycles.forEach(c => c.modules.forEach(m => cycleNodeIds.add(m)));
-
-      const elements = [];
-      const groupPackages = document.getElementById("chk-group-pkg").checked;
-      const packageParents = new Set();
-
-      // 1. Nodes
-      result.modules.forEach(mod => {
-        const isCycle = cycleNodeIds.has(mod.id);
-        const label = isCycle ? `🚨 ${mod.name}\n[循環参照]` : mod.name;
-        const width = isCycle
-          ? Math.max(130, Math.min(185, mod.name.length * 9 + 40))
-          : Math.max(120, Math.min(170, mod.name.length * 9 + 30));
-        const height = isCycle ? 48 : 40;
-
-        const classes = [];
-        if (isCycle) classes.push("in-cycle");
-        if (mod.is_oversized) classes.push("oversized");
-
-        let parentId = undefined;
-        if (groupPackages) {
-          const parts = mod.id.split(".");
-          if (parts.length > 1) {
-            const pkgPath = parts.slice(0, -1).join(".");
-            parentId = "pkg:" + pkgPath;
-            if (!packageParents.has(parentId)) {
-              packageParents.add(parentId);
-              elements.push({
-                group: "nodes",
-                data: {
-                  id: parentId,
-                  label: parts.slice(0, -1).pop() || pkgPath
-                }
-              });
-            }
-          }
-        }
-
-        elements.push({
-          group: "nodes",
-          data: {
-            id: mod.id,
-            label: label,
-            loc: mod.loc,
-            width: width,
-            height: height,
-            parent: parentId
-          },
-          classes: classes.join(" ")
-        });
-      });
-
-      // 2. Edges (Aggregated)
-      result.edges.forEach((edge, idx) => {
-        const classes = [];
-        if (edge.is_circular) classes.push("cycle-edge");
-
-        elements.push({
-          group: "edges",
-          data: {
-            id: `e-${idx}`,
-            source: edge.source,
-            target: edge.target,
-            line: edge.line,
-            count: edge.import_count || 1,
-            cycleLabel: edge.is_circular ? `🚨 循環 (L:${edge.line})` : ""
-          },
-          classes: classes.join(" ")
-        });
-      });
-
-      cy.elements().remove();
-      cy.add(elements);
-
-      runLayout();
-      applyFilters();
-      renderTree(result);
-    }
-
-    function buildFileTree(modules) {
-      const root = {
-        name: "root",
-        relPath: "",
-        isDir: true,
-        children: new Map()
-      };
-
-      for (const mod of modules) {
-        const parts = mod.relative_path.split(/[/\\]+/).filter(Boolean);
-        let current = root;
-
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i];
-          const isLast = (i === parts.length - 1);
-          const currentRelPath = parts.slice(0, i + 1).join("/");
-
-          if (isLast) {
-            current.children.set(part, {
-              name: part,
-              relPath: currentRelPath,
-              isDir: false,
-              module: mod,
-              children: new Map()
-            });
-          } else {
-            if (!current.children.has(part)) {
-              current.children.set(part, {
-                name: part,
-                relPath: currentRelPath,
-                isDir: true,
-                children: new Map()
-              });
-            }
-            current = current.children.get(part);
-          }
-        }
-      }
-
-      return root;
-    }
-
-    function countPythonFiles(node) {
-      if (!node.isDir) return 1;
-      let count = 0;
-      for (const child of node.children.values()) {
-        count += countPythonFiles(child);
-      }
-      return count;
-    }
-
-    function createTreeElement(node, cycleSet, isRoot = false) {
-      const container = document.createElement("div");
-      if (!isRoot) {
-        container.className = "tree-node";
-        container.dataset.path = node.relPath;
-      }
-
-      if (!isRoot) {
-        const row = document.createElement("div");
-        row.className = "tree-item-row";
-
-        if (node.isDir) {
-          row.innerHTML = `
-            <span class="tree-arrow expanded">▶</span>
-            <span>📁</span>
-            <span class="tree-label" title="${node.relPath}">${node.name}</span>
-            <span class="tree-meta">(${countPythonFiles(node)})</span>
-          `;
-          row.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const arrow = row.querySelector(".tree-arrow");
-            const childrenContainer = container.querySelector(":scope > .tree-children");
-            if (childrenContainer) {
-              const isCollapsed = childrenContainer.classList.toggle("collapsed");
-              if (arrow) arrow.classList.toggle("expanded", !isCollapsed);
-            }
-          });
-        } else {
-          const mod = node.module;
-          row.dataset.moduleId = mod.id;
-          row.dataset.relPath = node.relPath;
-
-          const isCycle = cycleSet.has(mod.id);
-          const isBloat = mod.is_oversized;
-
-          let badge = "";
-          if (isCycle) badge = '<span style="color:var(--cycle-color); font-weight:bold; font-size:8px;">[循環]</span>';
-          else if (isBloat) badge = '<span style="color:var(--bloat-color); font-weight:bold; font-size:8px;">[肥大]</span>';
-
-          row.innerHTML = `
-            <span class="tree-arrow" style="visibility:hidden;">▶</span>
-            <span>🐍</span>
-            <span class="tree-label" title="${node.relPath}">${node.name}</span>
-            ${badge}
-            <span class="tree-meta">${mod.loc}L</span>
-            <button class="btn-tree-jump" title="外部エディタで開く" style="background:transparent;border:none;cursor:pointer;font-size:11px;opacity:0.6;padding:0 2px;">📝</button>
-          `;
-
-          row.querySelector(".btn-tree-jump")?.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (mod.absolute_path) jumpToEditor(mod.absolute_path, 1);
-          });
-
-          row.addEventListener("click", (e) => {
-            e.stopPropagation();
-            highlightModule(mod.id, true);
-          });
-
-          row.addEventListener("dblclick", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            jumpToFileCentricDiagram(mod.id);
-          });
-        }
-
-        container.appendChild(row);
-      }
-
-      if (node.children.size > 0) {
-        const childrenContainer = document.createElement("div");
-        childrenContainer.className = "tree-children";
-
-        const sorted = Array.from(node.children.values()).sort((a, b) => {
-          if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        });
-
-        for (const child of sorted) {
-          childrenContainer.appendChild(createTreeElement(child, cycleSet));
-        }
-
-        container.appendChild(childrenContainer);
-      }
-
-      return container;
-    }
-
-    function renderTree(result) {
-      const treeBody = document.getElementById("tree-body");
-      if (!treeBody) return;
-
-      const cycleSet = new Set();
-      result.cycles.forEach(c => c.modules.forEach(m => cycleSet.add(m)));
-
-      const root = buildFileTree(result.modules);
-      treeBody.innerHTML = "";
-
-      if (root.children.size === 0) {
-        treeBody.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:12px;">Python ファイルがありません</div>';
-        return;
-      }
-
-      const domTree = createTreeElement(root, cycleSet, true);
-      treeBody.appendChild(domTree);
-
-      if (selectedNodeId) {
-        highlightTreeNode(selectedNodeId);
-      }
-    }
-
-    function filterTree() {
-      const query = document.getElementById("tree-search").value.trim().toLowerCase();
-      const treeBody = document.getElementById("tree-body");
-      if (!treeBody) return;
-
-      const fileRows = treeBody.querySelectorAll(".tree-item-row[data-module-id]");
-      if (!query) {
-        treeBody.querySelectorAll(".tree-node").forEach(el => el.style.display = "");
-        return;
-      }
-
-      treeBody.querySelectorAll(".tree-node").forEach(el => el.style.display = "none");
-
-      fileRows.forEach(row => {
-        const relPath = (row.dataset.relPath || "").toLowerCase();
-        const label = (row.querySelector(".tree-label")?.textContent || "").toLowerCase();
-        if (relPath.includes(query) || label.includes(query)) {
-          const fileNode = row.closest(".tree-node");
-          if (fileNode) fileNode.style.display = "";
-
-          let curr = row.parentElement;
-          while (curr && curr !== treeBody) {
-            if (curr.classList.contains("tree-node")) curr.style.display = "";
-            if (curr.classList.contains("tree-children")) {
-              curr.classList.remove("collapsed");
-              const arrow = curr.parentElement?.querySelector(":scope > .tree-item-row .tree-arrow");
-              if (arrow) arrow.classList.add("expanded");
-            }
-            curr = curr.parentElement;
-          }
-        }
-      });
-    }
-
-    function collapseAllTree() {
-      const treeBody = document.getElementById("tree-body");
-      if (!treeBody) return;
-      treeBody.querySelectorAll(".tree-children").forEach(el => el.classList.add("collapsed"));
-      treeBody.querySelectorAll(".tree-arrow").forEach(el => el.classList.remove("expanded"));
-    }
-
-    function expandAllTree() {
-      const treeBody = document.getElementById("tree-body");
-      if (!treeBody) return;
-      treeBody.querySelectorAll(".tree-children").forEach(el => el.classList.remove("collapsed"));
-      treeBody.querySelectorAll(".tree-arrow").forEach(el => el.classList.add("expanded"));
-    }
-
-    function toggleTreePanel() {
-      const panel = document.getElementById("tree-panel");
-      const btn = document.getElementById("btn-toggle-tree");
-      if (!panel) return;
-      const isCollapsed = panel.classList.toggle("collapsed");
-      btn?.classList.toggle("active", !isCollapsed);
-      if (cy) {
-        setTimeout(() => cy.resize(), 150);
-      }
-    }
-
-    function runLayout() {
-      if (!cy) return;
-      const layoutName = document.getElementById("select-layout").value;
-      let opts = { name: layoutName, animate: false };
-      if (layoutName === "dagre") {
-        opts = {
-          name: "dagre",
-          rankDir: flowDirection,
-          nodeSep: 45,
-          rankSep: 90,
-          edgeSep: 25,
-          animate: false
-        };
-      }
-      cy.layout(opts).run();
-      cy.fit(undefined, 30);
-    }
-
-    function applyFilters() {
-      if (!cy || !currentResult) return;
-      const term = document.getElementById("input-search").value.trim().toLowerCase();
-      if (term) {
-        currentViewMode = "overview";
-        selectedNodeId = null;
-        fileDiagramModuleId = null;
-        updateOverviewButton();
-      } else if (currentViewMode === "file" && fileDiagramModuleId) {
-        selectModuleById(fileDiagramModuleId, false);
-        return;
-      }
-
-      const onlyCycle = document.getElementById("chk-only-cycle").checked;
-      const onlyBloat = document.getElementById("chk-only-bloat").checked;
-
-      const cycleSet = new Set();
-      currentResult.cycles.forEach(c => c.modules.forEach(m => cycleSet.add(m)));
-
-      cy.nodes(":childless").forEach(n => {
-        const id = n.id().toLowerCase();
-        const label = (n.data("label") || "").toLowerCase();
-        const mod = currentResult.modules.find(m => m.id === n.id());
-
-        let show = true;
-        if (term && !id.includes(term) && !label.includes(term)) show = false;
-        if (onlyCycle && !cycleSet.has(n.id())) show = false;
-        if (onlyBloat && (!mod || !mod.is_oversized)) show = false;
-
-        if (show) n.removeClass("hidden");
-        else n.addClass("hidden");
-      });
-
-      cy.edges().forEach(e => {
-        const src = cy.$id(e.source().id());
-        const tgt = cy.$id(e.target().id());
-        if (src.hasClass("hidden") || tgt.hasClass("hidden")) {
-          e.addClass("hidden");
-        } else {
-          e.removeClass("hidden");
-        }
-      });
-
-      cy.nodes(":parent").forEach(p => {
-        p.removeClass("file-mode-package");
-        const visibleChildren = p.children().not(".hidden");
-        if (visibleChildren.length === 0) {
-          p.addClass("hidden");
-        } else {
-          p.removeClass("hidden");
-        }
-      });
-    }
-
-    function renderInspector(mod) {
-      const isCycle = currentResult?.cycles.some(c => c.modules.includes(mod.id));
-      const outsideCurrentDiagram = currentViewMode === "file" && !!cy && cy.$id(mod.id).hasClass("hidden");
-      const el = document.getElementById("inspector");
-      el.className = "inspector";
-
-      const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      })[char]);
-
-      let badges = "";
-      if (isCycle) badges += '<span class="stat-badge badge-cycle">循環インポート</span>';
-      if (mod.is_oversized) badges += '<span class="stat-badge badge-bloat">肥大化 (1000+行)</span>';
-
-      let cycleAlertHtml = "";
-      if (isCycle) {
-        const cycleMods = currentResult.cycles
-          .filter(c => c.modules.includes(mod.id))
-          .flatMap(c => c.modules)
-          .filter(m => m !== mod.id);
-        const cyclePartners = [...new Set(cycleMods)].map(m => m.split(".").pop()).join(", ");
-        const suggestion = currentResult.cycles
-          .filter(c => c.modules.includes(mod.id))
-          .map(c => ModuleLoomCycles.suggestion(c, currentResult.edges))
-          .find(Boolean);
-        const suggestionText = suggestion
-          ? `改善候補: ${ModuleLoomCycles.escapeHtml(suggestion.source)} → ${ModuleLoomCycles.escapeHtml(suggestion.target)} (L:${suggestion.line}): ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.guidance(suggestion.kind))}`
-          : "";
-        cycleAlertHtml = `
-          <div style="background:#3d141e; border:1.5px solid #ff4d4d; border-radius:6px; padding:8px 10px; margin-top:8px; font-size:11px; color:#ff8099; line-height:1.45;">
-            <div style="font-weight:bold; color:#ff4d4d; font-size:12px; display:flex; align-items:center; gap:5px; margin-bottom:4px;">
-              <span>⚠️ トップレベルの循環インポート</span>
+        <div class="editor-select-area" hidden>
+          <label for="editor-select">ジャンプ先:</label>
+          <select id="editor-select">
+            <option value="pycharm">PyCharm</option>
+            <option value="vscode">VS Code</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="main-container">
+        <!-- Python Source Tree Panel -->
+        <aside id="tree-panel" class="tree-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="panel-icon">📁</span>
+              <h3>ソースツリー (.py)</h3>
             </div>
-            <div>このモジュールは <b style="color:#ffffff;">[${ModuleLoomCycles.escapeHtml(cyclePartners)}]</b> と循環しています。初期化時の参照順によっては ImportError などの原因になります。</div>
-            <div style="margin-top:5px;">${suggestionText} 変更後は自動更新または再解析で確認できます。</div>
           </div>
-        `;
-      }
-
-      // Outbound imports (利用先)
-      let importsHtml = "";
-      if (mod.imports && mod.imports.length > 0) {
-        importsHtml = mod.imports.map(imp => {
-          const isCircularImport = currentResult ? currentResult.edges.some(e =>
-            e.source === mod.id &&
-            (e.target === imp.module || e.target.endsWith("." + imp.module) || imp.module.endsWith("." + e.target)) &&
-            e.is_circular
-          ) : false;
-          const isDeferred = imp.is_top_level === false;
-          let badgeHtml = "";
-          if (isCircularImport) {
-            badgeHtml = '<span style="color:#ffffff; font-size:8px; font-weight:bold; background:#ff4d4d; padding:1px 5px; border-radius:3px; margin-left:4px;">[🔄 循環]</span>';
-          } else if (isDeferred) {
-            badgeHtml = '<span style="color:#a6adc8; font-size:8px; background:#181825; border:1px solid #45475a; padding:1px 4px; border-radius:3px; margin-left:4px;" title="関数・メソッド内の遅延インポート（モジュール初期化時にはロードされないため循環エラーを回避）">⚡ 遅延インポート</span>';
-          }
-          return `<li class="import-item" style="display:flex; justify-content:space-between; align-items:center;" onclick="jumpToEditor('${mod.absolute_path}', ${imp.line})" title="${imp.module} (L:${imp.line}${isDeferred ? ' - 遅延インポート' : ''})">
-            <span style="display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:190px;">
-              <span>📤</span>
-              <span style="${isCircularImport ? 'color:#ff8099; font-weight:600;' : ''}">${imp.is_from ? "from " + imp.module : "import " + imp.module}</span>
-              ${badgeHtml}
-            </span>
-            <span style="color:var(--text-muted); font-size:9px; font-family:monospace; margin-left:6px;">L:${imp.line}</span>
-          </li>`;
-        }).join("");
-      } else {
-        importsHtml = '<li style="color:var(--text-muted); font-size:10px; padding:4px;">インポートなし (最下層等)</li>';
-      }
-
-      // Inbound dependents (被インポート / 利用元)
-      const inboundEdges = currentResult ? currentResult.edges.filter(e => e.target === mod.id) : [];
-      let inboundHtml = "";
-      if (inboundEdges.length > 0) {
-        inboundHtml = inboundEdges.map(e => {
-          const srcMod = currentResult.modules.find(m => m.id === e.source);
-          const name = srcMod ? srcMod.name : e.source.split(".").pop();
-          const path = srcMod ? srcMod.absolute_path : "";
-          const isCycle = e.is_circular;
-          const isDeferred = e.is_top_level === false;
-          let inboundBadge = "";
-          if (isCycle) {
-            inboundBadge = '<span style="color:#ffffff; font-size:8px; font-weight:bold; background:#ff4d4d; padding:1px 5px; border-radius:3px; margin-left:4px;">[🔄 循環]</span>';
-          } else if (isDeferred) {
-            inboundBadge = '<span style="color:#a6adc8; font-size:8px; background:#181825; border:1px solid #45475a; padding:1px 4px; border-radius:3px; margin-left:4px;" title="利用元の関数内での遅延インポート">⚡ 遅延インポート</span>';
-          }
-          return `
-            <li class="import-item" style="display:flex; justify-content:space-between; align-items:center;" onclick="${srcMod ? `jumpToEditor('${path}', ${e.line})` : ''}" title="${e.source} (L:${e.line}${isDeferred ? ' - 遅延インポート' : ''})">
-              <span style="display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:190px;">
-                <span>📥</span>
-                <span style="${isCycle ? 'color:#ff8099; font-weight:bold;' : 'color:var(--accent); font-weight:600;'} cursor:pointer;" onclick="event.stopPropagation(); highlightModule('${e.source}', true);" title="${e.source} を選択">${name}</span>
-                ${inboundBadge}
-              </span>
-              <span style="color:var(--text-muted); font-size:9px; font-family:monospace; margin-left:6px;">L:${e.line}</span>
-            </li>
-          `;
-        }).join("");
-      } else {
-        inboundHtml = '<li style="color:var(--text-muted); font-size:10px; padding:4px;">被インポートなし (エントリポイント等)</li>';
-      }
-
-      const classes = mod.classes || [];
-      const functions = mod.functions || [];
-      const renderSymbolChildren = parentLine => {
-        const entries = [
-          ...classes.filter(cls => (cls.parent_class_line ?? null) === parentLine).map(value => ({ type: "class", value })),
-          ...functions.filter(fn => (fn.parent_class_line ?? null) === parentLine).map(value => ({ type: "function", value }))
-        ].sort((a, b) => a.value.line - b.value.line);
-
-        return entries.map(({ type, value }) => {
-          if (type === "function") {
-            return `<button type="button" class="symbol-tree-function" data-function-line="${value.line}">ƒ ${escapeHtml(value.name)} <span class="symbol-tree-line">L:${value.line}</span></button>`;
-          }
-          return `<details class="symbol-tree-group" open>
-            <summary>📦 ${escapeHtml(value.name)} <span class="symbol-tree-line">L:${value.line}</span><button type="button" class="symbol-tree-open" data-class-line="${value.line}" title="エディタで開く">↗</button></summary>
-            <div class="symbol-tree-children">${renderSymbolChildren(value.line) || '<span class="symbol-tree-line">メソッドなし</span>'}</div>
-          </details>`;
-        }).join("");
-      };
-      const symbolTreeHtml = renderSymbolChildren(null) || '<span class="symbol-tree-line">クラス・関数なし</span>';
-
-      el.innerHTML = `
-        <div>
-          <div class="module-title" onclick="jumpToEditor('${mod.absolute_path}', 1)" title="クリックでエディタで開く">
-            ${mod.name} ↗
+          <div class="tree-search-area">
+            <input type="text" id="tree-search-input" placeholder="Python ファイル検索..." />
           </div>
-          <div class="module-path">${mod.relative_path}</div>
-          <div>${badges}</div>
-          ${cycleAlertHtml}
-          ${outsideCurrentDiagram ? '<div style="color:var(--text-muted); font-size:11px; margin-top:8px;">現在の依存図には含まれません。表示を切り替えるには下のボタンかツリーのダブルクリックを使ってください。</div>' : ''}
-          <button class="btn" id="btn-show-this-dep" style="width:100%; margin-top:6px; justify-content:center; padding:3px 6px; font-size:10px;">
-            🎯 このモジュールの依存図を表示
+          <div id="tree-content" class="tree-content">
+            <p class="placeholder-text">解析を実行すると Python ソースツリーが表示されます</p>
+          </div>
+        </aside>
+
+        <div class="graph-wrapper">
+          <div id="cy-container" class="graph-canvas"></div>
+          <div class="floating-zoom-controls">
+            <button id="btn-float-flow-direction" class="btn-float" title="フロー方向の切り替え (横 ↔ 縦)">↔</button>
+            <button id="btn-float-zoom-in" class="btn-float" title="拡大 (Zoom In)">&#43;</button>
+            <button id="btn-float-zoom-out" class="btn-float" title="縮小 (Zoom Out)">&minus;</button>
+            <button id="btn-float-zoom-reset" class="btn-float" title="等倍リセット (100%)">1:1</button>
+            <button id="btn-float-zoom-fit" class="btn-float" title="全体表示 (Fit)">&#x2922;</button>
+          </div>
+        </div>
+        <aside id="inspector-panel" class="inspector-panel">
+          <div class="panel-header">
+            <h3>モジュール詳細</h3>
+            <button id="btn-close-inspector" class="btn-icon">&times;</button>
+          </div>
+          <div id="inspector-content" class="panel-content">
+            <p class="placeholder-text">グラフ上のノードをクリックすると詳細が表示されます</p>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="app-footer">
+        <div id="status-bar">準備完了</div>
+        <div id="metrics-summary">モジュール数: 0 | 循環インポート: 0 | 肥大化警告: 0 | 解析エラー: 0</div>
+        <div id="app-version">v1.0.2</div>
+      </footer>
+    </div>
+
+    <div id="callgraph-modal" class="modal-overlay hidden">
+      <div class="modal-container">
+        <div class="modal-header">
+          <div class="modal-title-area"><span class="modal-icon">☎</span><span id="callgraph-title" class="modal-title">コールグラフ</span></div>
+          <button id="btn-close-callgraph" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body"><div class="modal-legend"><div class="legend-item">緑: 選択モジュール</div><div class="legend-item">ノードをダブルクリック: 定義位置を開く</div></div><div id="callgraph-cy-container" class="modal-graph-canvas"></div></div>
+        <div class="modal-footer"><div></div><button id="btn-close-callgraph-footer" class="btn-secondary btn-sm">閉じる</button></div>
+      </div>
+    </div>
+
+    <div id="ruff-fix-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ruff-fix-title">
+      <div class="modal-container">
+        <div class="modal-header">
+          <strong id="ruff-fix-title">外部ツールの修正差分</strong>
+          <button id="btn-close-ruff-fix" class="btn-icon modal-close" aria-label="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="display:block; overflow:auto; padding:16px">
+          <p id="ruff-fix-file" style="margin-bottom:10px; overflow-wrap:anywhere"></p>
+          <p style="margin-bottom:10px; color:var(--warning-color)">選択したツールは候補以外の箇所も変更する場合があります。読み込み時の副作用や注釈の実行時参照への影響を含め、差分を確認してください。</p>
+          <pre id="ruff-fix-diff" style="white-space:pre-wrap; overflow-wrap:anywhere; user-select:text"></pre>
+        </div>
+        <div class="modal-footer"><button id="btn-apply-ruff-fix" class="btn-primary">差分を適用</button></div>
+      </div>
+    </div>
+
+    <!-- 循環インポート解消ガイド・アシスタント モーダル -->
+    <div id="cycle-guide-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cycle-guide-title">
+      <div class="modal-container" style="max-width: 680px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+          <div class="modal-title-area">
+            <span class="modal-icon">🔄</span>
+            <strong id="cycle-guide-title" class="modal-title">循環インポートの解消アシスタント</strong>
+          </div>
+          <button id="btn-close-cycle-guide" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; overflow-y: auto; padding: 16px; gap: 14px; font-size: 0.85rem;">
+          <div id="cycle-guide-summary" style="background: rgba(243, 139, 168, 0.1); border: 1px solid rgba(243, 139, 168, 0.3); border-radius: 6px; padding: 10px 14px;">
+            <div style="font-weight: bold; color: var(--danger-color); margin-bottom: 4px;">循環インポートループ</div>
+            <div id="cycle-guide-path" style="font-family: monospace; font-size: 0.85rem; color: var(--text-main); word-break: break-all;"></div>
+          </div>
+
+          <div id="cycle-guide-status-box" style="background: #181825; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+            <div style="font-weight: bold; margin-bottom: 6px; color: var(--text-main);">改善推奨箇所の状態</div>
+            <div id="cycle-guide-target-desc" style="color: var(--text-muted); margin-bottom: 6px;"></div>
+            <div id="cycle-guide-tool-reason" style="color: var(--warning-color); font-size: 0.8rem; line-height: 1.4;"></div>
+          </div>
+
+          <div style="background: #181825; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: var(--text-main);">推奨される解消方法（3つのアプローチ）</div>
+
+            <div style="margin-bottom: 12px;">
+              <div style="font-weight: 600; color: var(--accent-color); margin-bottom: 2px;">
+                ① 【最も簡単・推奨】 関数内遅延インポート（Local Import）への変更
+              </div>
+              <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0 0 6px 0;">
+                モジュール先頭（トップレベル）の <code>import</code> を、実際にその関数やクラスを利用している関数・メソッドの内部へ移動します。
+                モジュール初期化時の読み込み循環を即座に回避できます。
+              </p>
+              <pre style="background: #11111b; border: 1px solid rgba(255,255,255,0.06); padding: 8px 10px; border-radius: 4px; font-size: 0.76rem; color: #a6e3a1; overflow-x: auto; margin: 0;"><code id="cycle-guide-code-example"># 関数内でインポートする例:
+def example_function():
+    from app.module_b import target_func
+    return target_func()</code></pre>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <div style="font-weight: 600; color: var(--accent-color); margin-bottom: 2px;">
+                ② 共通モジュール（common/shared/types）への定義の抽出
+              </div>
+              <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">
+                循環の原因となっている共有データ構造、共通関数、型定義を別ファイル（例: <code>common.py</code> や <code>types.py</code>）へ切り出し、両モジュールから参照するように依存の向きを一方向化します。
+              </p>
+            </div>
+
+            <div>
+              <div style="font-weight: 600; color: var(--accent-color); margin-bottom: 2px;">
+                ③ 依存性の注入（DI）や引数渡しへの見直し
+              </div>
+              <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">
+                直接インポートして呼び出す代わりに、呼び出し元から必要な関数やオブジェクトを引数で渡すように設計を見直します。
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button id="btn-cycle-guide-jump" class="btn-primary" style="display: flex; align-items: center; gap: 6px;">
+            <span>📝</span> <span id="cycle-guide-jump-label">エディタで該当コード行を開く</span>
           </button>
-          <button class="btn" id="btn-open-modal-inspector" style="width:100%; margin-top:6px; justify-content:center; padding:3px 6px; font-size:10px;">
-            📊 ポップアップダイアログで開く
-          </button>
+          <button id="btn-close-cycle-guide-footer" class="btn-secondary">閉じる</button>
         </div>
+      </div>
+    </div>
 
-        <div class="stat-grid">
-          <div class="stat-box">
-            <div class="stat-box-title">コード行数</div>
-            <div class="stat-box-val">${mod.loc}</div>
+    <!-- 問題・エラー一覧 & モジュール検索 モーダル -->
+    <div id="issues-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="issues-modal-title">
+      <div class="modal-container" style="max-width: 820px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+          <div class="modal-title-area">
+            <span class="modal-icon">⚠️</span>
+            <strong id="issues-modal-title" class="modal-title">問題・エラー一覧 & モジュール検索</strong>
           </div>
-          <div class="stat-box">
-            <div class="stat-box-title">クラス / 関数</div>
-            <div class="stat-box-val">${mod.class_count} / ${mod.function_count}</div>
+          <button id="btn-close-issues-modal" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px;">
+          <div class="issues-filter-bar" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center;">
+            <input type="text" id="issues-search-filter" placeholder="キーワード絞り込み (モジュール名、メッセージ等)..." style="flex: 1; min-width: 180px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 0.82rem;" />
+            <div class="issues-category-tabs" style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <button class="btn-filter-tab active" data-filter="all">すべて (<span id="count-all">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="cycles">🔄 循環 (<span id="count-cycles">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="architecture">🏛 アーキテクチャ (<span id="count-arch">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="dependencies">📦 依存宣言 (<span id="count-deps">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="unused">🧹 未使用シンボル (<span id="count-unused">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="bloat">⚡ 肥大化 (<span id="count-bloat">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="diagnostics">🚨 診断エラー (<span id="count-diag">0</span>)</button>
+            </div>
+          </div>
+          <div id="issues-list-container" style="flex: 1; overflow-y: auto; max-height: 52vh; border: 1px solid var(--border-color); border-radius: 4px; background: #11111b; padding: 6px;">
+            <p class="placeholder-text" style="margin: 20px 0;">解析結果から問題を検索しています...</p>
           </div>
         </div>
-
-        <div style="font-size:11px; font-weight:bold; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
-          <span>📤 インポート (利用先)</span>
-          <span style="color:var(--text-muted); font-size:10px;">${mod.imports ? mod.imports.length : 0} 件</span>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color);">
+          <span id="issues-summary-text" style="color: var(--text-muted); font-size: 0.82rem;">0 件の問題</span>
+          <button id="btn-close-issues-footer" class="btn-secondary btn-sm">閉じる</button>
         </div>
-        <ul class="import-list">${importsHtml}</ul>
+      </div>
+    </div>
 
-        <div style="font-size:11px; font-weight:bold; margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-          <span>📥 被インポート (利用元)</span>
-          <span style="color:var(--text-muted); font-size:10px;">${inboundEdges.length} 件</span>
+    <div id="analysis-history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="analysis-history-title">
+      <div class="modal-container" style="max-width: 760px; max-height: 80vh;">
+        <div class="modal-header">
+          <strong id="analysis-history-title">解析履歴の比較</strong>
+          <button id="btn-close-analysis-history" class="btn-icon modal-close" aria-label="閉じる">&times;</button>
         </div>
-        <ul class="import-list">${inboundHtml}</ul>
-        <div style="font-size:11px; font-weight:bold; margin-top:8px;">docstring</div>
-        <div style="white-space:pre-wrap; overflow-wrap:anywhere; background:#181825; border-radius:4px; padding:8px; font-size:10px; line-height:1.5;">${mod.docstring ? escapeHtml(mod.docstring) : '<span style="color:var(--text-muted);">docstring なし</span>'}</div>
-        <div style="font-size:11px; font-weight:bold; margin-top:8px;">クラス一覧 (${classes.length})</div>
-        <details class="symbol-tree-group" open>
-          <summary>📁 ルート</summary>
-          <div class="symbol-tree-children">${symbolTreeHtml}</div>
-        </details>
-      `;
+        <div class="modal-body" style="padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+            <label>比較元 <select id="analysis-history-base"></select></label>
+            <label>比較先 <select id="analysis-history-head"></select></label>
+          </div>
+          <div id="analysis-history-summary"></div>
+          <div id="analysis-history-comparison"></div>
+        </div>
+        <div class="modal-footer"><span>この端末に保存された解析結果を比較します</span><button id="btn-close-analysis-history-footer" class="btn-secondary btn-sm">閉じる</button></div>
+      </div>
+    </div>
 
-      el.querySelectorAll("[data-class-line]").forEach(item => {
-        item.addEventListener("click", event => {
-          event.preventDefault();
-          event.stopPropagation();
-          jumpToEditor(mod.absolute_path, Number(item.dataset.classLine) || 1);
-        });
-      });
-      el.querySelectorAll("[data-function-line]").forEach(item => {
-        item.addEventListener("click", () => jumpToEditor(mod.absolute_path, Number(item.dataset.functionLine) || 1));
-      });
+    <!-- 変更ファイルの強調 モーダル -->
+    <div id="git-history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="git-history-title">
+      <div class="modal-container" style="max-width: 440px;">
+        <div class="modal-header">
+          <strong id="git-history-title">変更ファイルを依存図で強調</strong>
+          <button id="btn-close-git-history" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <label><input type="radio" name="git-change-mode" value="working" checked /> 作業中の変更（未コミット）</label>
+          <label><input type="radio" name="git-change-mode" value="commits" /> コミット間の変更</label>
+          <div id="git-commit-range" hidden>
+          <label style="font-size: 0.82rem;">比較元コミット (base):
+            <input type="text" id="git-history-base" value="HEAD~1" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;" />
+          </label>
+          <label style="font-size: 0.82rem;">比較先コミット (head):
+            <input type="text" id="git-history-head" value="HEAD" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;" />
+          </label>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted);">変更された Python ファイルの位置を強調します。コードの行単位の差分は表示しません。</p>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-cancel-git-history" class="btn-secondary btn-sm">キャンセル</button>
+          <button id="btn-submit-git-history" class="btn-primary btn-sm">変更ファイルを強調</button>
+        </div>
+      </div>
+    </div>
 
-      document.getElementById("btn-open-modal-inspector")?.addEventListener("click", () => {
-        openDependencyDialog(mod);
-      });
-      document.getElementById("btn-show-this-dep")?.addEventListener("click", () => {
-        jumpToFileCentricDiagram(mod.id);
-      });
-    }
+    <!-- MkDocs ドキュメント生成 モーダル -->
+    <div id="mkdocs-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mkdocs-title">
+      <div class="modal-container" style="max-width: 500px;">
+        <div class="modal-header">
+          <strong id="mkdocs-title">MkDocs ドキュメント生成</strong>
+          <button id="btn-close-mkdocs" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <label style="font-size: 0.82rem;">出力先ディレクトリ:
+            <input type="text" id="mkdocs-output-path" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;" />
+          </label>
+          <label style="font-size: 0.82rem;">ドキュメント言語:
+            <select id="mkdocs-lang" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;">
+              <option value="auto">自動判定 (auto)</option>
+              <option value="ja">日本語 (ja)</option>
+              <option value="en">English (en)</option>
+            </select>
+          </label>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">全体図とモジュール別リファレンスマニュアルを静的サイト形式で出力します。</p>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-cancel-mkdocs" class="btn-secondary btn-sm">キャンセル</button>
+          <button id="btn-submit-mkdocs" class="btn-primary btn-sm">ドキュメントを生成</button>
+        </div>
+      </div>
+    </div>
 
-    // Modal Dependency Dialog Functions
-    let modalCy = null;
-    let currentModalModule = null;
-
-    function openDependencyDialog(mod) {
-      if (!currentResult) return;
-      currentModalModule = mod;
-
-      const modalEl = document.getElementById("dependency-modal");
-      const titleEl = document.getElementById("modal-module-title");
-      const badgesEl = document.getElementById("modal-header-badges");
-      if (!modalEl || !titleEl) return;
-
-      titleEl.textContent = mod.name;
-      titleEl.title = mod.id;
-
-      const isCycle = currentResult.cycles.some(c => c.modules.includes(mod.id));
-      let badges = `<span class="stat-badge" style="background:#313244; color:#cdd6f4;">LOC: ${mod.loc}</span>`;
-      if (isCycle) badges += '<span class="stat-badge badge-cycle">循環インポート</span>';
-      if (mod.is_oversized) badges += '<span class="stat-badge badge-bloat">肥大化</span>';
-      badgesEl.innerHTML = badges;
-
-      modalEl.classList.remove("hidden");
-
-      setTimeout(() => {
-        renderModalGraph(mod);
-      }, 50);
-    }
-
-    function closeDependencyDialog() {
-      const modalEl = document.getElementById("dependency-modal");
-      if (modalEl) modalEl.classList.add("hidden");
-      if (modalCy) {
-        modalCy.destroy();
-        modalCy = null;
-      }
-      currentModalModule = null;
-    }
-
-    function renderModalGraph(mod) {
-      const container = document.getElementById("modal-cy-container");
-      if (!currentResult || !container) return;
-
-      if (modalCy) {
-        modalCy.destroy();
-        modalCy = null;
-      }
-
-      const inboundEdges = currentResult.edges.filter(e => e.target === mod.id);
-      const outboundEdges = currentResult.edges.filter(e => e.source === mod.id);
-
-      const inboundNodeIds = new Set(inboundEdges.map(e => e.source));
-      const outboundNodeIds = new Set(outboundEdges.map(e => e.target));
-
-      const directCycles = currentResult.cycles.filter(c => c.modules.includes(mod.id));
-      const depCycles = currentResult.cycles.filter(
-        c => !c.modules.includes(mod.id) && c.modules.some(m => outboundNodeIds.has(m))
-      );
-
-      let cycleFooterHtml = "";
-      if (directCycles.length > 0) {
-        cycleFooterHtml += `<span style="color:var(--cycle-color); font-weight:bold;">🔄 直接の循環インポート (${directCycles.length}件):</span> `;
-        cycleFooterHtml += directCycles.map(c =>
-          `<span style="background:rgba(243,139,168,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--cycle-color); margin-right:4px;">代表経路: ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.summary(c, currentResult.edges))}</span>`
-        ).join(" ");
-      }
-      if (depCycles.length > 0) {
-        if (cycleFooterHtml) cycleFooterHtml += " | ";
-        cycleFooterHtml += `<span style="color:var(--bloat-color); font-weight:bold;">⚠️ 依存先での循環 (${depCycles.length}件):</span> `;
-        cycleFooterHtml += depCycles.map(c =>
-          `<span style="background:rgba(250,179,135,0.2); padding:1px 5px; border-radius:3px; border:1px solid var(--bloat-color); margin-right:4px;">代表経路: ${ModuleLoomCycles.escapeHtml(ModuleLoomCycles.summary(c, currentResult.edges))}</span>`
-        ).join(" ");
-      }
-      if (!cycleFooterHtml) {
-        cycleFooterHtml = '<span style="color:#a6e3a1;">✓ このモジュール周辺に循環インポートはありません</span>';
-      }
-      document.getElementById("modal-cycles-info").innerHTML = cycleFooterHtml;
-
-      const elements = [];
-
-      // 1. Focal node (指定モジュール) - Box shape
-      const focalWidth = Math.max(150, mod.name.length * 10 + 36);
-      elements.push({
-        group: "nodes",
-        data: {
-          id: mod.id,
-          label: `${mod.name}\n(指定モジュール)`,
-          width: focalWidth,
-          height: 48,
-        },
-        classes: "focal-node" + (directCycles.length > 0 ? " in-cycle" : "")
-      });
-
-      // 2. Inbound nodes (利用元) - Box shape
-      inboundNodeIds.forEach(srcId => {
-        if (srcId === mod.id) return;
-        const srcMod = currentResult.modules.find(m => m.id === srcId);
-        const label = srcMod ? srcMod.name : (srcId.split(".").pop() || srcId);
-        const inCycle = currentResult.cycles.some(c => c.modules.includes(srcId));
-        const nodeWidth = Math.max(130, label.length * 9 + 28);
-        elements.push({
-          group: "nodes",
-          data: {
-            id: srcId,
-            label: `${label}\n[利用元]`,
-            width: nodeWidth,
-            height: 42,
-          },
-          classes: "inbound-node" + (inCycle ? " in-cycle" : "")
-        });
-      });
-
-      // 3. Outbound nodes (利用先) - Box shape
-      outboundNodeIds.forEach(tgtId => {
-        if (tgtId === mod.id) return;
-        const tgtMod = currentResult.modules.find(m => m.id === tgtId);
-        const label = tgtMod ? tgtMod.name : (tgtId.split(".").pop() || tgtId);
-        const inCycle = currentResult.cycles.some(c => c.modules.includes(tgtId));
-        const nodeWidth = Math.max(130, label.length * 9 + 28);
-        elements.push({
-          group: "nodes",
-          data: {
-            id: tgtId,
-            label: `${label}\n[利用先]`,
-            width: nodeWidth,
-            height: 42,
-          },
-          classes: "outbound-node" + (inCycle ? " in-cycle" : "")
-        });
-      });
-
-      // 4. Edges
-      const allDisplayedIds = new Set([mod.id, ...inboundNodeIds, ...outboundNodeIds]);
-      currentResult.edges.forEach((edge, idx) => {
-        if (allDisplayedIds.has(edge.source) && allDisplayedIds.has(edge.target)) {
-          let edgeClass = "normal-edge";
-          if (edge.is_circular) edgeClass = "cycle-edge";
-          else if (edge.target === mod.id) edgeClass = "inbound-edge";
-          else if (edge.source === mod.id) edgeClass = "outbound-edge";
-
-          elements.push({
-            group: "edges",
-            data: {
-              id: `modal-e-${idx}`,
-              source: edge.source,
-              target: edge.target,
-              label: edge.is_circular ? `🚨 循環 (L:${edge.line})` : `L:${edge.line}`,
-            },
-            classes: edgeClass
-          });
-        }
-      });
-
-      modalCy = cytoscape({
-        container: container,
-        boxSelectionEnabled: false,
-        elements: elements,
-        style: [
-          {
-            selector: "node",
-            style: {
-              shape: "round-rectangle",
-              label: "data(label)",
-              "text-wrap": "wrap",
-              "text-max-width": "140px",
-              color: "#cdd6f4",
-              "font-size": "11px",
-              "font-weight": 600,
-              "text-valign": "center",
-              "text-halign": "center",
-              width: "data(width)",
-              height: "data(height)",
-              "border-width": 2,
-              "border-color": "#45475a",
-              "background-color": "#181825",
-              padding: "5px"
-            }
-          },
-          {
-            selector: "node.focal-node",
-            style: {
-              shape: "round-rectangle",
-              "background-color": "#2c281e",
-              "border-color": "#f9e2af",
-              "border-width": 3.5,
-              color: "#f9e2af",
-              "font-size": "12px",
-              "font-weight": 700,
-              "z-index": 100
-            }
-          },
-          {
-            selector: "node.inbound-node",
-            style: {
-              shape: "round-rectangle",
-              "background-color": "#1e2e24",
-              "border-color": "#a6e3a1",
-              "border-width": 2.5,
-              color: "#a6e3a1"
-            }
-          },
-          {
-            selector: "node.outbound-node",
-            style: {
-              shape: "round-rectangle",
-              "background-color": "#182438",
-              "border-color": "#89b4fa",
-              "border-width": 2.5,
-              color: "#89b4fa"
-            }
-          },
-          {
-            selector: "node.in-cycle",
-            style: {
-              "border-color": "#ff4d4d",
-              "border-width": 4,
-              "background-color": "#38141e",
-              color: "#ff8099",
-              "font-weight": 700
-            }
-          },
-          {
-            selector: "edge",
-            style: {
-              width: 2.8,
-              "line-color": "#7f849c",
-              "target-arrow-color": "#89b4fa",
-              "target-arrow-shape": "triangle",
-              "curve-style": "bezier",
-              "control-point-step-size": 40,
-              "arrow-scale": 1.35,
-              label: "data(label)",
-              "font-size": "10px",
-              color: "#cdd6f4",
-              "text-background-opacity": 0.85,
-              "text-background-color": "#11111b",
-              "text-background-padding": "2px",
-              "text-background-shape": "roundrectangle"
-            }
-          },
-          {
-            selector: "edge.inbound-edge",
-            style: {
-              width: 3.2,
-              "line-color": "#a6e3a1",
-              "target-arrow-color": "#a6e3a1",
-              "arrow-scale": 1.4
-            }
-          },
-          {
-            selector: "edge.outbound-edge",
-            style: {
-              width: 3.2,
-              "line-color": "#89b4fa",
-              "target-arrow-color": "#89b4fa",
-              "arrow-scale": 1.4
-            }
-          },
-          {
-            selector: "edge.cycle-edge",
-            style: {
-              width: 4.5,
-              "line-color": "#ff4d4d",
-              "target-arrow-color": "#ff4d4d",
-              "line-style": "dashed",
-              "line-dash-pattern": [6, 4],
-              "curve-style": "bezier",
-              "control-point-step-size": 55,
-              "arrow-scale": 1.7,
-              label: "data(label)",
-              "font-size": "10px",
-              "font-weight": "bold",
-              color: "#ff8599",
-              "text-background-opacity": 0.95,
-              "text-background-color": "#2b0d14",
-              "text-background-padding": "3px",
-              "text-background-shape": "roundrectangle",
-              "text-border-color": "#ff4d4d",
-              "text-border-width": 1,
-              "z-index": 1000
-            }
-          }
-        ]
-      });
-
-      runModalLayout();
-
-      modalCy.on("tap", "node", (evt) => {
-        const clickedId = evt.target.id();
-        if (clickedId !== mod.id) {
-          const targetMod = currentResult.modules.find(m => m.id === clickedId);
-          if (targetMod) {
-            selectModuleById(targetMod.id, false);
-            openDependencyDialog(targetMod);
-          }
-        }
-      });
-
-      modalCy.on("dblclick", "node", (evt) => {
-        const clickedId = evt.target.id();
-        const targetMod = currentResult.modules.find(m => m.id === clickedId);
-        if (targetMod && targetMod.absolute_path) {
-          jumpToEditor(targetMod.absolute_path, 1);
-        }
-      });
-    }
-
-    function runModalLayout() {
-      if (!modalCy) return;
-      const layoutVal = document.getElementById("modal-layout-select").value;
-      let opts = {
-        name: "dagre",
-        rankDir: "LR",
-        nodeSep: 35,
-        rankSep: 110,
-        edgeSep: 25,
-        padding: 40,
-        animate: false
-      };
-      if (layoutVal === "dagre-tb") {
-        opts.rankDir = "TB";
-        opts.rankSep = 90;
-      } else if (layoutVal === "cose") {
-        opts = {
-          name: "cose",
-          padding: 30,
-          animate: false,
-          nodeOverlap: 20,
-          idealEdgeLength: 100
-        };
-      }
-      modalCy.layout(opts).run();
-      modalCy.fit(undefined, 30);
-    }
-
-    function zoomIn() {
-      if (!cy) return;
-      cy.zoom({
-        level: cy.zoom() * 1.25,
-        renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
-      });
-    }
-
-    function zoomOut() {
-      if (!cy) return;
-      cy.zoom({
-        level: cy.zoom() * 0.8,
-        renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
-      });
-    }
-
-    function zoomReset() {
-      if (!cy) return;
-      cy.zoom({
-        level: 1.0,
-        renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
-      });
-    }
-
-    // Attach control listeners
-    document.getElementById("btn-show-overview")?.addEventListener("click", switchToOverview);
-    document.getElementById("btn-analyze").addEventListener("click", triggerAnalyze);
-    document.getElementById("btn-fit").addEventListener("click", () => cy && cy.fit(undefined, 30));
-    document.getElementById("btn-zoom-in")?.addEventListener("click", zoomIn);
-    document.getElementById("btn-zoom-out")?.addEventListener("click", zoomOut);
-    document.getElementById("btn-zoom-reset")?.addEventListener("click", zoomReset);
-    document.getElementById("input-search").addEventListener("input", applyFilters);
-    document.getElementById("chk-only-cycle").addEventListener("change", applyFilters);
-    document.getElementById("chk-only-bloat").addEventListener("change", applyFilters);
-    document.getElementById("chk-group-pkg").addEventListener("change", () => currentResult && renderGraph(currentResult));
-    document.getElementById("chk-focus").addEventListener("change", () => {
-      if (selectedNodeId && cy) {
-        const node = cy.$id(selectedNodeId);
-        if (node.length > 0 && !node.hasClass("hidden")) highlightConnections(node);
-      }
-    });
-    document.getElementById("select-layout").addEventListener("change", runLayout);
-    document.getElementById("btn-flow-direction").addEventListener("click", toggleFlowDirection);
-    document.getElementById("btn-toggle-tree")?.addEventListener("click", toggleTreePanel);
-    document.getElementById("btn-tree-collapse")?.addEventListener("click", collapseAllTree);
-    document.getElementById("btn-tree-expand")?.addEventListener("click", expandAllTree);
-    document.getElementById("tree-search")?.addEventListener("input", filterTree);
-
-    // Modal control listeners
-    document.getElementById("btn-modal-fit")?.addEventListener("click", () => modalCy && modalCy.fit(undefined, 30));
-    document.getElementById("btn-modal-zoom-in")?.addEventListener("click", () => {
-      if (!modalCy) return;
-      modalCy.zoom({
-        level: modalCy.zoom() * 1.25,
-        renderedPosition: { x: modalCy.width() / 2, y: modalCy.height() / 2 }
-      });
-    });
-    document.getElementById("btn-modal-zoom-out")?.addEventListener("click", () => {
-      if (!modalCy) return;
-      modalCy.zoom({
-        level: modalCy.zoom() * 0.8,
-        renderedPosition: { x: modalCy.width() / 2, y: modalCy.height() / 2 }
-      });
-    });
-    document.getElementById("modal-layout-select")?.addEventListener("change", runModalLayout);
-    document.getElementById("btn-close-modal")?.addEventListener("click", closeDependencyDialog);
-    document.getElementById("btn-modal-close-footer")?.addEventListener("click", closeDependencyDialog);
-    document.getElementById("btn-modal-jump-editor")?.addEventListener("click", () => {
-      if (currentModalModule && currentModalModule.absolute_path) {
-        jumpToEditor(currentModalModule.absolute_path, 1);
-      }
-    });
-
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        closeDependencyDialog();
-      }
-    });
-
-    // Initialize on load
-    window.addEventListener("DOMContentLoaded", () => {
-      updateFlowDirectionButton();
-      initCytoscape();
-      // Auto trigger analyze on startup
-      setTimeout(triggerAnalyze, 500);
-    });
-  </script>
-</body>
+  </body>
 </html>

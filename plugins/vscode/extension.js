@@ -4,6 +4,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
+const { execFile } = require('child_process');
 
 let panel;
 let currentFolder;
@@ -14,8 +15,154 @@ let analysisPending = false;
 let manualAnalysisPending = false;
 let lastResult;
 const pendingChangedFiles = new Set();
+let pendingFix;
+
+function runFile(command, args, options = {}) {
+  const { allowDiff = false, ...execOptions } = options;
+  return new Promise((resolve, reject) => execFile(command, args, { ...execOptions, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
+    if (error && !(allowDiff && error.code === 1 && stdout.trim())) return reject(new Error((stderr || error.message).trim()));
+    resolve({ stdout, stderr });
+  }));
+}
+
+function ruffCommand(root) {
+  for (const candidate of [path.join(root, '.venv', 'bin', 'ruff'), path.join(root, 'venv', 'bin', 'ruff'), path.join(root, '.venv', 'Scripts', 'ruff.exe'), path.join(root, 'venv', 'Scripts', 'ruff.exe')]) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return 'ruff';
+}
+
+function fixTools(root) {
+  const tools = [{ id: 'ruff', label: 'Ruff (TC001)', kinds: ['type_only'], command: ruffCommand(root),
+    previewArgs: ['check', '--select', 'TC001', '--unsafe-fixes', '--no-cache', '--diff', '{file}'],
+    applyArgs: ['check', '--select', 'TC001', '--unsafe-fixes', '--no-cache', '--fix-only', '{file}'] }];
+  const configPath = path.join(root, 'moduleloom.toml');
+  if (!fs.existsSync(configPath)) return tools;
+  const content = fs.readFileSync(configPath, 'utf8');
+  const headers = [...content.matchAll(/^\[fix_tools\.([^\]]+)\]\s*$/gm)];
+  for (let i = 0; i < headers.length; i++) {
+    const id = headers[i][1];
+    if (id === 'ruff') throw new Error('fix_tools.ruff は予約済みです');
+    const start = headers[i].index + headers[i][0].length;
+    const nextTable = content.slice(start).search(/^\s*\[[^\]]+\]\s*$/m);
+    const end = nextTable < 0 ? content.length : start + nextTable;
+    const block = content.slice(start, end);
+    const string = key => block.match(new RegExp(`^\\s*${key}\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`, 'm'))?.[1]?.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    const array = key => {
+      const source = block.match(new RegExp(`^\\s*${key}\\s*=\\s*\\[([^\\]]*)\\]`, 'm'))?.[1];
+      return source == null ? null : [...source.matchAll(/"((?:[^"\\\\]|\\\\.)*)"/g)].map(item => item[1]);
+    };
+    const command = string('command');
+    const previewArgs = array('preview_args');
+    const applyArgs = array('apply_args');
+    if (!command || !previewArgs || !applyArgs) throw new Error(`fix_tools.${id} に command、preview_args、apply_args が必要です`);
+    const kinds = array('kinds') || ['type_only', 'runtime', 'unknown'];
+    if (kinds.some(kind => !['type_only', 'runtime', 'unknown'].includes(kind))) throw new Error(`fix_tools.${id}.kinds に不明な種類があります`);
+    let executable = command;
+    if (!path.isAbsolute(executable) && /[\\/]/.test(executable)) executable = path.join(root, executable);
+    tools.push({ id, label: string('label') || id, kinds, command: executable, previewArgs, applyArgs });
+  }
+  return tools;
+}
+
+function expandFixArgs(args, root, file, source, target, line) {
+  return args.map(arg => arg.replaceAll('{project}', root).replaceAll('{file}', file).replaceAll('{source}', source).replaceAll('{target}', target).replaceAll('{line}', String(line)));
+}
+
+async function analyzeForCommand(folder, changedFiles) {
+  const incremental = Array.isArray(changedFiles) && changedFiles.length > 0 && lastResult?.root_path === folder.uri.fsPath;
+  const args = ['--json', ...(incremental ? ['--incremental'] : []), folder.uri.fsPath];
+  const { stdout } = await new Promise((resolve, reject) => {
+    const child = spawn(analyzerExecutable(folder), args, { cwd: folder.uri.fsPath });
+    const chunks = []; let stderr = '';
+    child.stdin.on('error', () => {});
+    child.stdin.end(incremental ? JSON.stringify({ previous: lastResult, changed_files: changedFiles }) : undefined);
+    child.stdout.on('data', chunk => chunks.push(chunk));
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    child.on('error', reject);
+    child.on('close', code => code === 0 ? resolve({ stdout: Buffer.concat(chunks).toString('utf8') }) : reject(new Error(stderr.trim() || `analyze exited ${code}`)));
+  });
+  lastResult = JSON.parse(stdout);
+  return lastResult;
+}
+
+async function handlePluginCommand(folder, webview, message) {
+  const args = message.args || {};
+  const commandFolder = args.path && fs.existsSync(args.path) && fs.statSync(args.path).isDirectory()
+    ? { ...folder, uri: vscode.Uri.file(args.path) } : folder;
+  const root = path.resolve(commandFolder.uri.fsPath);
+  switch (message.command) {
+    case 'analyze_project': return analyzeForCommand(commandFolder, args.changedFiles);
+    case 'list_fix_tools': return fixTools(root).map(({ id, label, kinds }) => ({ id, label, kinds }));
+    case 'preview_cycle_fix': {
+      let item = lastResult?.cycles?.flatMap(cycle => cycle.suggestion ? [cycle.suggestion] : []).find(s => s.source === args.source && Number(s.line) === Number(args.line));
+      if (!item && args.target && args.kind) {
+        item = { source: args.source, target: args.target, line: Number(args.line), kind: args.kind };
+      }
+      const mod = lastResult?.modules?.find(candidate => candidate.id === args.source);
+      if (!item || !mod) throw new Error('循環改善候補が見つかりません。再解析してください');
+      const file = path.resolve(root, mod.relative_path || mod.absolute_path);
+      if (!file.startsWith(root + path.sep) || path.extname(file) !== '.py') throw new Error('対象ファイルが解析対象外です');
+      const tool = fixTools(root).find(candidate => candidate.id === args.toolId);
+      if (!tool.kinds.includes(item.kind) && tool.id !== 'ruff') throw new Error(`${tool.label} はこの循環候補の種類（${item.kind}）に対応していません`);
+      const original = fs.readFileSync(file);
+      const previewArgs = expandFixArgs(tool.previewArgs, root, file, args.source, item.target, Number(args.line));
+      let diff = '';
+      try {
+        const { stdout } = await runFile(tool.command, previewArgs, { cwd: root, allowDiff: true });
+        diff = stdout;
+      } catch (_) {
+        diff = '';
+      }
+      if (!fs.readFileSync(file).equals(original)) throw new Error(`${tool.label} のプレビュー用コマンドがファイルを変更しました`);
+      pendingFix = { root, file, original, diff, command: tool.command, previewArgs, applyArgs: expandFixArgs(tool.applyArgs, root, file, args.source, item.target, Number(args.line)), label: tool.label };
+      return { file, diff, tool: tool.label };
+    }
+    case 'apply_cycle_fix': {
+      if (!pendingFix || pendingFix.root !== path.resolve(lastResult?.root_path || root)) throw new Error('差分を再表示してから適用してください');
+      const pending = pendingFix; pendingFix = undefined;
+      if (!fs.readFileSync(pending.file).equals(pending.original)) throw new Error('差分表示後に対象ファイルが変更されました。再度プレビューしてください');
+      const { stdout: diff } = await runFile(pending.command, pending.previewArgs, { cwd: pending.root, allowDiff: true });
+      if (diff !== pending.diff) throw new Error(`${pending.label} の修正内容が変わりました。再度プレビューしてください`);
+      await runFile(pending.command, pending.applyArgs, { cwd: pending.root });
+      if (fs.readFileSync(pending.file).equals(pending.original)) throw new Error(`${pending.label} はファイルを変更しませんでした`);
+      return pending.file;
+    }
+    case 'git_changed_files': {
+      let stdout;
+      try { ({ stdout } = await runFile('git', ['-C', root, 'status', '--short'], { cwd: root })); }
+      catch (_) { return []; }
+      return stdout.split(/\r?\n/).filter(Boolean).map(line => line.slice(3).trim()).filter(file => file.endsWith('.py'));
+    }
+    case 'git_diff_files': {
+      const { stdout } = await runFile('git', ['-C', root, 'diff', '--name-only', `${args.base}..${args.head}`], { cwd: root });
+      return stdout.split(/\r?\n/).filter(file => file.endsWith('.py'));
+    }
+    case 'generate_mkdocs': {
+      const output = path.resolve(args.output);
+      await runFile(analyzerExecutable(commandFolder), ['--mkdocs', output, '--lang', args.lang || 'auto', root], { cwd: root });
+      return output;
+    }
+    case 'export_report': {
+      const outDir = path.join(root, '.moduleloom');
+      fs.mkdirSync(outDir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const jsonPath = path.join(outDir, `moduleloom-analysis-${stamp}.json`);
+      if (typeof args.json !== 'string') throw new Error('解析データがありません');
+      fs.writeFileSync(jsonPath, args.json, 'utf8');
+      return jsonPath;
+    }
+    case 'watch_project': watchFolder(commandFolder); return {};
+    case 'stop_watching': clearTimeout(refreshTimer); pendingChangedFiles.clear(); fileWatchers.forEach(watcher => watcher.dispose()); fileWatchers = []; return {};
+    case 'open_in_editor': await openFile(commandFolder, args.filePath, args.line); return {};
+    case 'detect_editors': return ['code'];
+    default: throw new Error(`Unsupported ModuleLoom command: ${message.command}`);
+  }
+}
 
 function watchFolder(folder) {
+  clearTimeout(refreshTimer);
+  pendingChangedFiles.clear();
   fileWatchers.forEach(watcher => watcher.dispose());
   fileWatchers = ['**'].map(pattern => {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
@@ -36,7 +183,7 @@ function watchFolder(folder) {
       refreshTimer = setTimeout(() => {
         const changed = [...pendingChangedFiles];
         pendingChangedFiles.clear();
-        runAnalysis(currentFolder, panel.webview, changed);
+        panel.webview.postMessage({ type: 'file_changed', files: changed });
       }, 500);
     };
     watcher.onDidChange(uri => refresh(uri, 'change'));
@@ -156,28 +303,47 @@ async function openFile(folder, filePath, line) {
   }
 }
 
-function makeHtml(context, webview) {
+function makeHtml(context, webview, folder) {
   const media = vscode.Uri.joinPath(context.extensionUri, 'media');
   let html = fs.readFileSync(path.join(context.extensionPath, 'media', 'index.html'), 'utf8');
-  for (const name of ['cytoscape.min.js', 'cytoscape-dagre.min.js', 'cycle-insights.js']) {
-    const uri = webview.asWebviewUri(vscode.Uri.joinPath(media, name));
-    html = html.replace(`src="${name}"`, `src="${uri}"`);
-  }
-  const bridge = `<script>\n` +
-    `const vscodeApi = acquireVsCodeApi();\n` +
-    `window.cefQuery = ({request}) => vscodeApi.postMessage(JSON.parse(request));\n` +
-    `window.addEventListener('message', event => {\n` +
-    `  const message = event.data;\n` +
-    `  if (message.type === 'result') window.renderModuleGraph(message.result);\n` +
-    `  if (message.type === 'error') document.getElementById('status-info').textContent = message.message;\n` +
-    `});\n</script>`;
-  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src 'unsafe-inline'; script-src 'unsafe-inline' ${webview.cspSource};">`;
-  html = html.replace('</head>', `${csp}</head>`);
-  html = html.replace('<script>\n    if (window.cytoscapeDagre)', `${bridge}\n  <script>\n    if (window.cytoscapeDagre)`);
+  html = html.replace(/(?:src|href)="(?:\.\/)?assets\/([^\"]+)"/g, (_match, name) => {
+    const uri = webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', name));
+    return `${_match.startsWith('src') ? 'src' : 'href'}="${uri}"`;
+  });
+  const bridge = `<script>
+    window.__MODULELOOM_PROJECT_PATH__ = ${JSON.stringify(folder.uri.fsPath)};
+    window.__MODULELOOM_EDITOR__ = 'vscode';
+    const vscodeApi = acquireVsCodeApi();
+    let moduleLoomRequestId = 0;
+    const moduleLoomPending = new Map();
+    window.__MODULELOOM_INVOKE__ = (command, args) => new Promise((resolve, reject) => {
+      const requestId = ++moduleLoomRequestId;
+      moduleLoomPending.set(requestId, {resolve, reject});
+      vscodeApi.postMessage({type:'command', requestId, command, args});
+    });
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.type === 'command_result') {
+        const pending = moduleLoomPending.get(message.requestId);
+        if (!pending) return;
+        moduleLoomPending.delete(message.requestId);
+        message.error ? pending.reject(new Error(message.error)) : pending.resolve(message.result);
+      }
+      if (message.type === 'file_changed') window.__MODULELOOM_FILE_CHANGED__?.(message.files);
+      if (message.type === 'reanalyze') window.__MODULELOOM_REANALYZE__?.();
+    });
+  </script>`;
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline';"><style>.editor-select-area{display:none !important;}</style>`;
+  html = html.replace('</head>', `${csp}${bridge}</head>`);
   return html.replaceAll('PyCharm', 'VS Code');
 }
 
 function activate(context) {
+  // Keep a visible Activity Bar entry even before the graph panel is opened.
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('moduleloom.launch', {
+    getChildren: () => [],
+    getTreeItem: item => item
+  }));
   context.subscriptions.push(vscode.commands.registerCommand('moduleloom.openGraph', uri => {
     const folder = getWorkspaceFolder(uri);
     if (!folder) {
@@ -192,7 +358,7 @@ function activate(context) {
     currentFolder = folder;
     if (panel) {
       panel.reveal();
-      runAnalysis(folder, panel.webview);
+      panel.webview.postMessage({ type: 'reanalyze' });
       return;
     }
     panel = vscode.window.createWebviewPanel('moduleloom.graph', 'ModuleLoom', vscode.ViewColumn.Beside, {
@@ -200,10 +366,18 @@ function activate(context) {
       localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
       retainContextWhenHidden: true
     });
-    panel.webview.html = makeHtml(context, panel.webview);
-    panel.webview.onDidReceiveMessage(message => {
+    panel.webview.html = makeHtml(context, panel.webview, currentFolder);
+    panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'analyze') runAnalysis(currentFolder, panel.webview);
       if (message.type === 'open_file') openFile(currentFolder, message.path, message.line);
+      if (message.type === 'command') {
+        try {
+          const result = await handlePluginCommand(currentFolder, panel.webview, message);
+          panel?.webview.postMessage({ type: 'command_result', requestId: message.requestId, result });
+        } catch (error) {
+          panel?.webview.postMessage({ type: 'command_result', requestId: message.requestId, error: error.message });
+        }
+      }
     }, null, context.subscriptions);
     panel.onDidDispose(() => {
       panel = undefined;

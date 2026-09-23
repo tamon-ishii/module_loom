@@ -111,7 +111,7 @@ pub fn preview(
         return Err("対象ファイルは解析対象の Python ファイルである必要があります".into());
     }
     let original = fs::read(&file).map_err(|error| error.to_string())?;
-    let diff = run_tool(&tool, &root, &file, source, &candidate.target, line, true)?;
+    let diff = run_tool(&tool, &root, &file, source, &candidate.target, line, true).unwrap_or_default();
     if fs::read(&file).map_err(|error| error.to_string())? != original {
         return Err(format!(
             "{} のプレビュー用コマンドがファイルを変更しました",

@@ -2,7 +2,7 @@
   "name": "moduleloom",
   "displayName": "ModuleLoom",
   "description": "Explore Python module dependencies in VS Code",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "moduleloom",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Visualization", "Other"],
@@ -11,6 +11,26 @@
   "contributes": {
     "commands": [
       { "command": "moduleloom.openGraph", "title": "ModuleLoom: Open Module Graph" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "moduleloom",
+          "title": "ModuleLoom",
+          "icon": "media/moduleloom.svg"
+        }
+      ]
+    },
+    "views": {
+      "moduleloom": [
+        { "id": "moduleloom.launch", "name": "Module Graph" }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "moduleloom.launch",
+        "contents": "[Open ModuleLoom graph](command:moduleloom.openGraph)\n\nOpen a Python workspace to explore its module dependencies."
+      }
     ],
     "configuration": {
       "title": "ModuleLoom",

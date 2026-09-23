@@ -59,7 +59,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
     public static class ToolWindowHolder {
         public JBCefBrowser browser;
+        public JTextField projectPathField;
         public JComboBox<String> targetCombo;
+        public JCheckBox chkDoubleClickSync;
+        public JCheckBox chkAutoRefresh;
         public volatile boolean syncOnDoubleClick = true;
         public volatile String currentAnalyzePath;
         public volatile String pendingFilePath;
@@ -73,6 +76,27 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         public final Set<String> pendingChangedFiles = new HashSet<>();
         public volatile String lastResultJson;
         public volatile String lastResultRoot;
+        public volatile PendingFix pendingFix;
+    }
+
+    private static class PendingFix {
+        final Path root, file;
+        final byte[] original;
+        final String diff, command, label;
+        final List<String> previewArgs, applyArgs;
+        PendingFix(Path root, Path file, byte[] original, String diff, String command, String label, List<String> previewArgs, List<String> applyArgs) {
+            this.root = root; this.file = file; this.original = original; this.diff = diff; this.command = command;
+            this.label = label; this.previewArgs = previewArgs; this.applyArgs = applyArgs;
+        }
+    }
+
+    private static class FixToolConfig {
+        final String id, label, command;
+        final List<String> kinds, previewArgs, applyArgs;
+        FixToolConfig(String id, String label, String command, List<String> kinds, List<String> previewArgs, List<String> applyArgs) {
+            this.id = id; this.label = label; this.command = command; this.kinds = kinds;
+            this.previewArgs = previewArgs; this.applyArgs = applyArgs;
+        }
     }
 
     private static final Map<Project, ToolWindowHolder> activeHolders = new ConcurrentHashMap<>();
@@ -128,9 +152,8 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         JPanel mainPanel = new JPanel(new BorderLayout());
 
-        // Top Toolbar
+        // Keep the common actions visible and expand the analysis target only when it changes.
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        JButton btnMkdocs = new JButton("MkDocs 出力");
         JComboBox<String> targetCombo = new JComboBox<>();
         String projBase = project.getBasePath() != null ? project.getBasePath() : "";
         Path samplePath = Path.of(projBase, "sample_project");
@@ -141,17 +164,42 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             targetCombo.addItem(project.getName());
         }
 
+        String initialPath = selectedAnalysisPath(project, targetCombo);
+        JTextField projectPathField = new JTextField(initialPath != null ? initialPath : projBase, 18);
+        projectPathField.setToolTipText("解析する Python プロジェクトのパス");
+
+        JButton btnAnalyze = new JButton("解析実行");
+        btnAnalyze.setToolTipText("指定したパスのモジュール依存関係を解析します");
+
         JCheckBox chkDoubleClickSync = new JCheckBox("ダブルクリック連動", true);
-        JCheckBox chkAutoRefresh = new JCheckBox("自動更新", true);
-        chkAutoRefresh.setToolTipText("Python ファイルや moduleloom.toml の保存・追加・削除後に再解析します");
         chkDoubleClickSync.setToolTipText("PyCharm側でファイルをダブルクリックして開いた時、自動で依存図を開きます (ModuleLoomからのオープン時は反応しません)");
 
-        toolbarPanel.add(new JLabel("解析対象:"));
-        toolbarPanel.add(targetCombo);
-        toolbarPanel.add(btnMkdocs);
+        JCheckBox chkAutoRefresh = new JCheckBox("自動更新", true);
+        chkAutoRefresh.setToolTipText("Python ファイルや moduleloom.toml の保存・追加・削除後に再解析します");
+
+        JButton btnTargetSettings = new JButton("対象設定 ▸");
+        btnTargetSettings.setToolTipText("解析対象: " + projectPathField.getText());
+        JPanel targetSettingsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        targetSettingsPanel.add(new JLabel("解析対象:"));
+        targetSettingsPanel.add(targetCombo);
+        targetSettingsPanel.add(new JLabel("プロジェクトパス:"));
+        targetSettingsPanel.add(projectPathField);
+        targetSettingsPanel.setVisible(false);
+        btnTargetSettings.addActionListener(e -> {
+            boolean expanded = !targetSettingsPanel.isVisible();
+            targetSettingsPanel.setVisible(expanded);
+            btnTargetSettings.setText(expanded ? "対象設定 ▾" : "対象設定 ▸");
+            mainPanel.revalidate();
+        });
+
+        toolbarPanel.add(btnAnalyze);
+        toolbarPanel.add(btnTargetSettings);
         toolbarPanel.add(chkDoubleClickSync);
         toolbarPanel.add(chkAutoRefresh);
-        mainPanel.add(toolbarPanel, BorderLayout.NORTH);
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(toolbarPanel, BorderLayout.NORTH);
+        topPanel.add(targetSettingsPanel, BorderLayout.CENTER);
+        mainPanel.add(topPanel, BorderLayout.NORTH);
 
         // Setup JCEF Browser
         JBCefBrowser browser = new JBCefBrowser();
@@ -159,13 +207,38 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         ToolWindowHolder holder = new ToolWindowHolder();
         holder.browser = browser;
+        holder.projectPathField = projectPathField;
         holder.targetCombo = targetCombo;
         holder.syncOnDoubleClick = chkDoubleClickSync.isSelected();
+        holder.autoRefresh = chkAutoRefresh.isSelected();
+        holder.chkDoubleClickSync = chkDoubleClickSync;
+        holder.chkAutoRefresh = chkAutoRefresh;
         activeHolders.put(project, holder);
+
+        browser.getJBCefClient().addDisplayHandler(new org.cef.handler.CefDisplayHandlerAdapter() {
+            @Override
+            public boolean onConsoleMessage(CefBrowser cefBrowser, org.cef.CefSettings.LogSeverity level, String message, String source, int line) {
+                System.out.println("[ModuleLoom JS " + level + "] " + (source != null ? source : "") + ":" + line + " - " + message);
+                return false;
+            }
+        }, browser.getCefBrowser());
 
         chkDoubleClickSync.addActionListener(e -> {
             holder.syncOnDoubleClick = chkDoubleClickSync.isSelected();
         });
+        chkAutoRefresh.addActionListener(e -> {
+            holder.autoRefresh = chkAutoRefresh.isSelected();
+            if (!holder.autoRefresh) {
+                holder.refreshTimer.stop();
+            }
+        });
+        btnAnalyze.addActionListener(e -> {
+            String path = projectPathField.getText().trim();
+            btnTargetSettings.setToolTipText("解析対象: " + path);
+            ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, path.isEmpty() ? null : path, null));
+        });
+        projectPathField.addActionListener(e -> btnAnalyze.doClick());
+
         holder.refreshTimer = new Timer(500, e -> ApplicationManager.getApplication().executeOnPooledThread(() ->
                 runAnalyze(project, holder, holder.currentAnalyzePath, null, drainChangedFiles(holder))));
         holder.refreshTimer.setRepeats(false);
@@ -173,72 +246,41 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             holder.refreshTimer.stop();
             activeHolders.remove(project, holder);
         });
-        chkAutoRefresh.addActionListener(e -> {
-            holder.autoRefresh = chkAutoRefresh.isSelected();
-            if (!holder.autoRefresh) holder.refreshTimer.stop();
-        });
 
         // Extract bundled web assets to user cache directory
-        Path webDir = prepareWebAssets();
-
         jsQuery.addHandler(query -> {
-            handleClientQuery(project, browser, query, targetCombo);
-            return new JBCefJSQuery.Response("ok");
+            return new JBCefJSQuery.Response(handleClientQuery(project, browser, query, targetCombo));
         });
-
-        // Inject JS bridge on page load
-        browser.getJBCefClient().addLoadHandler(new CefLoadHandlerAdapter() {
-            @Override
-            public void onLoadEnd(CefBrowser cefBrowser, CefFrame frame, int httpStatusCode) {
-                if (frame.isMain()) {
-                    String injectScript = "window.cefQuery = function(arg) { " +
-                            jsQuery.inject("arg.request") +
-                            " };";
-                    cefBrowser.executeJavaScript(injectScript, cefBrowser.getURL(), 0);
-                    // Automatically trigger analysis on initial load
-                    ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, null, null));
-                }
-            }
-        }, browser.getCefBrowser());
-
-        btnMkdocs.addActionListener(e -> {
-            String basePath = project.getBasePath();
-            if (basePath == null) return;
-            Path suggested = Path.of(basePath, "moduleloom-docs");
-            JFileChooser chooser = new JFileChooser(basePath);
-            chooser.setDialogTitle("MkDocs 出力先を選択");
-            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            chooser.setAcceptAllFileFilterUsed(false);
-            chooser.setToolTipText("空のディレクトリ、または以前 ModuleLoom が生成したディレクトリを選択してください (推奨: " + suggested + ")");
-            if (chooser.showSaveDialog(mainPanel) == JFileChooser.APPROVE_OPTION) {
-                Path output = chooser.getSelectedFile().toPath().toAbsolutePath().normalize();
-                String[] languages = {"auto", "ja", "en", "fr", "de", "es", "zh", "ko", "pt"};
-                Object languageChoice = JOptionPane.showInputDialog(mainPanel,
-                        "ドキュメントの言語", "MkDocs", JOptionPane.QUESTION_MESSAGE,
-                        null, languages, "auto");
-                if (languageChoice == null) return;
-                String lang = languageChoice.toString();
-                if ("auto".equals(lang)) {
-                    lang = Locale.getDefault().getLanguage();
-                    if (lang.isBlank() || !List.of("ja", "en", "fr", "de", "es", "zh", "ko", "pt").contains(lang)) lang = "en";
-                }
-                String analysisPath = selectedAnalysisPath(project, targetCombo);
-                int moduleCount = countModules(holder.lastResultJson);
-                String preview = "生成先: " + output + "\nモジュール数: " + moduleCount
-                        + "\n言語: " + lang + "\n\nMkDocs プロジェクトを生成しますか？";
-                if (JOptionPane.showConfirmDialog(mainPanel, preview, "MkDocs 出力の確認",
-                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION) return;
-                String selectedLang = lang;
-                ApplicationManager.getApplication().executeOnPooledThread(() ->
-                        generateMkDocs(project, holder, analysisPath, output, selectedLang));
-            }
-        });
+        Path webDir = prepareWebAssets(initialPath, jsQuery);
 
         targetCombo.addActionListener(e -> {
-            ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, null, null));
+            String path = selectedAnalysisPath(project, targetCombo);
+            if (path != null) {
+                projectPathField.setText(path);
+                btnTargetSettings.setToolTipText("解析対象: " + path);
+            }
+            ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, path, null));
         });
 
         if (webDir != null && Files.exists(webDir.resolve("index.html"))) {
+            browser.getJBCefClient().addLoadHandler(new CefLoadHandlerAdapter() {
+                @Override
+                public void onLoadEnd(CefBrowser cefBrowser, CefFrame frame, int httpStatusCode) {
+                    if (!frame.isMain()) return;
+                    String path = projectPathField.getText().trim();
+                    cefBrowser.executeJavaScript("(function(){" +
+                            "const p=document.getElementById('project-path-input');" +
+                            "if(p&&!p.value){p.value='" + escapeJs(path) + "';}" +
+                            "const trigger=function(){" +
+                            "if(typeof window.__MODULELOOM_REANALYZE__==='function'){window.__MODULELOOM_REANALYZE__();}" +
+                            "else{const b=document.getElementById('btn-analyze');if(b)b.click();}" +
+                            "};" +
+                            "if(typeof window.__MODULELOOM_REANALYZE__==='function'){trigger();}" +
+                            "else{let a=0;const it=setInterval(function(){a++;if(typeof window.__MODULELOOM_REANALYZE__==='function'||a>20){clearInterval(it);trigger();}},100);}" +
+                            "})();",
+                            cefBrowser.getURL() != null ? cefBrowser.getURL() : "", 0);
+                }
+            }, browser.getCefBrowser());
             browser.loadURL(webDir.resolve("index.html").toUri().toString());
         } else {
             browser.loadHTML("<html><body><h2>Failed to load web assets</h2></body></html>");
@@ -377,8 +419,22 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         return basePath;
     }
 
-    private void handleClientQuery(Project project, JBCefBrowser browser, String query, JComboBox<String> targetCombo) {
-        if (query == null || query.isEmpty()) return;
+    private String handleClientQuery(Project project, JBCefBrowser browser, String query, JComboBox<String> targetCombo) {
+        if (query == null || query.isEmpty()) return "null";
+
+        if (query.contains("\"type\":\"command\"")) {
+            ToolWindowHolder holder = activeHolders.get(project);
+            String requestId = extractJsonField(query, "requestId");
+            String command = extractJsonField(query, "command");
+            String result;
+            try {
+                result = runPluginCommand(project, holder, command, query);
+                return result;
+            } catch (Exception error) {
+                String message = error.getMessage() == null ? error.toString() : error.getMessage();
+                return "{\"__moduleloom_error__\":" + jsonString(message) + "}";
+            }
+        }
 
         if (query.contains("\"type\":\"open_file\"") || query.contains("'type':'open_file'")) {
             // Mark timestamp so handleUserFileActivation will completely ignore this event!
@@ -401,13 +457,256 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                     }
                 });
             }
+            return "null";
         } else if (query.contains("\"type\":\"analyze\"") || query.contains("'type':'analyze'")) {
             ToolWindowHolder holder = activeHolders.get(project);
             if (holder != null) {
-                ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, null, null));
+        // The web UI starts the initial analysis after its page has loaded.
             }
         }
+        return "null";
     }
+
+    private String runPluginCommand(Project project, ToolWindowHolder holder, String command, String request) throws Exception {
+        if (holder == null) throw new IllegalStateException("ModuleLoom の状態を取得できません");
+        String pathArg = extractJsonField(request, "path");
+        String rootText = pathArg == null ? holder.lastResultRoot : pathArg;
+        if (rootText == null) rootText = selectedAnalysisPath(project, holder.targetCombo);
+        if (rootText == null) throw new IllegalStateException("解析対象を選択してください");
+        Path root = Path.of(rootText).toRealPath();
+        String source = extractJsonField(request, "source");
+        String targetArg = extractJsonField(request, "target");
+        String lineText = extractJsonField(request, "line");
+        String kindArg = extractJsonField(request, "kind");
+        String output = extractJsonField(request, "output");
+        String lang = extractJsonField(request, "lang");
+        String base = extractJsonField(request, "base");
+        String head = extractJsonField(request, "head");
+        String toolId = extractJsonField(request, "toolId");
+        switch (command == null ? "" : command) {
+            case "analyze_project": {
+                String raw = runProcess(root, List.of(findAnalyzerBinary(project), "--json", root.toString()), null, false);
+                int start = raw.indexOf('{');
+                int end = raw.lastIndexOf('}');
+                String json = (start >= 0 && end > start) ? raw.substring(start, end + 1) : raw.trim();
+                holder.lastResultJson = json;
+                holder.lastResultRoot = root.toString();
+                holder.currentAnalyzePath = root.toString();
+                return json;
+            }
+            case "list_fix_tools": {
+                List<String> entries = new ArrayList<>();
+                for (FixToolConfig tool : availableFixTools(root)) {
+                    entries.add("{\"id\":" + jsonString(tool.id) + ",\"label\":" + jsonString(tool.label) + ",\"kinds\":" + jsonArray(tool.kinds) + "}");
+                }
+                return "[" + String.join(",", entries) + "]";
+            }
+            case "preview_cycle_fix": {
+                if (toolId == null || source == null || lineText == null)
+                    throw new IllegalArgumentException("循環改善候補が見つかりません。再解析してください");
+                int line = Integer.parseInt(lineText);
+                String quotedSource = Pattern.quote(source);
+                String target = targetArg;
+                String kind = kindArg;
+                if ((target == null || target.isBlank() || kind == null || kind.isBlank()) && holder.lastResultJson != null) {
+                    Pattern suggestion = Pattern.compile("\"suggestion\"\\s*:\\s*\\{[^}]*\"source\"\\s*:\\s*\"" + quotedSource + "\"[^}]*\"target\"\\s*:\\s*\"([^\"]+)\"[^}]*\"line\"\\s*:\\s*" + line + "[^}]*\"kind\"\\s*:\\s*\"([^\"]+)\"", Pattern.DOTALL);
+                    Matcher suggestionMatch = suggestion.matcher(holder.lastResultJson);
+                    if (suggestionMatch.find()) {
+                        if (target == null || target.isBlank()) target = suggestionMatch.group(1);
+                        if (kind == null || kind.isBlank()) kind = suggestionMatch.group(2);
+                    }
+                }
+                if (target == null || target.isBlank()) target = source;
+                if (kind == null || kind.isBlank()) kind = "unknown";
+
+                final String finalKind = kind;
+                FixToolConfig selectedTool = availableFixTools(root).stream().filter(tool -> tool.id.equals(toolId)).findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("選択した外部ツールが見つかりません: " + toolId));
+                if (!selectedTool.kinds.contains(finalKind) && !"ruff".equals(toolId)) {
+                    throw new IllegalArgumentException(selectedTool.label + " はこの循環候補の種類（" + finalKind + "）に対応していません");
+                }
+
+                Path file = null;
+                if (holder.lastResultJson != null) {
+                    Pattern module = Pattern.compile("\"id\"\\s*:\\s*\"" + quotedSource + "\".*?\"absolute_path\"\\s*:\\s*\"([^\"]+)\"", Pattern.DOTALL);
+                    Matcher moduleMatch = module.matcher(holder.lastResultJson);
+                    if (moduleMatch.find()) {
+                        String absolute = moduleMatch.group(1).replace("\\\\", "\\").replace("\\\"", "\"");
+                        Path candidate = Path.of(absolute);
+                        if (!candidate.isAbsolute()) candidate = root.resolve(candidate);
+                        candidate = candidate.normalize();
+                        if (Files.isRegularFile(candidate)) file = candidate;
+                    }
+                }
+                if (file == null) {
+                    Path candidate = root.resolve(source.replace('.', '/') + ".py");
+                    if (Files.isRegularFile(candidate)) file = candidate;
+                    else {
+                        candidate = root.resolve(source.replace('.', '/') + "/__init__.py");
+                        if (Files.isRegularFile(candidate)) file = candidate;
+                    }
+                }
+                if (file == null) throw new IllegalArgumentException("対象モジュールが見つかりません: " + source);
+                file = file.toRealPath();
+                if (!file.startsWith(root) || !"py".equals(getExtension(file))) throw new IllegalArgumentException("対象ファイルは解析対象の Python ファイルである必要があります");
+                byte[] original = Files.readAllBytes(file);
+                List<String> previewArgs = expandFixArgs(selectedTool.previewArgs, root, file, source, target, line);
+                List<String> applyArgs = expandFixArgs(selectedTool.applyArgs, root, file, source, target, line);
+                String diff = "";
+                try {
+                    diff = runProcess(root, prepend(selectedTool.command, previewArgs), null, true);
+                } catch (Exception ignored) {
+                    diff = "";
+                }
+                if (!java.util.Arrays.equals(original, Files.readAllBytes(file))) throw new IllegalStateException(selectedTool.label + " のプレビュー用コマンドがファイルを変更しました");
+                holder.pendingFix = new PendingFix(root, file, original, diff, selectedTool.command, selectedTool.label, previewArgs, applyArgs);
+                return "{\"file\":" + jsonString(file.toString()) + ",\"diff\":" + jsonString(diff) + ",\"tool\":" + jsonString(selectedTool.label) + "}";
+            }
+            case "apply_cycle_fix": {
+                PendingFix pending = holder.pendingFix;
+                holder.pendingFix = null;
+                if (pending == null || !pending.root.equals(root)) throw new IllegalStateException("差分を再表示してから適用してください");
+                if (!java.util.Arrays.equals(pending.original, Files.readAllBytes(pending.file))) throw new IllegalStateException("差分表示後に対象ファイルが変更されました。再度プレビューしてください");
+                String diff = runProcess(root, prepend(pending.command, pending.previewArgs), null, true);
+                if (!pending.diff.equals(diff)) throw new IllegalStateException(pending.label + " の修正内容が変わりました。再度プレビューしてください");
+                runProcess(root, prepend(pending.command, pending.applyArgs), null, false);
+                if (java.util.Arrays.equals(pending.original, Files.readAllBytes(pending.file))) throw new IllegalStateException(pending.label + " はファイルを変更しませんでした");
+                return jsonString(pending.file.toString());
+            }
+            case "generate_mkdocs": {
+                if (output == null) throw new IllegalArgumentException("出力先を指定してください");
+                String binary = findAnalyzerBinary(project);
+                runProcess(root, List.of(binary, "--mkdocs", output, "--lang", lang == null ? "auto" : lang, root.toString()), null, false);
+                return jsonString(output);
+            }
+            case "export_report": {
+                String jsonData = extractJsonField(request, "json");
+                if (jsonData == null) throw new IllegalArgumentException("解析データがありません");
+                Path outDir = root.resolve(".moduleloom");
+                Files.createDirectories(outDir);
+                String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss").format(new java.util.Date());
+                Path jsonPath = outDir.resolve("moduleloom-analysis-" + stamp + ".json");
+                Files.writeString(jsonPath, jsonData, StandardCharsets.UTF_8);
+                return jsonString(jsonPath.toString());
+            }
+            case "git_changed_files": {
+                String status = runProcess(root, List.of("git", "-C", root.toString(), "status", "--short"), null, false);
+                List<String> files = new ArrayList<>();
+                for (String item : status.split("\\R")) if (item.length() > 3 && item.substring(3).trim().endsWith(".py")) files.add(item.substring(3).trim());
+                return jsonArray(files);
+            }
+            case "git_diff_files": {
+                String diff = runProcess(root, List.of("git", "-C", root.toString(), "diff", "--name-only", base + ".." + head), null, false);
+                List<String> files = new ArrayList<>();
+                for (String item : diff.split("\\R")) if (item.endsWith(".py")) files.add(item);
+                return jsonArray(files);
+            }
+            case "watch_project": holder.autoRefresh = true; holder.currentAnalyzePath = root.toString(); return "{}";
+            case "stop_watching": holder.autoRefresh = false; holder.refreshTimer.stop(); return "{}";
+            case "detect_editors": return "[\"pycharm\"]";
+            case "open_in_editor": {
+                String file = extractJsonField(request, "filePath");
+                int line = lineText == null ? 1 : Integer.parseInt(lineText);
+                if (file != null) ApplicationManager.getApplication().invokeLater(() -> {
+                    VirtualFile vf = LocalFileSystem.getInstance().findFileByPath(file);
+                    if (vf != null) FileEditorManager.getInstance(project).openTextEditor(new OpenFileDescriptor(project, vf, Math.max(0, line - 1), 0), true);
+                });
+                return "{}";
+            }
+            default: throw new IllegalArgumentException("Unsupported ModuleLoom command: " + command);
+        }
+    }
+
+    private static List<FixToolConfig> availableFixTools(Path root) throws Exception {
+        List<FixToolConfig> tools = new ArrayList<>();
+        tools.add(new FixToolConfig("ruff", "Ruff (TC001)", ruffExecutable(root), List.of("type_only"),
+                List.of("check", "--select", "TC001", "--unsafe-fixes", "--no-cache", "--diff", "{file}"),
+                List.of("check", "--select", "TC001", "--unsafe-fixes", "--no-cache", "--fix-only", "{file}")));
+        Path config = root.resolve("moduleloom.toml");
+        if (!Files.isRegularFile(config)) return tools;
+        String content = Files.readString(config, StandardCharsets.UTF_8);
+        Matcher tables = Pattern.compile("(?m)^\\[fix_tools\\.([^\\]]+)\\]\\s*$").matcher(content);
+        List<String[]> blocks = new ArrayList<>();
+        while (tables.find()) blocks.add(new String[]{tables.group(1), String.valueOf(tables.start()), String.valueOf(tables.end())});
+        for (String[] table : blocks) {
+            String id = table[0];
+            if ("ruff".equals(id)) throw new IllegalArgumentException("fix_tools.ruff は予約済みです");
+            int start = Integer.parseInt(table[2]);
+            Matcher nextTable = Pattern.compile("(?m)^\\s*\\[[^\\]]+\\]\\s*$").matcher(content);
+            int end = content.length();
+            if (nextTable.find(start)) end = nextTable.start();
+            String block = content.substring(start, end);
+            String label = tomlString(block, "label");
+            String command = tomlString(block, "command");
+            List<String> preview = tomlArray(block, "preview_args");
+            List<String> apply = tomlArray(block, "apply_args");
+            List<String> kinds = tomlArray(block, "kinds");
+            if (command == null || preview == null || apply == null) throw new IllegalArgumentException("fix_tools." + id + " に command、preview_args、apply_args が必要です");
+            if (kinds == null) kinds = List.of("type_only", "runtime", "unknown");
+            if (kinds.stream().anyMatch(kind -> !List.of("type_only", "runtime", "unknown").contains(kind))) throw new IllegalArgumentException("fix_tools." + id + ".kinds に不明な種類があります");
+            Path commandPath = Path.of(command);
+            if (!commandPath.isAbsolute() && (command.contains("/") || command.contains("\\"))) commandPath = root.resolve(commandPath);
+            tools.add(new FixToolConfig(id, label == null ? id : label, commandPath.toString(), kinds, preview, apply));
+        }
+        return tools;
+    }
+    private static String tomlString(String block, String key) {
+        Matcher matcher = Pattern.compile("(?m)^\\s*" + Pattern.quote(key) + "\\s*=\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").matcher(block);
+        return matcher.find() ? matcher.group(1).replace("\\\"", "\"").replace("\\\\", "\\") : null;
+    }
+    private static List<String> tomlArray(String block, String key) {
+        Matcher assignment = Pattern.compile("(?s)(?m)^\\s*" + Pattern.quote(key) + "\\s*=\\s*\\[(.*?)\\]").matcher(block);
+        if (!assignment.find()) return null;
+        List<String> values = new ArrayList<>();
+        Matcher items = Pattern.compile("\"((?:[^\"\\\\]|\\\\.)*)\"").matcher(assignment.group(1));
+        while (items.find()) values.add(items.group(1).replace("\\\"", "\"").replace("\\\\", "\\"));
+        return values;
+    }
+    private static List<String> expandFixArgs(List<String> args, Path root, Path file, String source, String target, int line) {
+        List<String> expanded = new ArrayList<>();
+        for (String arg : args) expanded.add(arg.replace("{project}", root.toString()).replace("{file}", file.toString())
+                .replace("{source}", source).replace("{target}", target).replace("{line}", Integer.toString(line)));
+        return expanded;
+    }
+    private static List<String> prepend(String executable, List<String> args) {
+        List<String> command = new ArrayList<>(); command.add(executable); command.addAll(args); return command;
+    }
+    private static String getExtension(Path file) { String name = file.getFileName().toString(); int dot = name.lastIndexOf('.'); return dot < 0 ? "" : name.substring(dot + 1); }
+    private static String ruffExecutable(Path root) {
+        for (String relative : List.of(".venv/bin/ruff", "venv/bin/ruff", ".venv/Scripts/ruff.exe", "venv/Scripts/ruff.exe")) {
+            Path candidate = root.resolve(relative);
+            if (Files.isRegularFile(candidate)) return candidate.toString();
+            if (root.getParent() != null) {
+                Path parentCandidate = root.getParent().resolve(relative);
+                if (Files.isRegularFile(parentCandidate)) return parentCandidate.toString();
+            }
+        }
+        String home = System.getProperty("user.home");
+        if (home != null) {
+            for (String relative : List.of(".local/bin/ruff", ".cargo/bin/ruff")) {
+                Path candidate = Path.of(home, relative);
+                if (Files.isRegularFile(candidate)) return candidate.toString();
+            }
+        }
+        return "ruff";
+    }
+    private static String runProcess(Path cwd, List<String> command, String stdin, boolean allowDiffExit) throws Exception {
+        Process process = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(false).start();
+        if (stdin != null) process.getOutputStream().write(stdin.getBytes(StandardCharsets.UTF_8));
+        process.getOutputStream().close();
+        String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        int code = process.waitFor();
+        if (code != 0 && !(allowDiffExit && code == 1 && !stdout.isBlank())) {
+            String err = !stderr.isBlank() ? stderr.trim() : stdout.trim();
+            throw new IllegalStateException(err.isBlank() ? String.join(" ", command) + " exited " + code : err);
+        }
+        return stdout;
+    }
+    private static String jsonString(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\"";
+    }
+    private static String jsonArray(List<String> values) { return "[" + values.stream().map(ModuleLoomToolWindowFactory::jsonString).collect(java.util.stream.Collectors.joining(",")) + "]"; }
 
     private static String selectedAnalysisPath(Project project, JComboBox<String> targetCombo) {
         String basePath = project.getBasePath();
@@ -578,6 +877,31 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             holder.pendingFilePath = targetFileToOpen;
         }
 
+        if (holder.browser != null && holder.browser.getCefBrowser() != null) {
+            final String finalBasePath = basePath;
+            ApplicationManager.getApplication().invokeLater(() -> {
+                if (holder.projectPathField != null && finalBasePath != null) {
+                    holder.projectPathField.setText(finalBasePath);
+                }
+                if (holder.browser != null && holder.browser.getCefBrowser() != null) {
+                    String pendingFile = targetFileToOpen == null ? "" : "window.__MODULELOOM_PENDING_FILE__='" + escapeJs(targetFileToOpen) + "';";
+                    String syncUi = "(function(){" + pendingFile +
+                            "const trigger=function(){" +
+                            "const p=document.getElementById('project-path-input');" +
+                            "if(p){p.value='" + escapeJs(finalBasePath) + "';}" +
+                            "if(typeof window.__MODULELOOM_REANALYZE__==='function'){window.__MODULELOOM_REANALYZE__();}" +
+                            "else{const b=document.getElementById('btn-analyze');if(b)b.click();}" +
+                            "};" +
+                            "if(typeof window.__MODULELOOM_REANALYZE__==='function'){trigger();}" +
+                            "else{let a=0;const it=setInterval(function(){a++;if(typeof window.__MODULELOOM_REANALYZE__==='function'||a>20){clearInterval(it);trigger();}},100);}" +
+                            "})();";
+                    String url = holder.browser.getCefBrowser().getURL();
+                    holder.browser.getCefBrowser().executeJavaScript(syncUi, url != null ? url : "", 0);
+                }
+            });
+            return;
+        }
+
         // Path to analyze CLI binary
         String binaryPath = findAnalyzerBinary(project);
         if (binaryPath == null) {
@@ -681,18 +1005,37 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         return "analyze";
     }
 
-    private Path prepareWebAssets() {
+    private Path prepareWebAssets(String initialProjectPath, JBCefJSQuery jsQuery) {
         try {
             Path targetDir = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "web");
             Files.createDirectories(targetDir);
 
-            String[] files = {"index.html", "cytoscape.min.js", "cytoscape-dagre.min.js", "cycle-insights.js"};
+            String[] files = {"index.html", "assets/index.js", "assets/index.css"};
             for (String file : files) {
                 try (InputStream is = getClass().getResourceAsStream("/web/" + file)) {
                     if (is != null) {
-                        Files.copy(is, targetDir.resolve(file), StandardCopyOption.REPLACE_EXISTING);
+                        Path target = targetDir.resolve(file);
+                        Files.createDirectories(target.getParent());
+                        Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
                     }
                 }
+            }
+            Path index = targetDir.resolve("index.html");
+            if (Files.isRegularFile(index)) {
+                String html = Files.readString(index, StandardCharsets.UTF_8);
+                // Ensure module script is converted to defer script for file:// CORS compatibility in Chromium/JCEF
+                html = html.replace("<script type=\"module\" crossorigin", "<script defer");
+                Path stylesheet = targetDir.resolve("assets/index.css");
+                if (Files.isRegularFile(stylesheet)) {
+                    String css = Files.readString(stylesheet, StandardCharsets.UTF_8);
+                    html = html.replace("</head>", "<style>" + css + "</style></head>");
+                }
+                String bootstrap = "<style>#project-path-input,#btn-analyze,.editor-select-area,.watch-toggle-label{display:none !important;}</style>" +
+                        "<script>window.__MODULELOOM_PROJECT_PATH__=" + jsonString(initialProjectPath == null ? "" : initialProjectPath) + ";" +
+                        "window.__MODULELOOM_EDITOR__='pycharm';" +
+                        "window.cefQuery=function(arg){" + jsQuery.inject("arg.request", "arg.onSuccess", "arg.onFailure") + "};" +
+                        "let moduleLoomRequestId=0;window.__MODULELOOM_INVOKE__=function(command,args){return new Promise((resolve,reject)=>{const requestId=++moduleLoomRequestId;window.cefQuery({request:JSON.stringify({type:'command',requestId,command,args}),onSuccess:function(raw){try{const result=JSON.parse(raw);if(result&&result.__moduleloom_error__)reject(new Error(result.__moduleloom_error__));else resolve(result);}catch(e){reject(e);}},onFailure:function(code,msg){reject(new Error(msg));}});});};</script>";
+                Files.writeString(index, html.replace("</head>", bootstrap + "</head>"), StandardCharsets.UTF_8);
             }
             return targetDir;
         } catch (Exception e) {
@@ -705,7 +1048,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         Pattern pattern = Pattern.compile("\"" + key + "\":\\s*\"?([^,\"}]+)\"?");
         Matcher matcher = pattern.matcher(json);
         if (matcher.find()) {
-            return matcher.group(1).trim();
+            return matcher.group(1).trim().replace("\\\\", "\\").replace("\\\"", "\"").replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
         }
         return null;
     }

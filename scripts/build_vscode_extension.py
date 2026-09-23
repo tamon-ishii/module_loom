@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Copy shared browser assets into the VS Code extension package."""
+"""Copy the shared web application into the VS Code extension package."""
 from pathlib import Path
 import shutil
+import subprocess
 
 root = Path(__file__).resolve().parent.parent
-source = root / "plugins" / "pycharm" / "src" / "main" / "resources" / "web"
+subprocess.run(["npm", "run", "build"], cwd=root, check=True)
+source = root / "dist"
 destination = root / "plugins" / "vscode" / "media"
-destination.mkdir(exist_ok=True)
-for name in ("cytoscape.min.js", "cytoscape-dagre.min.js"):
-    shutil.copy2(source / name, destination / name)
-    print(f"Updated {destination / name}")
-shutil.copy2(root / "shared" / "cycle-insights.js", destination / "cycle-insights.js")
+if destination.exists():
+    shutil.rmtree(destination)
+shutil.copytree(source, destination)
+shutil.copy2(root / "plugins" / "vscode" / "moduleloom.svg", destination / "moduleloom.svg")
+print(f"Updated shared web application in {destination}")

@@ -79,8 +79,16 @@ export function compareAnalysisIssues(previous: AnalysisResult, current: Analysi
   };
 }
 
-export function recordAnalysisHistory(result: AnalysisResult): void {
+export function recordAnalysisHistory(result: AnalysisResult): boolean {
   const history = readAnalysisHistory(result.root_path);
   history.push({ timestamp: new Date().toISOString(), result });
-  localStorage.setItem(historyKey(result.root_path), JSON.stringify(history.slice(-20)));
+  for (let count = Math.min(history.length, 20); count > 0; count--) {
+    try {
+      localStorage.setItem(historyKey(result.root_path), JSON.stringify(history.slice(-count)));
+      return true;
+    } catch {
+      // 保存容量が足りない場合は古い履歴を減らして再試行する。
+    }
+  }
+  return false;
 }

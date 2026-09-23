@@ -2,13 +2,14 @@
 """Build a VSIX with only Python's standard library."""
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from xml.sax.saxutils import escape
 from zipfile import ZIP_DEFLATED, ZipFile
 
 root = Path(__file__).resolve().parent.parent
 extension = root / "plugins" / "vscode"
-shutil.copy2(root / "shared" / "cycle-insights.js", extension / "media" / "cycle-insights.js")
+subprocess.run(["python3", str(root / "scripts" / "build_vscode_extension.py")], cwd=root, check=True)
 manifest = json.loads((extension / "package.json").read_text(encoding="utf-8"))
 output_dir = root / "target" / "vscode-extension"
 output_dir.mkdir(parents=True, exist_ok=True)
@@ -37,6 +38,7 @@ content_types = '''<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="json" ContentType="application/json" />
   <Default Extension="js" ContentType="application/javascript" />
+  <Default Extension="css" ContentType="text/css" />
   <Default Extension="html" ContentType="text/html" />
   <Default Extension="md" ContentType="text/markdown" />
   <Override PartName="/extension.vsixmanifest" ContentType="text/xml" />

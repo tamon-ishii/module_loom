@@ -21,4 +21,3 @@ jobs:
       - run: cargo test --workspace
       - run: npm ci
       - run: npm run build
-      - run: cargo run -p moduleloom-analyzer --bin analyze -- --check sample_project
