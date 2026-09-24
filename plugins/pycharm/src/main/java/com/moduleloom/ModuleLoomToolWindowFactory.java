@@ -77,6 +77,8 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         public volatile String lastResultJson;
         public volatile String lastResultRoot;
         public volatile PendingFix pendingFix;
+        public volatile String uiLocale = Locale.getDefault().getLanguage().equals("ja") ? "ja" : "en";
+        public java.util.function.Consumer<String> applyLocale;
     }
 
     private static class PendingFix {
@@ -100,6 +102,15 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     }
 
     private static final Map<Project, ToolWindowHolder> activeHolders = new ConcurrentHashMap<>();
+
+    public static boolean isEnglishUi(Project project) {
+        ToolWindowHolder holder = activeHolders.get(project);
+        return "en".equals(holder != null ? holder.uiLocale : (Locale.getDefault().getLanguage().equals("ja") ? "ja" : "en"));
+    }
+
+    private static String ui(String locale, String japanese, String english) {
+        return "en".equals(locale) ? english : japanese;
+    }
 
     // A fileOpened event can occur during the second mouse press, before MOUSE_CLICKED.
     private static volatile long lastUserDoubleClickTime = 0;
@@ -154,15 +165,24 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
         // Keep the common actions visible and expand the analysis target only when it changes.
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        String[] uiLocale = {Locale.getDefault().getLanguage().equals("ja") ? "ja" : "en"};
         JComboBox<String> targetCombo = new JComboBox<>();
         String projBase = project.getBasePath() != null ? project.getBasePath() : "";
         Path samplePath = Path.of(projBase, "sample_project");
         if (Files.exists(samplePath) && Files.isDirectory(samplePath)) {
             targetCombo.addItem("sample_project");
-            targetCombo.addItem("プロジェクト全体 (" + project.getName() + ")");
+            targetCombo.addItem("project_root");
         } else {
             targetCombo.addItem(project.getName());
         }
+        DefaultListCellRenderer defaultRenderer = new DefaultListCellRenderer();
+        targetCombo.setRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            JLabel label = (JLabel) defaultRenderer.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            label.setText("project_root".equals(value)
+                    ? ui(uiLocale[0], "プロジェクト全体", "Entire project") + " (" + project.getName() + ")"
+                    : value);
+            return label;
+        });
 
         String initialPath = selectedAnalysisPath(project, targetCombo);
         JTextField projectPathField = new JTextField(initialPath != null ? initialPath : projBase, 18);
@@ -184,11 +204,13 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         JPanel targetSettingsPanel = new JPanel();
         targetSettingsPanel.setLayout(new BoxLayout(targetSettingsPanel, BoxLayout.Y_AXIS));
         JPanel projectPathRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        projectPathRow.add(new JLabel("プロジェクトパス:"));
+        JLabel projectPathLabel = new JLabel("プロジェクトパス:");
+        projectPathRow.add(projectPathLabel);
         projectPathRow.add(projectPathField);
         projectPathRow.add(btnBrowseProject);
         JPanel analysisTargetRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        analysisTargetRow.add(new JLabel("解析対象:"));
+        JLabel analysisTargetLabel = new JLabel("解析対象:");
+        analysisTargetRow.add(analysisTargetLabel);
         analysisTargetRow.add(targetCombo);
         targetSettingsPanel.add(projectPathRow);
         targetSettingsPanel.add(analysisTargetRow);
@@ -196,12 +218,12 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         btnTargetSettings.addActionListener(e -> {
             boolean expanded = !targetSettingsPanel.isVisible();
             targetSettingsPanel.setVisible(expanded);
-            btnTargetSettings.setText(expanded ? "対象設定 ▾" : "対象設定 ▸");
+            btnTargetSettings.setText(ui(uiLocale[0], "対象設定", "Target settings") + (expanded ? " ▾" : " ▸"));
             mainPanel.revalidate();
         });
         btnBrowseProject.addActionListener(e -> {
             JFileChooser chooser = new JFileChooser();
-            chooser.setDialogTitle("解析するプロジェクトのディレクトリを選択");
+            chooser.setDialogTitle(ui(uiLocale[0], "解析するプロジェクトのディレクトリを選択", "Select project directory to analyze"));
             chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             String currentPath = projectPathField.getText().trim();
             File currentDirectory = currentPath.isEmpty() ? null : new File(currentPath);
@@ -213,7 +235,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             if (chooser.showOpenDialog(mainPanel) == JFileChooser.APPROVE_OPTION) {
                 String selectedPath = chooser.getSelectedFile().getAbsolutePath();
                 projectPathField.setText(selectedPath);
-                btnTargetSettings.setToolTipText("解析対象: " + selectedPath);
+                btnTargetSettings.setToolTipText(ui(uiLocale[0], "解析対象: ", "Analysis target: ") + selectedPath);
             }
         });
 
@@ -238,6 +260,30 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         holder.autoRefresh = chkAutoRefresh.isSelected();
         holder.chkDoubleClickSync = chkDoubleClickSync;
         holder.chkAutoRefresh = chkAutoRefresh;
+        holder.uiLocale = uiLocale[0];
+        holder.applyLocale = language -> {
+            uiLocale[0] = language;
+            btnAnalyze.setText(ui(language, "解析実行", "Analyze"));
+            btnAnalyze.setToolTipText(ui(language, "指定したパスのモジュール依存関係を解析します", "Analyze module dependencies at the selected path"));
+            btnBrowseProject.setText(ui(language, "参照…", "Browse…"));
+            btnBrowseProject.setToolTipText(ui(language, "解析するプロジェクトのディレクトリを選択", "Select project directory to analyze"));
+            projectPathField.setToolTipText(ui(language, "解析する Python プロジェクトのパス", "Path to the Python project to analyze"));
+            projectPathLabel.setText(ui(language, "プロジェクトパス:", "Project path:"));
+            analysisTargetLabel.setText(ui(language, "解析対象:", "Analysis target:"));
+            btnTargetSettings.setText(ui(language, "対象設定", "Target settings") + (targetSettingsPanel.isVisible() ? " ▾" : " ▸"));
+            btnTargetSettings.setToolTipText(ui(language, "解析対象: ", "Analysis target: ") + projectPathField.getText());
+            chkDoubleClickSync.setText(ui(language, "ダブルクリック連動", "Sync on double-click"));
+            chkDoubleClickSync.setToolTipText(ui(language,
+                    "PyCharm側でファイルをダブルクリックして開いた時、自動で依存図を開きます (ModuleLoomからのオープン時は反応しません)",
+                    "Open the dependency graph when you double-click a file in PyCharm"));
+            chkAutoRefresh.setText(ui(language, "自動更新", "Auto refresh"));
+            chkAutoRefresh.setToolTipText(ui(language,
+                    "Python ファイルや moduleloom.toml の保存・追加・削除後に再解析します",
+                    "Reanalyze after Python files or moduleloom.toml change"));
+            targetCombo.repaint();
+            mainPanel.revalidate();
+        };
+        holder.applyLocale.accept(uiLocale[0]);
         activeHolders.put(project, holder);
 
         browser.getJBCefClient().addDisplayHandler(new org.cef.handler.CefDisplayHandlerAdapter() {
@@ -259,7 +305,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         });
         btnAnalyze.addActionListener(e -> {
             String path = projectPathField.getText().trim();
-            btnTargetSettings.setToolTipText("解析対象: " + path);
+            btnTargetSettings.setToolTipText(ui(uiLocale[0], "解析対象: ", "Analysis target: ") + path);
             ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, path.isEmpty() ? null : path, null));
         });
         projectPathField.addActionListener(e -> btnAnalyze.doClick());
@@ -282,7 +328,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
             String path = selectedAnalysisPath(project, targetCombo);
             if (path != null) {
                 projectPathField.setText(path);
-                btnTargetSettings.setToolTipText("解析対象: " + path);
+                btnTargetSettings.setToolTipText(ui(uiLocale[0], "解析対象: ", "Analysis target: ") + path);
             }
             ApplicationManager.getApplication().executeOnPooledThread(() -> runAnalyze(project, holder, path, null));
         });
@@ -498,6 +544,15 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
 
     private String runPluginCommand(Project project, ToolWindowHolder holder, String command, String request) throws Exception {
         if (holder == null) throw new IllegalStateException("ModuleLoom の状態を取得できません");
+        if ("set_ui_locale".equals(command)) {
+            String selected = extractJsonField(request, "locale");
+            if (!"ja".equals(selected) && !"en".equals(selected)) throw new IllegalArgumentException("Unsupported UI locale");
+            holder.uiLocale = selected;
+            SwingUtilities.invokeLater(() -> {
+                if (holder.applyLocale != null) holder.applyLocale.accept(selected);
+            });
+            return "{}";
+        }
         String pathArg = extractJsonField(request, "path");
         String rootText = pathArg == null ? holder.lastResultRoot : pathArg;
         if (rootText == null) rootText = selectedAnalysisPath(project, holder.targetCombo);

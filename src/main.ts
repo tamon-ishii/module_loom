@@ -3,6 +3,7 @@ import cytoscape, { Core, EventObject } from "cytoscape";
 // @ts-ignore
 import dagre from "cytoscape-dagre";
 import { escapeHtml } from "./utils";
+import { currentUiLocale, initUiLocale, setUiLocale, translateUiText, type UiLocale } from "./i18n";
 import { cycleGuidance, cyclePath, cycleSuggestion } from "./cycle-insights";
 import {
   compareAnalysisResults,
@@ -34,6 +35,7 @@ let activeFixToolName = "Ruff";
 
 // DOM Elements
 const pathInput = document.getElementById("project-path-input") as HTMLInputElement;
+const uiLanguage = document.getElementById("ui-language") as HTMLSelectElement;
 const btnAnalyze = document.getElementById("btn-analyze") as HTMLButtonElement;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const chkWatch = document.getElementById("chk-watch") as HTMLInputElement;
@@ -1176,7 +1178,6 @@ function updateGraph(result: AnalysisResult) {
   // 1. Create nodes and package parents
   result.modules.forEach((mod) => {
     const isCycle = cycleNodeIds.has(mod.id);
-    const label = isCycle ? `🚨 ${mod.name}\n[循環参照]` : mod.name;
     // Box dimensions for card-style layout
     const width = isCycle
       ? Math.max(130, Math.min(185, mod.name.length * 9 + 40))
@@ -1211,7 +1212,7 @@ function updateGraph(result: AnalysisResult) {
       group: "nodes",
       data: {
         id: mod.id,
-        label: label,
+        label: isCycle ? `🚨 ${mod.name}\n${translateUiText("[循環参照]")}` : mod.name,
         loc: mod.loc,
         coupling: (mod.afferent_coupling || 0) + (mod.efferent_coupling || 0),
         width,
@@ -1258,7 +1259,7 @@ function updateGraph(result: AnalysisResult) {
         target: edge.target,
         line: edge.line,
         count: edge.import_count || 1,
-        cycleLabel: edge.is_circular ? `🚨 循環 (L:${edge.line})` : "",
+        cycleLabel: edge.is_circular ? translateUiText(`🚨 循環 (L:${edge.line})`) : "",
       },
       classes: classes.join(" "),
     });
@@ -1446,18 +1447,18 @@ function applyFilters() {
       if (isFileMode && selectedModule) {
         if (id === selectedModule.id) {
           node.addClass("focal-node");
-          node.data("label", `🎯 ${modName}\n[起点モジュール]`);
+          node.data("label", `🎯 ${modName}\n${translateUiText("[起点モジュール]")}`);
         } else if (fileData?.roots.includes(id)) {
           node.addClass("root-node");
-          node.data("label", `🌱 ${modName}\n[ルーツ]`);
+          node.data("label", `🌱 ${modName}\n${translateUiText("[ルーツ]")}`);
         } else if (fileData?.cycleModules.has(id)) {
-          node.data("label", `🚨 ${modName}\n[循環]`);
+          node.data("label", `🚨 ${modName}\n${translateUiText("[循環]")}`);
         } else {
           node.data("label", modName);
         }
       } else {
         const isCycle = cycleNodeIds.has(id);
-        node.data("label", isCycle ? `🚨 ${modName}\n[循環参照]` : modName);
+        node.data("label", isCycle ? `🚨 ${modName}\n${translateUiText("[循環参照]")}` : modName);
       }
     } else {
       node.addClass("hidden");
@@ -2278,7 +2279,7 @@ function showAnalysisHistory() {
   }
   const history = readAnalysisHistory(currentResult.root_path);
   const options = history.map((snapshot, index) =>
-    `<option value="${index}">${escapeHtml(new Date(snapshot.timestamp).toLocaleString())} — ${snapshot.result.modules.length} モジュール / ${snapshot.result.cycles.length} 循環</option>`).join("");
+    `<option value="${index}">${escapeHtml(new Date(snapshot.timestamp).toLocaleString(currentUiLocale() === "ja" ? "ja-JP" : "en-US"))} — ${snapshot.result.modules.length} モジュール / ${snapshot.result.cycles.length} 循環</option>`).join("");
   analysisHistoryBase.innerHTML = options;
   analysisHistoryHead.innerHTML = options;
   analysisHistoryBase.value = String(Math.max(0, history.length - 2));
@@ -2432,7 +2433,7 @@ function scheduleAnalysisFromFileChange(paths: string[] = []) {
       updateGraph(result);
       statusBar.innerText = toolError
         ? `修正ツールの設定エラー: ${toolError}`
-        : `自動更新完了 (${new Date().toLocaleTimeString()})`;
+        : `自動更新完了 (${new Date().toLocaleTimeString(currentUiLocale() === "ja" ? "ja-JP" : "en-US")})`;
     } catch (err: any) {
       statusBar.innerText = `自動再解析エラー: ${err.toString()}`;
     } finally {
@@ -3384,6 +3385,19 @@ if (editorSelect && savedEditor && (savedEditor === "pycharm" || savedEditor ===
 }
 
 // Initialize
+uiLanguage.value = initUiLocale();
+function syncHostUiLocale(locale: UiLocale) {
+  if (hostEditor === "pycharm" && typeof (window as any).__MODULELOOM_INVOKE__ === "function") {
+    void invokeCommand("set_ui_locale", { locale }).catch((error) => console.warn("UI locale sync failed", error));
+  }
+}
+uiLanguage.addEventListener("change", () => {
+  const locale: UiLocale = uiLanguage.value === "en" ? "en" : "ja";
+  setUiLocale(locale);
+  syncHostUiLocale(locale);
+  if (currentResult) updateGraph(currentResult);
+});
+syncHostUiLocale(uiLanguage.value === "en" ? "en" : "ja");
 updateFlowDirectionButton();
 initGraph();
 void initFileWatcherEvents();

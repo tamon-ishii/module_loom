@@ -31,10 +31,11 @@ public class OpenInModuleLoomAction extends AnAction implements DumbAware {
         e.getPresentation().setEnabledAndVisible(visible);
 
         if (visible) {
+            boolean english = ModuleLoomToolWindowFactory.isEnglishUi(project);
             if (file.isDirectory()) {
-                e.getPresentation().setText("ModuleLoom で解析: " + file.getName());
+                e.getPresentation().setText((english ? "Analyze with ModuleLoom: " : "ModuleLoom で解析: ") + file.getName());
             } else {
-                e.getPresentation().setText("ModuleLoom で依存図を開く: " + file.getName());
+                e.getPresentation().setText((english ? "Open dependency graph in ModuleLoom: " : "ModuleLoom で依存図を開く: ") + file.getName());
             }
         }
     }

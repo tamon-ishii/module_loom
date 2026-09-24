@@ -4,6 +4,8 @@
 
 Python モジュールの依存関係、循環インポート、肥大化を可視化するツールです。デスクトップアプリ、PyCharm プラグイン、VS Code 拡張を別々に配布します。
 
+画面の **表示 → 言語** で日本語・英語を切り替えられます。初回は環境の言語を使い、選択内容を保存します。
+
 ## GitHub からインストール
 
 [Releases](https://github.com/tamon-ishii/module_loom/releases) から使用する版のファイルを選んでください。

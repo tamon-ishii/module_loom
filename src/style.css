@@ -240,6 +240,7 @@ button {
 }
 
 .toolbar-menu-content .menu-actions { flex-wrap: wrap; }
+.toolbar-menu-content > label { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-muted); }
 .toolbar-menu-content .chain-controls { flex-wrap: wrap; border-top: 1px solid var(--border-color); padding-top: 8px; }
 .chain-controls span { width: 100%; font-size: 0.78rem; color: var(--text-muted); }
 .chain-controls select { width: 150px; min-width: 0; }
