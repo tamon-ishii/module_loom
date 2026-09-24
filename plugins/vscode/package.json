@@ -2,7 +2,7 @@
   "name": "moduleloom",
   "displayName": "ModuleLoom",
   "description": "Explore Python module dependencies in VS Code",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "moduleloom",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Visualization", "Other"],

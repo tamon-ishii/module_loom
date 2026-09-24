@@ -6,7 +6,7 @@ ModuleLoom は、PyCharm 内で Python プロジェクトのモジュール依�
 
 初回掲載は[Marketplace](https://plugins.jetbrains.com/)で行います。JetBrainsアカウントでVendor profileを作成し、Marketplace Developer Agreementに同意した後、プラグインJARを登録してください。説明、カテゴリ、タグ、対応製品、ライセンスとライセンスURL、ソースコードURLを掲載フォームで設定します。公開前にJetBrainsの審査があります。
 
-初回掲載後は、GitHubの `main` ブランチへのプラグイン関連ファイルのpushでGitHub ActionsがJARをビルドし、Marketplaceへ更新をアップロードします。リポジトリの **Settings → Secrets and variables → Actions** にMarketplaceのPermanent Tokenを `JETBRAINS_MARKETPLACE_TOKEN` という名前で登録してください。トークンはMarketplaceプロフィールの **My Tokens** で発行します。GitHub Actionsの実行番号から更新ごとに異なるバージョンを設定します。
+初回掲載後は、GitHubの `main` ブランチへのプラグイン関連ファイル・画面ソースのpushでGitHub ActionsがJARをビルドし、Marketplaceへ更新をアップロードします。リポジトリの **Settings → Secrets and variables → Actions → New repository secret** にMarketplaceのPermanent Tokenを `JETBRAINS_MARKETPLACE_TOKEN` という名前で登録してください。トークンはMarketplaceプロフィールの **My Tokens** で発行します。更新ごとに UTC の日付と GitHub Actions の実行番号から異なる `major.minor.patch` 形式のバージョンを設定します。
 
 Marketplaceへのアップロードには既存の掲載が必要です。初回登録前にActionsが動いた場合はアップロード工程が失敗するため、掲載完了後に `main` へ再度pushするか、Actionsから **Publish PyCharm plugin → Run workflow** を実行してください。
 

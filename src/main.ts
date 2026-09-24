@@ -898,9 +898,42 @@ function restoreGraphPositions() {
       const position = positions[node.id()];
       if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) node.position(position);
     });
+    separateOverlappingNodes(cy.nodes(":childless").not(".hidden"));
     cy.fit(cy.elements().not(".hidden"), 40);
   } catch {
     localStorage.removeItem(key);
+  }
+}
+
+function separateOverlappingNodes(nodes: cytoscape.NodeCollection) {
+  const horizontalFlow = flowDirection === "LR";
+  const ordered = nodes.toArray().sort((a, b) => {
+    const first = horizontalFlow ? a.position("y") - b.position("y") : a.position("x") - b.position("x");
+    return first || a.id().localeCompare(b.id());
+  });
+  const placed: cytoscape.NodeSingular[] = [];
+  const gap = 16;
+  for (const node of ordered) {
+    // Keep the flow rank fixed and move only across the flow direction.
+    for (let attempt = 0; attempt < placed.length; attempt++) {
+      const box = node.boundingBox({ includeLabels: true, includeOverlays: false });
+      let shift = 0;
+      for (const other of placed) {
+        const previous = other.boundingBox({ includeLabels: true, includeOverlays: false });
+        const crossOverlap = horizontalFlow
+          ? box.x1 < previous.x2 + gap && box.x2 + gap > previous.x1
+          : box.y1 < previous.y2 + gap && box.y2 + gap > previous.y1;
+        if (!crossOverlap) continue;
+        const separation = horizontalFlow ? previous.y2 + gap - box.y1 : previous.x2 + gap - box.x1;
+        if (separation > 0 && (horizontalFlow ? box.y1 < previous.y2 + gap : box.x1 < previous.x2 + gap)) {
+          shift = Math.max(shift, separation);
+        }
+      }
+      if (shift === 0) break;
+      node.position(horizontalFlow ? { x: node.position("x"), y: node.position("y") + shift }
+        : { x: node.position("x") + shift, y: node.position("y") });
+    }
+    placed.push(node);
   }
 }
 
@@ -1303,6 +1336,7 @@ function runLayout() {
       nodeSep: 60,
       rankSep: 100,
       edgeSep: 30,
+      nodeDimensionsIncludeLabels: true,
       fit: true,
       padding: 40,
       animate: false,
@@ -1336,6 +1370,7 @@ function runLayout() {
 
   const visible = cy.elements().not(".hidden");
   visible.layout(options).run();
+  separateOverlappingNodes(cy.nodes(":childless").not(".hidden"));
   cy.fit(visible, 40);
 }
 
@@ -1480,10 +1515,13 @@ function applyFilters() {
           nodeSep: 50,
           rankSep: 130,
           edgeSep: 35,
+          nodeDimensionsIncludeLabels: true,
           padding: 50,
           animate: false,
         } as any)
         .run();
+
+      separateOverlappingNodes(visibleNodes);
 
       // Fit into one single screen viewport without over-zooming
       cy.fit(visibleEles, 50);

@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - "crates/**"
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "vite.config.ts"
       - "plugins/pycharm/**"
       - "scripts/build_pycharm_plugin.py"
       - "scripts/stage_analyzers.py"
@@ -76,10 +82,12 @@ jobs:
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2025.3.1.tar.gz
           mkdir -p "$RUNNER_TEMP/pycharm"
           tar -xzf "$RUNNER_TEMP/pycharm.tar.gz" -C "$RUNNER_TEMP/pycharm" --strip-components=1
+      - name: Set plugin version
+        run: |
+          python3 -c 'import datetime, os; now = datetime.datetime.now(datetime.timezone.utc); patch = now.day * 10000000 + int(os.environ["GITHUB_RUN_NUMBER"]) * 1000 + int(os.environ["GITHUB_RUN_ATTEMPT"]); print(f"MODULELOOM_VERSION={now.year}.{now.month}.{patch}")' >> "$GITHUB_ENV"
       - name: Build plugin
         env:
           PYCHARM_HOME: ${{ runner.temp }}/pycharm
-          MODULELOOM_VERSION: ${{ github.run_number }}.${{ github.run_attempt }}
         run: python scripts/build_pycharm_plugin.py --build-only
       - uses: actions/upload-artifact@v4
         with:

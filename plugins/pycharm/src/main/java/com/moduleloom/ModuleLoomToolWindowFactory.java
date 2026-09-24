@@ -383,6 +383,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         if (holder == null || !holder.syncOnDoubleClick) {
             return;
         }
+        ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ModuleLoom");
+        if (toolWindow == null || !toolWindow.isVisible()) {
+            return;
+        }
 
         String filePath = file.getPath();
         if (filePath.equals(lastHandledFilePath) && now - lastHandledTime < 600) {
@@ -1070,10 +1074,36 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     }
 
     private String extractJsonField(String json, String key) {
-        Pattern pattern = Pattern.compile("\"" + key + "\":\\s*\"?([^,\"}]+)\"?");
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|(-?\\d+))");
         Matcher matcher = pattern.matcher(json);
         if (matcher.find()) {
-            return matcher.group(1).trim().replace("\\\\", "\\").replace("\\\"", "\"").replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
+            if (matcher.group(2) != null) return matcher.group(2);
+            String encoded = matcher.group(1);
+            StringBuilder decoded = new StringBuilder(encoded.length());
+            for (int i = 0; i < encoded.length(); i++) {
+                char ch = encoded.charAt(i);
+                if (ch != '\\' || ++i >= encoded.length()) {
+                    decoded.append(ch);
+                    continue;
+                }
+                switch (encoded.charAt(i)) {
+                    case '"' -> decoded.append('"');
+                    case '\\' -> decoded.append('\\');
+                    case '/' -> decoded.append('/');
+                    case 'n' -> decoded.append('\n');
+                    case 'r' -> decoded.append('\r');
+                    case 't' -> decoded.append('\t');
+                    case 'b' -> decoded.append('\b');
+                    case 'f' -> decoded.append('\f');
+                    case 'u' -> {
+                        if (i + 4 >= encoded.length()) throw new IllegalArgumentException("Invalid JSON Unicode escape");
+                        decoded.append((char) Integer.parseInt(encoded.substring(i + 1, i + 5), 16));
+                        i += 4;
+                    }
+                    default -> throw new IllegalArgumentException("Invalid JSON escape");
+                }
+            }
+            return decoded.toString();
         }
         return null;
     }

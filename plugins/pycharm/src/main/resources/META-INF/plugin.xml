@@ -16,7 +16,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="ModuleLoom"
                     anchor="right"
-                    canCloseContents="true"
+                    canCloseContents="false"
                     icon="AllIcons.Toolwindows.ToolWindowModuleDependencies"
                     factoryClass="com.moduleloom.ModuleLoomToolWindowFactory"/>
     </extensions>
