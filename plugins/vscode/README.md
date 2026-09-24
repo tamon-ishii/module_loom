@@ -13,7 +13,7 @@ To package and install from this repository, run:
 ```sh
 python3 scripts/build_vscode_extension.py
 python3 scripts/package_vscode_extension.py
-code --install-extension target/vscode-extension/moduleloom-1.0.4.vsix
+code --install-extension target/vscode-extension/moduleloom-1.0.5.vsix
 ```
 
 Reload VS Code after installation.

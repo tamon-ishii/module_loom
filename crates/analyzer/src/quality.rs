@@ -44,11 +44,12 @@ pub struct QualityData {
 }
 
 pub fn collect(root: &Path, modules: &[ModuleInfo]) -> QualityData {
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let mut warnings = Vec::new();
-    let functions = run_lizard(root, modules, &mut warnings);
-    let clones = run_jscpd(root, modules, &mut warnings);
+    let functions = run_lizard(&root, modules, &mut warnings);
+    let clones = run_jscpd(&root, modules, &mut warnings);
     let mut literals = repeated_literals(modules);
-    let magic = run_ruff(root, modules, &mut warnings);
+    let magic = run_ruff(&root, modules, &mut warnings);
     let magic_source = if magic.is_some() {
         "Ruff".to_string()
     } else {
@@ -76,17 +77,19 @@ fn executable(root: &Path, name: &str) -> Option<PathBuf> {
     } else {
         vec![name.to_string()]
     };
-    for base in [
-        root.join(".venv/bin"),
-        root.join("venv/bin"),
-        root.join(".venv/Scripts"),
-        root.join("venv/Scripts"),
-        root.join("node_modules/.bin"),
-    ] {
-        for candidate in &names {
-            let path = base.join(candidate);
-            if path.is_file() {
-                return Some(path);
+    for project in std::iter::once(root).chain(root.parent()) {
+        for base in [
+            project.join(".venv/bin"),
+            project.join("venv/bin"),
+            project.join(".venv/Scripts"),
+            project.join("venv/Scripts"),
+            project.join("node_modules/.bin"),
+        ] {
+            for candidate in &names {
+                let path = base.join(candidate);
+                if path.is_file() {
+                    return Some(path);
+                }
             }
         }
     }

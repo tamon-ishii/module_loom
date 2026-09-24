@@ -4,6 +4,8 @@ const exact: Record<string, string> = {
   "Python プロジェクトのパス (/path/to/project)": "Python project path (/path/to/project)",
   "解析実行": "Analyze",
   "コード診断": "Code diagnostics",
+  "診断実行": "Run diagnostics",
+  "現在のコードを診断して結果を更新": "Diagnose the current code and update the results",
   "詳細なコード品質を解析してグラフに表示": "Analyze code quality and show graphical results",
   "前の表示に戻る": "Go back",
   "← 戻る": "← Back",

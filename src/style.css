@@ -51,15 +51,26 @@ body {
 .complexity-dashboard {
   position: relative;
   z-index: 100;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.78rem;
+}
+.complexity-dashboard > summary {
+  cursor: pointer;
+  padding: 9px 120px 9px 12px;
+  font-weight: 700;
+}
+.complexity-dashboard > summary:hover { background: var(--border-color); }
+#complexity-dashboard-score { margin-left: 12px; color: var(--warning-color); }
+#btn-quality { position: absolute; top: 4px; right: 12px; z-index: 1; }
+.complexity-dashboard-content {
   display: grid;
   grid-template-columns: minmax(170px, 220px) minmax(300px, 1fr) minmax(220px, 350px);
   gap: 12px;
   align-items: center;
   padding: 8px 12px;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border-color);
-  font-size: 0.78rem;
 }
+.complexity-dashboard:not([open]) > .complexity-dashboard-content { display: none; }
 .complexity-dashboard[hidden] { display: none; }
 .complexity-dashboard.quality-loading::after {
   content: "コード診断中…";
@@ -121,12 +132,12 @@ body {
 .complexity-duplicate-row button { padding: 3px 5px; background: #313244; color: var(--text-main); }
 
 @media (max-width: 900px) {
-  .complexity-dashboard { grid-template-columns: minmax(150px, 200px) 1fr; }
+  .complexity-dashboard-content { grid-template-columns: minmax(150px, 200px) 1fr; }
   .complexity-priorities { grid-column: 1 / -1; }
 }
 
 @media (max-width: 600px) {
-  .complexity-dashboard { grid-template-columns: 1fr; }
+  .complexity-dashboard-content { grid-template-columns: 1fr; }
   .complexity-components { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .complexity-priorities { grid-column: auto; }
 }

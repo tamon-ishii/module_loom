@@ -11,7 +11,6 @@
         <div class="controls-area">
           <input type="text" id="project-path-input" placeholder="Python プロジェクトのパス (/path/to/project)" />
           <button id="btn-analyze" class="btn-primary">解析実行</button>
-          <button id="btn-quality" class="btn-secondary" title="詳細なコード品質を解析してグラフに表示">コード診断</button>
           <div class="primary-actions">
             <button id="btn-back" class="btn-secondary" title="前の表示に戻る">← 戻る</button>
             <button id="btn-show-overview" class="btn-secondary" title="プロジェクト全モジュールの全体図を表示">全体図</button>
@@ -79,7 +78,10 @@
         </div>
       </header>
 
-      <section id="complexity-dashboard" class="complexity-dashboard" aria-label="プロジェクト複雑度" hidden></section>
+      <details id="complexity-dashboard" class="complexity-dashboard" aria-label="プロジェクト複雑度">
+        <summary><span id="complexity-dashboard-title">コード診断</span><span id="complexity-dashboard-score"></span><button id="btn-quality" class="btn-secondary btn-sm" type="button" title="現在のコードを診断して結果を更新">診断実行</button></summary>
+        <div id="complexity-dashboard-content" class="complexity-dashboard-content"></div>
+      </details>
 
       <div class="main-container">
         <!-- Python Source Tree Panel -->
@@ -122,7 +124,7 @@
       <footer class="app-footer">
         <div id="status-bar">準備完了</div>
         <div id="metrics-summary">モジュール数: 0 | 循環インポート: 0 | 肥大化警告: 0 | 解析エラー: 0</div>
-        <div id="app-version">v1.0.4</div>
+        <div id="app-version">v1.0.5</div>
       </footer>
     </div>
 

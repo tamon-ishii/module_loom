@@ -25,8 +25,8 @@ PyCharm と VS Code の配布ファイルには、対応する OS の解析用�
 `main` へのプッシュと手動実行では、ビルド結果を GitHub Actions の成果物として保存します。`v` で始まるタグをプッシュすると、3種類の配布ファイルと解析 CLI を GitHub Releases に公開します。
 
 ```sh
-git tag v1.0.4
-git push origin v1.0.4
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
 タグの版は `src-tauri/tauri.conf.json` と `plugins/vscode/package.json` の版に合わせてください。
@@ -89,7 +89,7 @@ CI では `--check` を付けると、解析できなかった Python ファイ�
 
 画面上部の「総合複雑度」は 0～100 の見直し目安です。循環・相互 import を含むモジュールと結合度（35%）、肥大化モジュールの割合（25%）、関数数あたりの分岐の複雑さ（20%）、重複行の割合（20%）から計算します。値が高いほど確認を勧めます。各内訳と優先候補を表示し、候補を押すと依存図へ移動できます。重複は空行とコメント行を除いた連続 6 行が一致する箇所を候補として表示し、行番号からエディタで確認できます。文字列や変数名を変えた類似コードは検出対象外です。解析できなかったファイルは集計に含まれないため、解析エラーも確認してください。
 
-トップの「コード診断」は詳細解析を明示的に実行します。実行中表示の後、総合複雑度の内訳、優先候補、重複箇所、マジックナンバー、重複リテラルを表示し、検出箇所からエディタへ移動できます。分岐の複雑さは [Lizard](https://github.com/terryyin/lizard)、重複コードは [jscpd](https://jscpd.dev/)、比較式に含まれるマジックナンバーは [Ruff の PLR2004](https://docs.astral.sh/ruff/rules/magic-value-comparison/) を使用します。重複リテラルは ModuleLoom が Python の構文木から、8文字以上の文字列または `0`・`1` 以外の数値が3回以上出現する候補を検出します。マジックナンバーはすべての数値リテラルを対象にするものではありません。Lizard または jscpd が利用できない場合は ModuleLoom の推定値に戻し、画面とJSONに採用した解析器を記録します。外部ツールは解析対象プロジェクトの `.venv` / `venv`、`node_modules/.bin`、または `PATH` から検索します。
+「コード診断」欄の「診断実行」は詳細解析を明示的に実行します。ファイル変更時の自動更新は通常のモジュール解析で、詳細診断はボタンから再実行します。実行中表示の後、総合複雑度の内訳、優先候補、重複箇所、マジックナンバー、重複リテラルを表示し、検出箇所からエディタへ移動できます。分岐の複雑さは [Lizard](https://github.com/terryyin/lizard)、重複コードは [jscpd](https://jscpd.dev/)、比較式に含まれるマジックナンバーは [Ruff の PLR2004](https://docs.astral.sh/ruff/rules/magic-value-comparison/) を使用します。重複リテラルは ModuleLoom が Python の構文木から、8文字以上の文字列または `0`・`1` 以外の数値が3回以上出現する候補を検出します。マジックナンバーはすべての数値リテラルを対象にするものではありません。Lizard または jscpd が利用できない場合は ModuleLoom の推定値に戻し、画面とJSONに採用した解析器を記録します。外部ツールは解析対象プロジェクトの `.venv` / `venv`、`node_modules/.bin`、または `PATH` から検索します。
 
 ```bash
 uv sync --group dev
