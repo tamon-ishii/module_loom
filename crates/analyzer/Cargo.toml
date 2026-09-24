@@ -12,6 +12,4 @@ petgraph = "0.8"
 walkdir = "2.5"
 thiserror = "2.0"
 toml = "0.8"
-
-[dev-dependencies]
 tempfile = "3.10"

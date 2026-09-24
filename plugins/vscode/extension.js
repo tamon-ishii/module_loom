@@ -69,9 +69,9 @@ function expandFixArgs(args, root, file, source, target, line) {
   return args.map(arg => arg.replaceAll('{project}', root).replaceAll('{file}', file).replaceAll('{source}', source).replaceAll('{target}', target).replaceAll('{line}', String(line)));
 }
 
-async function analyzeForCommand(folder, changedFiles) {
+async function analyzeForCommand(folder, changedFiles, quality = false) {
   const incremental = Array.isArray(changedFiles) && changedFiles.length > 0 && lastResult?.root_path === folder.uri.fsPath;
-  const args = ['--json', ...(incremental ? ['--incremental'] : []), folder.uri.fsPath];
+  const args = ['--json', ...(quality ? ['--quality'] : []), ...(incremental ? ['--incremental'] : []), folder.uri.fsPath];
   const { stdout } = await new Promise((resolve, reject) => {
     const child = spawn(analyzerExecutable(folder), args, { cwd: folder.uri.fsPath });
     const chunks = []; let stderr = '';
@@ -92,7 +92,7 @@ async function handlePluginCommand(folder, webview, message) {
     ? { ...folder, uri: vscode.Uri.file(args.path) } : folder;
   const root = path.resolve(commandFolder.uri.fsPath);
   switch (message.command) {
-    case 'analyze_project': return analyzeForCommand(commandFolder, args.changedFiles);
+    case 'analyze_project': return analyzeForCommand(commandFolder, args.changedFiles, args.quality === true);
     case 'list_fix_tools': return fixTools(root).map(({ id, label, kinds }) => ({ id, label, kinds }));
     case 'preview_cycle_fix': {
       let item = lastResult?.cycles?.flatMap(cycle => cycle.suggestion ? [cycle.suggestion] : []).find(s => s.source === args.source && Number(s.line) === Number(args.line));

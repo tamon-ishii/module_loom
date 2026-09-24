@@ -61,6 +61,7 @@ fn apply_cycle_fix(
 fn analyze_project(
     path: String,
     changed_files: Option<Vec<PathBuf>>,
+    quality: Option<bool>,
     state: State<'_, WatchState>,
 ) -> Result<AnalysisResult, String> {
     let p = PathBuf::from(path);
@@ -71,13 +72,16 @@ fn analyze_project(
         .cached_result
         .lock()
         .map_err(|_| "Analysis cache is unavailable")?;
-    let result = match (cached.as_ref(), changed_files.as_deref()) {
+    let mut result = match (cached.as_ref(), changed_files.as_deref()) {
         (Some(previous), Some(changed)) if !changed.is_empty() && previous.root_path == p => {
             moduleloom_analyzer::analyze_directory_incremental(&p, previous, changed)
                 .or_else(|_| moduleloom_analyzer::analyze_directory(&p))?
         }
         _ => moduleloom_analyzer::analyze_directory(&p)?,
     };
+    if quality.unwrap_or(false) {
+        moduleloom_analyzer::enrich_quality(&mut result);
+    }
     *cached = Some(result.clone());
     Ok(result)
 }

@@ -3,6 +3,8 @@ export type UiLocale = "ja" | "en";
 const exact: Record<string, string> = {
   "Python プロジェクトのパス (/path/to/project)": "Python project path (/path/to/project)",
   "解析実行": "Analyze",
+  "コード診断": "Code diagnostics",
+  "詳細なコード品質を解析してグラフに表示": "Analyze code quality and show graphical results",
   "前の表示に戻る": "Go back",
   "← 戻る": "← Back",
   "プロジェクト全モジュールの全体図を表示": "Show the full project graph",

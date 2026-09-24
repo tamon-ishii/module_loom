@@ -37,6 +37,7 @@ let activeFixToolName = "Ruff";
 const pathInput = document.getElementById("project-path-input") as HTMLInputElement;
 const uiLanguage = document.getElementById("ui-language") as HTMLSelectElement;
 const btnAnalyze = document.getElementById("btn-analyze") as HTMLButtonElement;
+const btnQuality = document.getElementById("btn-quality") as HTMLButtonElement;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const chkWatch = document.getElementById("chk-watch") as HTMLInputElement;
 const chkOnlyCycles = document.getElementById("chk-only-cycles") as HTMLInputElement;
@@ -79,6 +80,7 @@ function preferredEditor(): "pycharm" | "vscode" {
 const inspectorContent = document.getElementById("inspector-content") as HTMLDivElement;
 const statusBar = document.getElementById("status-bar") as HTMLDivElement;
 const metricsSummary = document.getElementById("metrics-summary") as HTMLDivElement;
+const complexityDashboard = document.getElementById("complexity-dashboard") as HTMLElement;
 const btnResolveCycles = document.getElementById("btn-resolve-cycles") as HTMLButtonElement | null;
 const ruffFixModal = document.getElementById("ruff-fix-modal") as HTMLDivElement;
 const ruffFixFile = document.getElementById("ruff-fix-file") as HTMLElement;
@@ -2193,7 +2195,65 @@ function highlightCycleInGraph(cycleModules: string[]) {
 }
 
 
+function renderComplexityDashboard(result: AnalysisResult) {
+  const summary = result.complexity;
+  if (!summary || result.modules.length === 0) {
+    complexityDashboard.hidden = true;
+    return;
+  }
+  complexityDashboard.hidden = false;
+  const en = currentUiLocale() === "en";
+  const score = Math.max(0, Math.min(100, summary.score));
+  const components: Array<[string, number]> = [
+    [en ? "Imports" : "相互参照", summary.imports],
+    [en ? "Size" : "コード量", summary.size],
+    [en ? "Code complexity" : "分岐の複雑さ", summary.code],
+    [en ? "Duplication" : "重複コード", summary.duplication],
+  ];
+  const metricHtml = components.map(([label, value]) => `<div class="complexity-component">
+    <span>${label}</span><strong>${value}</strong><progress max="100" value="${value}" aria-label="${label}"></progress>
+  </div>`).join("");
+  const hotspots = summary.hotspots.slice(0, 3).map((item) => {
+    const reasons = [
+      item.cycle ? (en ? "cycle" : "循環") : "",
+      item.mutual_import && !item.cycle ? (en ? "mutual imports" : "相互 import") : "",
+      item.oversized ? (en ? "oversized" : "肥大化") : "",
+      item.duplicate_lines ? `${en ? "duplicate" : "重複"} ${item.duplicate_lines} ${en ? "lines" : "行"}` : "",
+      item.cyclomatic_complexity > 10 ? `${en ? "complexity" : "循環的複雑度"} ${item.cyclomatic_complexity}` : "",
+      item.max_function_complexity ? `${item.max_function_name || "function"} CCN ${item.max_function_complexity}` : "",
+    ].filter(Boolean).join(" · ");
+    return `<button class="complexity-hotspot" data-module="${escapeHtml(item.module)}" title="${escapeHtml(reasons)}">
+      <span>${escapeHtml(item.module)}</span><strong>${item.score}</strong><small>${escapeHtml(reasons || `${en ? "imports" : "依存"} ${item.imports} / ${en ? "imported by" : "被依存"} ${item.imported_by}`)}</small>
+    </button>`;
+  }).join("");
+  const duplicateRows = summary.duplicate_blocks.slice(0, 5).map((block) =>
+    `<div class="complexity-duplicate-row"><button data-module="${escapeHtml(block.first_module)}" data-line="${block.first_line}">${escapeHtml(block.first_module)}:${block.first_line}</button><span>↔</span><button data-module="${escapeHtml(block.second_module)}" data-line="${block.second_line}">${escapeHtml(block.second_module)}:${block.second_line}</button></div>`
+  ).join("");
+  const literalRows = (summary.literal_findings || []).map((finding) =>
+    `<button class="complexity-finding" data-module="${escapeHtml(finding.module)}" data-line="${finding.line}"><span>${finding.kind === "magic-number" ? (en ? "Magic number" : "マジックナンバー") : finding.kind === "repeated-number" ? (en ? "Repeated number" : "重複数値") : (en ? "Repeated string" : "重複文字列")}</span><strong>${escapeHtml(finding.module)}:${finding.line}</strong><small>${escapeHtml(finding.value)}${finding.count > 1 ? ` (${finding.count}×)` : ""}</small></button>`
+  ).join("");
+  const warnings = (summary.quality_warnings || []).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("");
+  const sourceLabel = `${en ? "Code" : "分岐"}: ${escapeHtml(summary.code_source || "ModuleLoom")} · ${en ? "Duplicates" : "重複"}: ${escapeHtml(summary.duplication_source || "ModuleLoom")} · ${en ? "Magic numbers" : "数値"}: ${escapeHtml(summary.magic_source || (summary.quality_ran ? (en ? "unavailable" : "利用不可") : (en ? "not run" : "未実行")))}`;
+  complexityDashboard.innerHTML = `<div class="complexity-overall">
+    <div class="complexity-ring" role="meter" aria-label="${en ? "Overall complexity" : "総合複雑度"}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" style="--risk:${score}"><strong>${score}</strong><small>/ 100</small></div>
+    <div><strong>${en ? "Overall complexity" : "総合複雑度"}</strong><small>${en ? "Higher means more review needed" : "高いほど見直しの目安"}</small>${result.analysis_errors?.length ? `<small class="complexity-incomplete">${en ? "Incomplete: " : "未解析: "}${result.analysis_errors.length} ${en ? "files" : "件"}</small>` : ""}</div>
+  </div><div class="complexity-components">${metricHtml}</div><div class="complexity-priorities"><strong>${en ? "Review first" : "優先して確認"}</strong>${hotspots || `<small>${en ? "No findings" : "候補なし"}</small>`}</div>
+  <div class="complexity-quality"><strong>${en ? "Code diagnostics" : "コード診断"}</strong><small>${sourceLabel}</small>${summary.quality_ran ? `<div class="complexity-finding-list">${literalRows || `<small>${en ? "No magic numbers or repeated literals found" : "マジックナンバー・重複リテラルの検出なし"}</small>`}</div>${warnings ? `<details><summary>${en ? "Tool warnings" : "外部ツールの警告"} (${summary.quality_warnings?.length})</summary><ul>${warnings}</ul></details>` : ""}` : `<small>${en ? "Use Code diagnostics at the top for detailed analysis" : "詳細な診断は上部の「コード診断」から実行できます"}</small>`}</div>
+  <details class="complexity-method"><summary>${en ? "Method and duplicate locations" : "算出方法と重複箇所"} (${summary.duplicate_lines} ${en ? "lines" : "行"})</summary><p>${en ? "Heuristic score: imports 35%, size 25%, branch complexity 20%, duplication 20%. Code and duplicate metrics use Lizard and jscpd when available; otherwise ModuleLoom estimates are used. Ruff PLR2004 checks comparison literals; repeated strings (8+ characters) and numbers (except 0 and 1) occur at least three times." : "目安値: 相互参照35%、肥大化25%、分岐の複雑さ20%、重複20%。分岐と重複は Lizard・jscpd が利用可能なら採用し、なければ ModuleLoom の推定値を使います。Ruff PLR2004 は比較式の数値を検出し、重複リテラルは8文字以上の文字列か0・1以外の数値が3回以上の候補です。"}</p>${duplicateRows}</details>`;
+}
+
+complexityDashboard.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-module]");
+  if (!button || !currentResult) return;
+  const module = currentResult.modules.find((item) => item.id === button.dataset.module);
+  if (!module) return;
+  const line = Number(button.dataset.line);
+  if (line > 0) void jumpToEditor(module.absolute_path, line);
+  else jumpToFileCentricDiagram(module.id);
+});
+
 function updateSummary(result: AnalysisResult) {
+  renderComplexityDashboard(result);
   const cycleCount = result.cycles.length;
   const bloatCount = result.modules.filter((m) => m.is_oversized).length;
   const errorCount = result.analysis_errors?.length || 0;
@@ -2335,7 +2395,7 @@ async function jumpToEditor(filePath: string, line: number = 1) {
   }
 }
 
-async function runAnalysis() {
+async function runAnalysis(quality = false) {
   const path = pathInput.value.trim();
   if (!path) {
     statusBar.innerText = "Python プロジェクトのパスを入力してください";
@@ -2343,14 +2403,22 @@ async function runAnalysis() {
     return false;
   }
   if (analysisRunning) {
-    manualAnalysisPending = true;
+    if (quality) qualityAnalysisPending = true;
+    else manualAnalysisPending = true;
     return false;
   }
   analysisRunning = true;
+  if (quality) {
+    btnQuality.disabled = true;
+    btnQuality.textContent = currentUiLocale() === "en" ? "Analyzing…" : "診断中…";
+    btnQuality.setAttribute("aria-busy", "true");
+    complexityDashboard.hidden = false;
+    complexityDashboard.classList.add("quality-loading");
+  }
   localStorage.setItem("project_path", path);
-  statusBar.innerText = `解析中: ${path}...`;
+  statusBar.innerText = `${quality ? "コード診断中" : "解析中"}: ${path}...`;
   try {
-    const result = await invokeCommand<AnalysisResult>("analyze_project", { path });
+    const result = await invokeCommand<AnalysisResult>("analyze_project", { path, quality });
     const toolError = await refreshFixTools(path);
     updateGraph(result);
     const pendingFilePath = (window as any).__MODULELOOM_PENDING_FILE__;
@@ -2368,7 +2436,17 @@ async function runAnalysis() {
     return false;
   } finally {
     analysisRunning = false;
-    if (manualAnalysisPending) {
+    if (quality) {
+      btnQuality.disabled = false;
+      btnQuality.textContent = currentUiLocale() === "en" ? "Code diagnostics" : "コード診断";
+      btnQuality.removeAttribute("aria-busy");
+      complexityDashboard.classList.remove("quality-loading");
+    }
+    if (qualityAnalysisPending) {
+      qualityAnalysisPending = false;
+      manualAnalysisPending = false;
+      void runAnalysis(true);
+    } else if (manualAnalysisPending) {
       manualAnalysisPending = false;
       void runAnalysis();
     } else if (analysisPending && watchedPath) {
@@ -2381,6 +2459,7 @@ let watchTimer: number | null = null;
 let analysisRunning = false;
 let analysisPending = false;
 let manualAnalysisPending = false;
+let qualityAnalysisPending = false;
 let watchedPath = "";
 const pendingChangedFiles = new Set<string>();
 
@@ -2438,7 +2517,11 @@ function scheduleAnalysisFromFileChange(paths: string[] = []) {
       statusBar.innerText = `自動再解析エラー: ${err.toString()}`;
     } finally {
       analysisRunning = false;
-      if (manualAnalysisPending) {
+      if (qualityAnalysisPending) {
+        qualityAnalysisPending = false;
+        manualAnalysisPending = false;
+        void runAnalysis(true);
+      } else if (manualAnalysisPending) {
         manualAnalysisPending = false;
         void runAnalysis();
       } else if (analysisPending && watchedPath) {
@@ -2957,6 +3040,20 @@ function getMockAnalysisResult(root: string): AnalysisResult {
       { modules: ["app.main", "app.router"] },
       { modules: ["app.models", "app.storage"] },
     ],
+    complexity: {
+      score: 34,
+      imports: 67,
+      size: 17,
+      code: 20,
+      duplication: 0,
+      duplicate_lines: 0,
+      duplicate_blocks: [],
+      hotspots: [
+        { module: "app.router", score: 41, cycle: true, mutual_import: true, oversized: false, cyclomatic_complexity: 8, duplicate_lines: 0, imports: 2, imported_by: 1 },
+        { module: "app.service", score: 31, cycle: false, mutual_import: false, oversized: true, cyclomatic_complexity: 18, duplicate_lines: 0, imports: 1, imported_by: 1 },
+        { module: "app.models", score: 39, cycle: true, mutual_import: true, oversized: false, cyclomatic_complexity: 5, duplicate_lines: 0, imports: 1, imported_by: 2 },
+      ],
+    },
   };
 }
 
@@ -3283,7 +3380,8 @@ fixToolSelect.addEventListener("change", () => {
 document.getElementById("btn-find-chain")?.addEventListener("click", findAndHighlightChain);
 document.getElementById("btn-back")?.addEventListener("click", goBack);
 btnShowOverview?.addEventListener("click", toggleOverviewOrFileView);
-btnAnalyze.addEventListener("click", runAnalysis);
+btnAnalyze.addEventListener("click", () => { void runAnalysis(); });
+btnQuality.addEventListener("click", () => { void runAnalysis(true); });
 searchInput.addEventListener("input", applyFilters);
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {

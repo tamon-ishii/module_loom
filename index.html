@@ -11,6 +11,7 @@
         <div class="controls-area">
           <input type="text" id="project-path-input" placeholder="Python プロジェクトのパス (/path/to/project)" />
           <button id="btn-analyze" class="btn-primary">解析実行</button>
+          <button id="btn-quality" class="btn-secondary" title="詳細なコード品質を解析してグラフに表示">コード診断</button>
           <div class="primary-actions">
             <button id="btn-back" class="btn-secondary" title="前の表示に戻る">← 戻る</button>
             <button id="btn-show-overview" class="btn-secondary" title="プロジェクト全モジュールの全体図を表示">全体図</button>
@@ -77,6 +78,8 @@
           </select>
         </div>
       </header>
+
+      <section id="complexity-dashboard" class="complexity-dashboard" aria-label="プロジェクト複雑度" hidden></section>
 
       <div class="main-container">
         <!-- Python Source Tree Panel -->

@@ -259,6 +259,68 @@ pub struct CycleSuggestion {
     pub kind: CycleSuggestionKind,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ComplexitySummary {
+    /// Heuristic risk score: 0 is low, 100 is high.
+    pub score: usize,
+    pub imports: usize,
+    pub size: usize,
+    pub code: usize,
+    pub duplication: usize,
+    pub duplicate_lines: usize,
+    pub duplicate_blocks: Vec<DuplicateBlock>,
+    pub hotspots: Vec<ComplexityHotspot>,
+    #[serde(default)]
+    pub code_source: String,
+    #[serde(default)]
+    pub duplication_source: String,
+    #[serde(default)]
+    pub magic_source: String,
+    #[serde(default)]
+    pub literal_findings: Vec<LiteralFinding>,
+    #[serde(default)]
+    pub quality_warnings: Vec<String>,
+    #[serde(default)]
+    pub quality_ran: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiteralFinding {
+    pub kind: String,
+    pub module: String,
+    pub line: usize,
+    pub value: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateBlock {
+    pub first_module: String,
+    pub first_line: usize,
+    pub second_module: String,
+    pub second_line: usize,
+    pub lines: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComplexityHotspot {
+    pub module: String,
+    pub score: usize,
+    pub cycle: bool,
+    pub mutual_import: bool,
+    pub oversized: bool,
+    pub cyclomatic_complexity: usize,
+    #[serde(default)]
+    pub max_function_complexity: Option<usize>,
+    #[serde(default)]
+    pub max_function_name: Option<String>,
+    #[serde(default)]
+    pub max_function_line: Option<usize>,
+    pub duplicate_lines: usize,
+    pub imports: usize,
+    pub imported_by: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisResult {
     pub root_path: PathBuf,
@@ -266,6 +328,8 @@ pub struct AnalysisResult {
     pub edges: Vec<DependencyEdge>,
     pub cycles: Vec<CircularCycle>,
     pub total_loc: usize,
+    #[serde(default)]
+    pub complexity: ComplexitySummary,
     #[serde(default)]
     pub analysis_errors: Vec<String>,
     #[serde(default)]

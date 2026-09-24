@@ -9,6 +9,7 @@ pub mod metrics;
 pub mod mkdocs;
 pub mod model;
 pub mod parser;
+pub mod quality;
 pub mod suggestions;
 
 use model::{
@@ -22,6 +23,12 @@ use std::path::{Path, PathBuf};
 pub fn analyze_directory(root: &Path) -> Result<AnalysisResult, String> {
     let config = load_config(root)?;
     analyze_directory_with_config(root, &config)
+}
+
+/// Run optional third-party quality tools for an explicitly requested detailed scan.
+pub fn enrich_quality(result: &mut AnalysisResult) {
+    let quality = quality::collect(&result.root_path, &result.modules);
+    metrics::apply_quality(result, quality);
 }
 
 pub fn analyze_directory_with_config(
@@ -126,12 +133,15 @@ fn assemble_result(
             .collect();
     }
 
+    let complexity = metrics::project_complexity(&modules, &edges, &cycles);
+
     AnalysisResult {
         root_path: root.to_path_buf(),
         modules,
         edges,
         cycles,
         total_loc,
+        complexity,
         analysis_errors,
         architecture_violations,
         symbol_edges,

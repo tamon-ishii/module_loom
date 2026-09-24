@@ -224,3 +224,146 @@ fn cli_reports_shortest_import_chain() {
         "a -> b -> c"
     );
 }
+
+#[test]
+fn quality_report_is_machine_readable_and_score_limit_fails() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(base.join("a.py"), "import b\nLABEL = 'repeated-value'\ndef pick(value):\n    if value == 42:\n        return 'repeated-value'\n    return 'repeated-value'\n").unwrap();
+    fs::write(base.join("b.py"), "import a\n").unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .args(["--quality-report", "--max-score", "0"])
+        .arg(base)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["module_count"], 2);
+    assert_eq!(report["complexity"]["quality_ran"], true);
+    assert!(report["complexity"]["score"].as_u64().unwrap() > 0);
+    assert!(report["complexity"]["literal_findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|finding| finding["kind"] == "repeated-string"
+            && finding["module"] == "a"
+            && finding["line"] == 2));
+    assert!(report.get("modules").is_none());
+}
+
+#[test]
+fn check_reports_incomplete_analysis_and_selectable_findings() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(base.join("broken.py"), "def broken(:\n").unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .arg("--check")
+        .arg(base)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Analysis error:"));
+
+    fs::remove_file(base.join("broken.py")).unwrap();
+    fs::write(base.join("a.py"), "import b\n").unwrap();
+    fs::write(base.join("b.py"), "import a\n").unwrap();
+    let default = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .arg("--check")
+        .arg(base)
+        .output()
+        .unwrap();
+    assert!(default.status.success());
+    let cycles = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .arg("--check-cycles")
+        .arg(base)
+        .output()
+        .unwrap();
+    assert_eq!(cycles.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&cycles.stderr).contains("Cycle:"));
+
+    let mut large = String::new();
+    for _ in 0..301 {
+        large.push_str("# line\n");
+    }
+    fs::write(base.join("large.py"), large).unwrap();
+    let bloat = std::process::Command::new(env!("CARGO_BIN_EXE_analyze"))
+        .arg("--check-bloat")
+        .arg(base)
+        .output()
+        .unwrap();
+    assert_eq!(bloat.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&bloat.stderr).contains("1 selected oversized module"));
+}
+
+#[test]
+fn reads_common_dependency_formats_without_optional_false_positives() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::create_dir_all(base.join("src/app")).unwrap();
+    fs::create_dir_all(base.join("src/tests")).unwrap();
+    fs::create_dir_all(base.join("requirements")).unwrap();
+    fs::write(base.join("src/app/main.py"), "import requests\n").unwrap();
+    fs::write(
+        base.join("src/tests/test_main.py"),
+        "import pytest\nimport hypothesis\n",
+    )
+    .unwrap();
+    fs::write(base.join("requirements.txt"), "-r requirements/base.txt\n").unwrap();
+    fs::write(base.join("requirements/base.txt"), "requests>=2\n").unwrap();
+    fs::write(base.join("requirements-dev.txt"), "pytest>=8\n").unwrap();
+    fs::write(base.join("pyproject.toml"), "[project.optional-dependencies]\nvisual = [\"matplotlib\"]\n[dependency-groups]\ntest = [\"hypothesis\"]\n").unwrap();
+    let result = analyze_directory(base).unwrap();
+    assert!(
+        result.dependency_issues.is_empty(),
+        "{:?}",
+        result.dependency_issues
+    );
+    assert!(result
+        .package_dependencies
+        .iter()
+        .any(|dep| dep.name == "matplotlib"));
+    assert!(result
+        .package_dependencies
+        .iter()
+        .any(|dep| dep.name == "requests" && dep.source == "requirements/base.txt"));
+}
+
+#[test]
+fn complexity_summary_finds_duplicates_and_prioritizes_cycle_modules() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    let repeated = "def run(value):\n    if value > 0:\n        result = value + 1\n        result *= 2\n        return result\n    return 0\n";
+    fs::write(base.join("a.py"), format!("import b\n{repeated}")).unwrap();
+    fs::write(base.join("b.py"), format!("import a\n{repeated}")).unwrap();
+    let result = analyze_directory(base).unwrap();
+    assert!(result.complexity.score > 0);
+    assert!(result.complexity.imports > 0);
+    assert!(result.complexity.duplicate_lines >= 12);
+    assert!(result.complexity.duplication > 0);
+    assert!(result
+        .complexity
+        .duplicate_blocks
+        .iter()
+        .any(|block| { block.first_module == "a" && block.second_module == "b" }));
+    assert!(result
+        .complexity
+        .hotspots
+        .iter()
+        .any(|item| item.module == "a" && item.cycle));
+}
+
+#[test]
+fn complexity_counts_mutual_imports_even_when_deferred() {
+    let root = tempdir().unwrap();
+    let base = root.path();
+    fs::write(base.join("a.py"), "def run():\n    import b\n").unwrap();
+    fs::write(base.join("b.py"), "def run():\n    import a\n").unwrap();
+    let result = analyze_directory(base).unwrap();
+    assert!(result.cycles.is_empty());
+    assert!(result.complexity.imports > 0);
+    assert!(result
+        .complexity
+        .hotspots
+        .iter()
+        .all(|item| item.mutual_import && !item.cycle));
+}

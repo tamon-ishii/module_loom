@@ -1,13 +1,14 @@
 use crate::model::{DependencyIssue, ModuleInfo, PackageDependency};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 #[derive(Default)]
 struct Manifest {
     direct: HashSet<String>,
     development: HashSet<String>,
+    optional: HashSet<String>,
     installed: HashSet<String>,
     packages: Vec<PackageDependency>,
     present: bool,
@@ -29,9 +30,7 @@ pub fn check_package_dependencies(root: &Path, modules: &[ModuleInfo]) -> Vec<De
         .collect();
     let mut imports: HashMap<String, (String, bool)> = HashMap::new();
     for module in modules {
-        let development = module.relative_path.starts_with("tests/")
-            || module.relative_path.contains("/tests/")
-            || module.relative_path.starts_with("test_");
+        let development = is_development_file(&module.relative_path);
         for import in &module.imports {
             if import.level != 0 {
                 continue;
@@ -86,7 +85,7 @@ pub fn check_package_dependencies(root: &Path, modules: &[ModuleInfo]) -> Vec<De
                 None,
                 "標準ライブラリを依存宣言に含めています",
             ));
-        } else if !imports.contains_key(name) {
+        } else if !manifest.optional.contains(name) && !imports.contains_key(name) {
             issues.push(issue(
                 "DEP002",
                 name,
@@ -98,6 +97,18 @@ pub fn check_package_dependencies(root: &Path, modules: &[ModuleInfo]) -> Vec<De
     issues.retain(|issue| !ignored.contains(&issue.package));
     issues.sort_by(|a, b| (&a.rule, &a.package).cmp(&(&b.rule, &b.package)));
     issues
+}
+
+fn is_development_file(path: &str) -> bool {
+    let path = path.replace('\\', "/");
+    let parts: Vec<_> = path.split('/').collect();
+    let file = parts.last().copied().unwrap_or("");
+    parts[..parts.len().saturating_sub(1)]
+        .iter()
+        .any(|part| matches!(*part, "tests" | "test" | "testing"))
+        || file.starts_with("test_")
+        || file.ends_with("_test.py")
+        || matches!(file, "conftest.py" | "noxfile.py" | "toxfile.py")
 }
 
 fn dependency_options(root: &Path) -> (HashMap<String, String>, HashSet<String>) {
@@ -145,13 +156,21 @@ fn issue(rule: &str, package: &str, module: Option<&String>, message: &str) -> D
 
 fn read_manifest(root: &Path) -> Manifest {
     let mut result = Manifest::default();
-    if let Ok(content) = fs::read_to_string(root.join("requirements.txt")) {
-        result.present = true;
-        for line in content.lines() {
-            if let Some((name, version)) = parse_requirement(line) {
-                add_package(&mut result, name, version, "requirements.txt", false);
-            }
-        }
+    let mut visited = HashSet::new();
+    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    for (name, development) in [
+        ("requirements.txt", false),
+        ("requirements.in", false),
+        ("dev-requirements.txt", true),
+        ("requirements-dev.txt", true),
+    ] {
+        read_requirements(
+            &canonical_root,
+            &root.join(name),
+            development,
+            &mut visited,
+            &mut result,
+        );
     }
     if let Ok(content) = fs::read_to_string(root.join("pyproject.toml")) {
         if let Ok(doc) = content.parse::<toml::Value>() {
@@ -167,15 +186,50 @@ fn read_manifest(root: &Path) -> Manifest {
                     }
                 }
             }
-            if let Some(deps) = doc
-                .get("dependency-groups")
-                .and_then(|v| v.get("dev"))
-                .and_then(toml::Value::as_array)
+            if let Some(groups) = doc
+                .get("project")
+                .and_then(|v| v.get("optional-dependencies"))
+                .and_then(toml::Value::as_table)
             {
                 result.present = true;
-                for dep in deps.iter().filter_map(toml::Value::as_str) {
-                    if let Some((name, version)) = parse_requirement(dep) {
-                        add_package(&mut result, name, version, "pyproject.toml:dev", true);
+                for (group, deps) in groups {
+                    for dep in deps
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(toml::Value::as_str)
+                    {
+                        if let Some((name, version)) = parse_requirement(dep) {
+                            result.optional.insert(normalize(&name));
+                            add_package(
+                                &mut result,
+                                name,
+                                version,
+                                &format!("pyproject.toml:extra:{group}"),
+                                false,
+                            );
+                        }
+                    }
+                }
+            }
+            if let Some(groups) = doc.get("dependency-groups").and_then(toml::Value::as_table) {
+                result.present = true;
+                for (group, deps) in groups {
+                    for dep in deps
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(toml::Value::as_str)
+                    {
+                        if let Some((name, version)) = parse_requirement(dep) {
+                            add_package(
+                                &mut result,
+                                name,
+                                version,
+                                &format!("pyproject.toml:{group}"),
+                                true,
+                            );
+                        }
                     }
                 }
             }
@@ -202,19 +256,24 @@ fn read_manifest(root: &Path) -> Manifest {
                 .get("tool")
                 .and_then(|v| v.get("poetry"))
                 .and_then(|v| v.get("group"))
-                .and_then(|v| v.get("dev"))
-                .and_then(|v| v.get("dependencies"))
                 .and_then(toml::Value::as_table)
             {
                 result.present = true;
-                for (name, value) in deps {
-                    add_package(
-                        &mut result,
-                        name.clone(),
-                        value.as_str().map(str::to_string),
-                        "pyproject.toml:dev",
-                        true,
-                    );
+                for (group, value) in deps {
+                    if !matches!(group.as_str(), "dev" | "test" | "testing") {
+                        continue;
+                    }
+                    if let Some(deps) = value.get("dependencies").and_then(toml::Value::as_table) {
+                        for (name, value) in deps {
+                            add_package(
+                                &mut result,
+                                name.clone(),
+                                value.as_str().map(str::to_string),
+                                &format!("pyproject.toml:{group}"),
+                                true,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -248,6 +307,49 @@ fn read_manifest(root: &Path) -> Manifest {
         .packages
         .dedup_by(|a, b| a.name.eq_ignore_ascii_case(&b.name) && a.source == b.source);
     result
+}
+
+fn read_requirements(
+    root: &Path,
+    path: &Path,
+    development: bool,
+    visited: &mut HashSet<(PathBuf, bool)>,
+    manifest: &mut Manifest,
+) {
+    let Ok(path) = path.canonicalize() else {
+        return;
+    };
+    if !visited.insert((path.clone(), development)) {
+        return;
+    }
+    let Ok(content) = fs::read_to_string(&path) else {
+        return;
+    };
+    manifest.present = true;
+    let source = path
+        .strip_prefix(root)
+        .unwrap_or(&path)
+        .to_string_lossy()
+        .to_string();
+    for line in content.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        if let Some(include) = line
+            .strip_prefix("-r ")
+            .or_else(|| line.strip_prefix("--requirement "))
+        {
+            if let Some(parent) = path.parent() {
+                read_requirements(
+                    root,
+                    &parent.join(include.trim()),
+                    development,
+                    visited,
+                    manifest,
+                );
+            }
+        } else if let Some((name, version)) = parse_requirement(line) {
+            add_package(manifest, name, version, &source, development);
+        }
+    }
 }
 
 fn add_package(

@@ -88,6 +88,22 @@ export interface AnalysisResult {
   edges: DependencyEdge[];
   cycles: CircularCycle[];
   total_loc: number;
+  complexity?: {
+    score: number;
+    imports: number;
+    size: number;
+    code: number;
+    duplication: number;
+    duplicate_lines: number;
+    duplicate_blocks: { first_module: string; first_line: number; second_module: string; second_line: number; lines: number }[];
+    hotspots: { module: string; score: number; cycle: boolean; mutual_import: boolean; oversized: boolean; cyclomatic_complexity: number; max_function_complexity?: number | null; max_function_name?: string | null; max_function_line?: number | null; duplicate_lines: number; imports: number; imported_by: number }[];
+    code_source?: string;
+    duplication_source?: string;
+    magic_source?: string;
+    literal_findings?: { kind: string; module: string; line: number; value: string; count: number }[];
+    quality_warnings?: string[];
+    quality_ran?: boolean;
+  };
   analysis_errors?: string[];
   architecture_violations?: ArchitectureViolation[];
   package_dependencies?: { name: string; version?: string; source: string }[];

@@ -569,7 +569,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         String toolId = extractJsonField(request, "toolId");
         switch (command == null ? "" : command) {
             case "analyze_project": {
-                String raw = runProcess(root, List.of(findAnalyzerBinary(project), "--json", root.toString()), null, false);
+                List<String> analyzeArgs = new ArrayList<>(List.of(findAnalyzerBinary(project), "--json"));
+                if ("true".equals(extractJsonField(request, "quality"))) analyzeArgs.add("--quality");
+                analyzeArgs.add(root.toString());
+                String raw = runProcess(root, analyzeArgs, null, false);
                 int start = raw.indexOf('{');
                 int end = raw.lastIndexOf('}');
                 String json = (start >= 0 && end > start) ? raw.substring(start, end + 1) : raw.trim();
@@ -1129,7 +1132,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     }
 
     private String extractJsonField(String json, String key) {
-        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|(-?\\d+))");
+        Pattern pattern = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|(-?\\d+|true|false))");
         Matcher matcher = pattern.matcher(json);
         if (matcher.find()) {
             if (matcher.group(2) != null) return matcher.group(2);

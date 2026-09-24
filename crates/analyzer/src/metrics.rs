@@ -1,4 +1,277 @@
 use crate::model::*;
+use crate::quality::{FunctionMetric, QualityData};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+
+const DUPLICATE_WINDOW: usize = 6;
+
+pub fn project_complexity(
+    modules: &[ModuleInfo],
+    edges: &[DependencyEdge],
+    cycles: &[CircularCycle],
+) -> ComplexitySummary {
+    if modules.is_empty() {
+        return ComplexitySummary::default();
+    }
+
+    let (duplicated, duplicate_blocks) = detect_duplicates(modules);
+    let duplicate_lines: usize = duplicated.iter().map(HashSet::len).sum();
+    let total_loc: usize = modules.iter().map(|module| module.loc).sum();
+    let cycle_ids: HashSet<_> = cycles.iter().flat_map(|cycle| &cycle.modules).collect();
+    let edge_pairs: HashSet<_> = edges
+        .iter()
+        .map(|edge| (&edge.source, &edge.target))
+        .collect();
+    let mutual_ids: HashSet<_> = edges
+        .iter()
+        .filter(|edge| edge_pairs.contains(&(&edge.target, &edge.source)))
+        .flat_map(|edge| [&edge.source, &edge.target])
+        .collect();
+    let import_risk_count = cycle_ids.union(&mutual_ids).count();
+    let high_coupling = modules
+        .iter()
+        .filter(|module| module.afferent_coupling + module.efferent_coupling >= 10)
+        .count();
+    let imports = percent(import_risk_count, modules.len())
+        .saturating_add(percent(high_coupling, modules.len()) / 3)
+        .min(100);
+    let size = percent(
+        modules.iter().filter(|module| module.is_oversized).count(),
+        modules.len(),
+    );
+    let code = modules.iter().map(code_risk).sum::<usize>() / modules.len();
+    let duplication = percent(duplicate_lines, total_loc);
+    let score = (imports * 35 + size * 25 + code * 20 + duplication * 20) / 100;
+
+    let mut hotspots: Vec<_> = modules
+        .iter()
+        .enumerate()
+        .map(|(index, module)| {
+            let cycle = cycle_ids.contains(&module.id);
+            let mutual_import = mutual_ids.contains(&module.id);
+            let duplicate_lines = duplicated[index].len();
+            let coupling = module.afferent_coupling + module.efferent_coupling;
+            let score = (if cycle {
+                35
+            } else if mutual_import {
+                20
+            } else {
+                0
+            }) + (if module.is_oversized { 25 } else { 0 })
+                + code_risk(module) / 5
+                + percent(duplicate_lines, module.loc) / 5
+                + (coupling * 2).min(10);
+            ComplexityHotspot {
+                module: module.id.clone(),
+                score: score.min(100),
+                cycle,
+                mutual_import,
+                oversized: module.is_oversized,
+                cyclomatic_complexity: module.cyclomatic_complexity,
+                max_function_complexity: None,
+                max_function_name: None,
+                max_function_line: None,
+                duplicate_lines,
+                imports: module.efferent_coupling,
+                imported_by: module.afferent_coupling,
+            }
+        })
+        .filter(|item| item.score > 0)
+        .collect();
+    hotspots.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.module.cmp(&b.module)));
+    hotspots.truncate(10);
+
+    ComplexitySummary {
+        score,
+        imports,
+        size,
+        code,
+        duplication,
+        duplicate_lines,
+        duplicate_blocks,
+        hotspots,
+        code_source: "ModuleLoom".into(),
+        duplication_source: "ModuleLoom".into(),
+        magic_source: String::new(),
+        literal_findings: Vec::new(),
+        quality_warnings: Vec::new(),
+        quality_ran: false,
+    }
+}
+
+pub fn apply_quality(result: &mut AnalysisResult, quality: QualityData) {
+    result.complexity.quality_ran = true;
+    let modules = &result.modules;
+    if modules.is_empty() {
+        return;
+    }
+    let functions = quality.functions.as_ref();
+    let code_risks: Vec<_> = modules
+        .iter()
+        .map(|module| {
+            functions
+                .and_then(|items| items.get(&module.id))
+                .map(|item| (item.ccn.saturating_sub(1) * 10).min(100))
+                .unwrap_or_else(|| code_risk(module))
+        })
+        .collect();
+    let (duplicated, blocks) = if let Some(clones) = quality.clones {
+        result.complexity.duplication_source = "jscpd".into();
+        (clones.duplicated, clones.blocks)
+    } else {
+        detect_duplicates(modules)
+    };
+    if functions.is_some() {
+        result.complexity.code_source = "Lizard".into();
+    }
+    result.complexity.magic_source = quality.magic_source;
+    result.complexity.literal_findings = quality.literals;
+    result.complexity.quality_warnings = quality.warnings;
+    result.complexity.code = code_risks.iter().sum::<usize>() / modules.len();
+    result.complexity.duplicate_lines = duplicated.iter().map(HashSet::len).sum();
+    result.complexity.duplicate_blocks = blocks;
+    result.complexity.duplication = percent(result.complexity.duplicate_lines, result.total_loc);
+    result.complexity.score = (result.complexity.imports * 35
+        + result.complexity.size * 25
+        + result.complexity.code * 20
+        + result.complexity.duplication * 20)
+        / 100;
+
+    let cycle_ids: HashSet<_> = result
+        .cycles
+        .iter()
+        .flat_map(|cycle| &cycle.modules)
+        .collect();
+    let pairs: HashSet<_> = result
+        .edges
+        .iter()
+        .map(|edge| (&edge.source, &edge.target))
+        .collect();
+    let mutual_ids: HashSet<_> = result
+        .edges
+        .iter()
+        .filter(|edge| pairs.contains(&(&edge.target, &edge.source)))
+        .flat_map(|edge| [&edge.source, &edge.target])
+        .collect();
+    let mut hotspots: Vec<_> = modules
+        .iter()
+        .enumerate()
+        .map(|(index, module)| {
+            let cycle = cycle_ids.contains(&module.id);
+            let mutual_import = mutual_ids.contains(&module.id);
+            let duplicate_lines = duplicated[index].len();
+            let coupling = module.afferent_coupling + module.efferent_coupling;
+            let function: Option<&FunctionMetric> =
+                functions.and_then(|items| items.get(&module.id));
+            let score = (if cycle {
+                35
+            } else if mutual_import {
+                20
+            } else {
+                0
+            }) + if module.is_oversized { 25 } else { 0 }
+                + code_risks[index] / 5
+                + percent(duplicate_lines, module.loc) / 5
+                + (coupling * 2).min(10);
+            ComplexityHotspot {
+                module: module.id.clone(),
+                score: score.min(100),
+                cycle,
+                mutual_import,
+                oversized: module.is_oversized,
+                cyclomatic_complexity: module.cyclomatic_complexity,
+                max_function_complexity: function.map(|item| item.ccn),
+                max_function_name: function.map(|item| item.name.clone()),
+                max_function_line: function.map(|item| item.line),
+                duplicate_lines,
+                imports: module.efferent_coupling,
+                imported_by: module.afferent_coupling,
+            }
+        })
+        .filter(|item| item.score > 0)
+        .collect();
+    hotspots.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.module.cmp(&b.module)));
+    hotspots.truncate(10);
+    result.complexity.hotspots = hotspots;
+}
+
+fn percent(part: usize, whole: usize) -> usize {
+    if whole == 0 {
+        0
+    } else {
+        part.saturating_mul(100).saturating_div(whole).min(100)
+    }
+}
+
+fn code_risk(module: &ModuleInfo) -> usize {
+    let definitions = module.function_count.max(1);
+    let average = module.cyclomatic_complexity.saturating_sub(1) / definitions;
+    (average * 10).min(100)
+}
+
+fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<DuplicateBlock>) {
+    let mut seen: HashMap<Vec<String>, (usize, Vec<usize>)> = HashMap::new();
+    let mut duplicated = vec![HashSet::new(); modules.len()];
+    let mut blocks: Vec<DuplicateBlock> = Vec::new();
+    for (module_index, module) in modules.iter().enumerate() {
+        let Ok(source) = fs::read_to_string(&module.absolute_path) else {
+            continue;
+        };
+        let lines: Vec<_> = source
+            .lines()
+            .enumerate()
+            .filter_map(|(index, line)| {
+                let normalized = line.trim();
+                (!normalized.is_empty() && !normalized.starts_with('#'))
+                    .then(|| (index + 1, normalized.to_string()))
+            })
+            .collect();
+        for window in lines.windows(DUPLICATE_WINDOW) {
+            let key: Vec<_> = window.iter().map(|(_, line)| line.clone()).collect();
+            let first_line = window[0].0;
+            if let Some((other_index, other_lines)) = seen.get(&key) {
+                let other_index = *other_index;
+                let other_line = other_lines[0];
+                if module_index == other_index && first_line.abs_diff(other_line) < DUPLICATE_WINDOW
+                {
+                    continue;
+                }
+                for (line, _) in window {
+                    duplicated[module_index].insert(*line);
+                }
+                for line in other_lines {
+                    duplicated[other_index].insert(*line);
+                }
+                if let Some(previous) = blocks.last_mut() {
+                    if previous.first_module == modules[other_index].id
+                        && previous.second_module == module.id
+                        && other_line <= previous.first_line + previous.lines
+                        && first_line <= previous.second_line + previous.lines
+                    {
+                        previous.lines = (other_line + DUPLICATE_WINDOW - previous.first_line)
+                            .max(first_line + DUPLICATE_WINDOW - previous.second_line);
+                        continue;
+                    }
+                }
+                if blocks.len() < 20 {
+                    blocks.push(DuplicateBlock {
+                        first_module: modules[other_index].id.clone(),
+                        first_line: other_line,
+                        second_module: module.id.clone(),
+                        second_line: first_line,
+                        lines: DUPLICATE_WINDOW,
+                    });
+                }
+            } else {
+                seen.insert(
+                    key,
+                    (module_index, window.iter().map(|(line, _)| *line).collect()),
+                );
+            }
+        }
+    }
+    (duplicated, blocks)
+}
 
 pub struct BloatThresholds {
     pub max_loc: usize,
