@@ -14,6 +14,10 @@ on:
       - "plugins/pycharm/**"
       - "scripts/build_pycharm_plugin.py"
       - "scripts/stage_analyzers.py"
+      - "scripts/check_cli_bundles.py"
+      - "scripts/check_ide_bundles.py"
+      - "scripts/stage_jscpd_wheel.py"
+      - "third_party/jscpd/LICENSE"
       - "shared/**"
       - ".github/workflows/publish-pycharm-marketplace.yml"
   workflow_dispatch:
@@ -54,10 +58,14 @@ jobs:
         run: |
           mkdir -p "analyzer/${{ matrix.platform }}"
           cp "target/release/${{ matrix.executable }}" "analyzer/${{ matrix.platform }}/"
+      - name: Stage jscpd v5 and its license
+        run: python scripts/stage_jscpd_wheel.py "analyzer/${{ matrix.platform }}"
+      - name: Smoke-test packaged diagnostics
+        run: python scripts/check_cli_bundles.py --binary "analyzer/${{ matrix.platform }}/${{ matrix.executable }}"
       - uses: actions/upload-artifact@v4
         with:
           name: analyzer-${{ matrix.platform }}
-          path: analyzer/${{ matrix.platform }}/${{ matrix.executable }}
+          path: analyzer/${{ matrix.platform }}/
           if-no-files-found: error
 
   publish:
@@ -77,6 +85,8 @@ jobs:
           path: analyzer-artifacts
       - name: Bundle analyzers
         run: python scripts/stage_analyzers.py analyzer-artifacts
+      - name: Verify standalone CLI diagnostics bundles
+        run: python scripts/check_cli_bundles.py
       - name: Download PyCharm build SDK
         run: |
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2026.2.3.tar.gz
@@ -89,6 +99,8 @@ jobs:
         env:
           PYCHARM_HOME: ${{ runner.temp }}/pycharm
         run: python scripts/build_pycharm_plugin.py --build-only
+      - name: Verify bundled diagnostics files
+        run: python scripts/check_ide_bundles.py --jar target/pycharm-plugin/moduleloom.jar
       - uses: actions/upload-artifact@v4
         with:
           name: ModuleLoom-PyCharm-${{ github.run_number }}.${{ github.run_attempt }}

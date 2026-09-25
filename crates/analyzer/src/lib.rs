@@ -4,6 +4,7 @@
 pub mod architecture;
 pub mod dependencies;
 pub mod diagnostics;
+mod duplicate_filter;
 pub mod graph;
 pub mod metrics;
 pub mod mkdocs;
@@ -255,6 +256,7 @@ pub fn load_config(root: &Path) -> Result<AnalysisConfig, String> {
             "max_loc" => config.max_loc = parsed,
             "max_functions" => config.max_functions = parsed,
             "max_classes" => config.max_classes = parsed,
+            "max_cyclomatic_complexity" => config.max_cyclomatic_complexity = parsed,
             _ => {}
         }
     }

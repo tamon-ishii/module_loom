@@ -207,14 +207,23 @@ function analyzerExecutable(folder) {
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
   const platform = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux';
   const executable = process.platform === 'win32' ? 'analyze.exe' : 'analyze';
+  const jscpdExecutable = process.platform === 'win32' ? 'jscpd.exe' : 'jscpd';
   const bundled = path.join(__dirname, 'bin', `${platform}-${arch}`, executable);
   if (fs.existsSync(bundled)) {
-    const hash = crypto.createHash('sha256').update(fs.readFileSync(bundled)).digest('hex').slice(0, 16);
+    const bundledJscpd = path.join(__dirname, 'bin', `${platform}-${arch}`, jscpdExecutable);
+    const digest = crypto.createHash('sha256').update(fs.readFileSync(bundled));
+    if (fs.existsSync(bundledJscpd)) digest.update(fs.readFileSync(bundledJscpd));
+    const hash = digest.digest('hex').slice(0, 16);
     const directory = path.join(os.homedir(), '.cache', 'moduleloom', 'bin', `${platform}-${arch}`, hash);
     const installed = path.join(directory, executable);
     fs.mkdirSync(directory, { recursive: true });
     if (!fs.existsSync(installed)) fs.copyFileSync(bundled, installed);
     if (process.platform !== 'win32') fs.chmodSync(installed, 0o755);
+    if (fs.existsSync(bundledJscpd)) {
+      const installedJscpd = path.join(directory, jscpdExecutable);
+      if (!fs.existsSync(installedJscpd)) fs.copyFileSync(bundledJscpd, installedJscpd);
+      if (process.platform !== 'win32') fs.chmodSync(installedJscpd, 0o755);
+    }
     return installed;
   }
   const local = path.join(folder.uri.fsPath, 'target', 'release', process.platform === 'win32' ? 'analyze.exe' : 'analyze');

@@ -39,6 +39,8 @@ jobs:
           cp "target/release/${{ matrix.executable }}" analyzer-output/
       - name: Stage jscpd v5 and its license
         run: python scripts/stage_jscpd_wheel.py analyzer-output
+      - name: Smoke-test packaged diagnostics
+        run: python scripts/check_cli_bundles.py --binary analyzer-output/${{ matrix.executable }}
       - uses: actions/upload-artifact@v4
         with:
           name: analyzer-${{ matrix.platform }}
@@ -113,6 +115,8 @@ jobs:
           path: analyzer-artifacts
       - name: Bundle analyzers
         run: python scripts/stage_analyzers.py analyzer-artifacts
+      - name: Verify standalone CLI diagnostics bundles
+        run: python scripts/check_cli_bundles.py
       - name: Download PyCharm build SDK
         run: |
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2026.2.3.tar.gz
@@ -126,6 +130,7 @@ jobs:
         run: |
           python scripts/build_pycharm_plugin.py --build-only
           python scripts/package_vscode_extension.py
+          python scripts/check_ide_bundles.py --jar target/pycharm-plugin/moduleloom.jar --vsix "target/vscode-extension/moduleloom-${MODULELOOM_VERSION}.vsix"
           mkdir -p target/ide-release
           cp target/pycharm-plugin/moduleloom.jar "target/ide-release/ModuleLoom-PyCharm-${MODULELOOM_VERSION}.jar"
           cp "target/vscode-extension/moduleloom-${MODULELOOM_VERSION}.vsix" "target/ide-release/ModuleLoom-VSCode-${MODULELOOM_VERSION}.vsix"

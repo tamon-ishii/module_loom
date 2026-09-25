@@ -1,3 +1,4 @@
+use crate::duplicate_filter::{actionable_lines, enrich_duplicate_blocks, is_generated_file};
 use crate::model::*;
 use crate::quality::{FunctionMetric, QualityData};
 use std::collections::{HashMap, HashSet};
@@ -14,7 +15,8 @@ pub fn project_complexity(
         return ComplexitySummary::default();
     }
 
-    let (duplicated, duplicate_blocks) = detect_duplicates(modules);
+    let (duplicated, mut duplicate_blocks) = detect_duplicates(modules);
+    enrich_duplicate_blocks(&mut duplicate_blocks, modules);
     let duplicate_lines: usize = duplicated.iter().map(HashSet::len).sum();
     let total_loc: usize = modules.iter().map(|module| module.loc).sum();
     let cycle_ids: HashSet<_> = cycles.iter().flat_map(|cycle| &cycle.modules).collect();
@@ -89,6 +91,7 @@ pub fn project_complexity(
         duplication,
         duplicate_lines,
         duplicate_blocks,
+        function_complexities: Vec::new(),
         hotspots,
         code_source: "ModuleLoom".into(),
         duplication_source: "ModuleLoom".into(),
@@ -110,25 +113,44 @@ pub fn apply_quality(result: &mut AnalysisResult, quality: QualityData) {
     if modules.is_empty() {
         return;
     }
-    let functions = quality.functions.as_ref();
+    let functions = &quality.functions;
     let code_risks: Vec<_> = modules
         .iter()
         .map(|module| {
             functions
-                .and_then(|items| items.get(&module.id))
+                .get(&module.id)
+                .and_then(|items| items.iter().max_by_key(|item| item.ccn))
                 .map(|item| (item.ccn.saturating_sub(1) * 10).min(100))
                 .unwrap_or_else(|| code_risk(module))
         })
         .collect();
-    let (duplicated, blocks) = if let Some(clones) = quality.clones {
+    let mut function_complexities: Vec<_> = modules
+        .iter()
+        .flat_map(|module| {
+            functions
+                .get(&module.id)
+                .into_iter()
+                .flatten()
+                .map(|item| FunctionComplexity {
+                    module: module.id.clone(),
+                    file: module.relative_path.clone(),
+                    name: item.name.clone(),
+                    line: item.line,
+                    ccn: item.ccn,
+                    source: quality.function_source.clone(),
+                })
+        })
+        .collect();
+    function_complexities.sort_by(|a, b| a.file.cmp(&b.file).then_with(|| a.line.cmp(&b.line)));
+    let (duplicated, mut blocks) = if let Some(clones) = quality.clones {
         result.complexity.duplication_source = "jscpd".into();
         (clones.duplicated, clones.blocks)
     } else {
         detect_duplicates(modules)
     };
-    if functions.is_some() {
-        result.complexity.code_source = "Lizard".into();
-    }
+    enrich_duplicate_blocks(&mut blocks, modules);
+    result.complexity.code_source = quality.function_source;
+    result.complexity.function_complexities = function_complexities;
     result.complexity.magic_source = quality.magic_source;
     result.complexity.literal_findings = quality.literals;
     result.complexity.quality_warnings = quality.warnings;
@@ -166,8 +188,9 @@ pub fn apply_quality(result: &mut AnalysisResult, quality: QualityData) {
             let mutual_import = mutual_ids.contains(&module.id);
             let duplicate_lines = duplicated[index].len();
             let coupling = module.afferent_coupling + module.efferent_coupling;
-            let function: Option<&FunctionMetric> =
-                functions.and_then(|items| items.get(&module.id));
+            let function: Option<&FunctionMetric> = functions
+                .get(&module.id)
+                .and_then(|items| items.iter().max_by_key(|item| item.ccn));
             let score = (if cycle {
                 35
             } else if mutual_import {
@@ -268,11 +291,17 @@ fn code_risk(module: &ModuleInfo) -> usize {
 fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<DuplicateBlock>) {
     let mut seen: HashMap<Vec<String>, (usize, Vec<usize>)> = HashMap::new();
     let mut duplicated = vec![HashSet::new(); modules.len()];
+    let mut actionable_by_module = vec![Vec::new(); modules.len()];
     let mut blocks: Vec<DuplicateBlock> = Vec::new();
     for (module_index, module) in modules.iter().enumerate() {
         let Ok(source) = fs::read_to_string(&module.absolute_path) else {
             continue;
         };
+        if is_generated_file(std::path::Path::new(&module.relative_path), &source) {
+            continue;
+        }
+        actionable_by_module[module_index] = actionable_lines(&source);
+        let actionable = &actionable_by_module[module_index];
         let lines: Vec<_> = source
             .lines()
             .enumerate()
@@ -283,6 +312,14 @@ fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<Duplic
             })
             .collect();
         for window in lines.windows(DUPLICATE_WINDOW) {
+            if window
+                .iter()
+                .filter(|(line, _)| actionable[*line - 1])
+                .count()
+                < DUPLICATE_WINDOW - 1
+            {
+                continue;
+            }
             let key: Vec<_> = window.iter().map(|(_, line)| line.clone()).collect();
             let first_line = window[0].0;
             if let Some((other_index, other_lines)) = seen.get(&key) {
@@ -293,10 +330,18 @@ fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<Duplic
                     continue;
                 }
                 for (line, _) in window {
-                    duplicated[module_index].insert(*line);
+                    if actionable[*line - 1] {
+                        duplicated[module_index].insert(*line);
+                    }
                 }
                 for line in other_lines {
-                    duplicated[other_index].insert(*line);
+                    if actionable_by_module[other_index]
+                        .get(*line - 1)
+                        .copied()
+                        .unwrap_or(false)
+                    {
+                        duplicated[other_index].insert(*line);
+                    }
                 }
                 if let Some(previous) = blocks.last_mut() {
                     if previous.first_module == modules[other_index].id
@@ -317,6 +362,10 @@ fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<Duplic
                         second_line: first_line,
                         lines: DUPLICATE_WINDOW,
                         kind: "exact".into(),
+                        first_function: None,
+                        second_function: None,
+                        first_signature: None,
+                        second_signature: None,
                     });
                 }
             } else {

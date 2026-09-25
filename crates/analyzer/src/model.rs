@@ -13,6 +13,8 @@ pub struct AnalysisConfig {
     pub max_functions: usize,
     #[serde(default = "default_max_classes")]
     pub max_classes: usize,
+    #[serde(default = "default_max_cyclomatic_complexity")]
+    pub max_cyclomatic_complexity: usize,
     #[serde(default)]
     pub architecture: ArchitectureConfig,
 }
@@ -26,6 +28,9 @@ fn default_max_functions() -> usize {
 fn default_max_classes() -> usize {
     10
 }
+fn default_max_cyclomatic_complexity() -> usize {
+    10
+}
 
 impl Default for AnalysisConfig {
     fn default() -> Self {
@@ -33,6 +38,7 @@ impl Default for AnalysisConfig {
             max_loc: 300,
             max_functions: 20,
             max_classes: 10,
+            max_cyclomatic_complexity: 10,
             architecture: ArchitectureConfig::default(),
         }
     }
@@ -269,6 +275,8 @@ pub struct ComplexitySummary {
     pub duplication: usize,
     pub duplicate_lines: usize,
     pub duplicate_blocks: Vec<DuplicateBlock>,
+    #[serde(default)]
+    pub function_complexities: Vec<FunctionComplexity>,
     pub hotspots: Vec<ComplexityHotspot>,
     #[serde(default)]
     pub code_source: String,
@@ -282,6 +290,16 @@ pub struct ComplexitySummary {
     pub quality_warnings: Vec<String>,
     #[serde(default)]
     pub quality_ran: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionComplexity {
+    pub module: String,
+    pub file: String,
+    pub name: String,
+    pub line: usize,
+    pub ccn: usize,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -302,6 +320,14 @@ pub struct DuplicateBlock {
     pub lines: usize,
     #[serde(default)]
     pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_function: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub second_function: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub second_signature: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,3 +1,4 @@
+use crate::duplicate_filter::{actionable_line_count, actionable_lines, is_generated_file};
 use crate::model::{Diagnostic, DiagnosticSeverity, DuplicateBlock, LiteralFinding, ModuleInfo};
 use rustpython_ast::{self as ast, Visitor};
 use rustpython_parser::{source_code::LineIndex, Parse};
@@ -36,7 +37,8 @@ pub struct CloneReport {
 }
 
 pub struct QualityData {
-    pub functions: Option<HashMap<String, FunctionMetric>>,
+    pub functions: HashMap<String, Vec<FunctionMetric>>,
+    pub function_source: String,
     pub clones: Option<CloneReport>,
     pub literals: Vec<LiteralFinding>,
     pub warnings: Vec<String>,
@@ -47,7 +49,10 @@ pub struct QualityData {
 pub fn collect(root: &Path, modules: &[ModuleInfo], jscpd_override: Option<&Path>) -> QualityData {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let mut warnings = Vec::new();
-    let functions = run_lizard(&root, modules, &mut warnings);
+    let (functions, function_source) = match run_lizard(&root, modules, &mut warnings) {
+        Some(functions) => (functions, "Lizard".to_string()),
+        None => (builtin_function_metrics(modules), "ModuleLoom".to_string()),
+    };
     let clones = run_jscpd(&root, modules, jscpd_override, &mut warnings);
     let mut literals = repeated_literals(modules);
     let magic = run_ruff(&root, modules, &mut warnings);
@@ -62,6 +67,7 @@ pub fn collect(root: &Path, modules: &[ModuleInfo], jscpd_override: Option<&Path
     literals.truncate(30);
     QualityData {
         functions,
+        function_source,
         clones,
         literals,
         warnings,
@@ -170,6 +176,14 @@ fn executable(root: &Path, name: &str) -> Option<PathBuf> {
                 return Some(path);
             }
         }
+        let filename = if cfg!(windows) { "jscpd.exe" } else { "jscpd" };
+        if let Some(path) = std::env::current_exe()
+            .ok()
+            .and_then(|binary| binary.parent().map(|directory| directory.join(filename)))
+            .filter(|path| path.is_file())
+        {
+            return Some(path);
+        }
     }
     let names = if cfg!(windows) {
         vec![
@@ -271,11 +285,117 @@ struct LizardFunction {
     ccn: usize,
 }
 
+struct FunctionCollector<'a> {
+    index: &'a LineIndex,
+    context: Vec<String>,
+    metrics: Vec<FunctionMetric>,
+}
+
+impl FunctionCollector<'_> {
+    fn record(&mut self, name: &str, line: usize, body: &[ast::Stmt]) {
+        let mut visitor = FunctionBodyComplexity { ccn: 1 };
+        for statement in body {
+            visitor.visit_stmt(statement.clone());
+        }
+        let name = if self.context.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}.{}", self.context.join("."), name)
+        };
+        self.metrics.push(FunctionMetric {
+            name,
+            line,
+            ccn: visitor.ccn,
+        });
+    }
+}
+
+impl Visitor for FunctionCollector<'_> {
+    fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
+        self.context.push(node.name.to_string());
+        self.generic_visit_stmt_class_def(node);
+        self.context.pop();
+    }
+
+    fn visit_stmt_function_def(&mut self, node: ast::StmtFunctionDef) {
+        let line = self.index.line_index(node.range.start()).get() as usize;
+        self.record(node.name.as_str(), line, &node.body);
+        self.context.push(node.name.to_string());
+        self.generic_visit_stmt_function_def(node);
+        self.context.pop();
+    }
+
+    fn visit_stmt_async_function_def(&mut self, node: ast::StmtAsyncFunctionDef) {
+        let line = self.index.line_index(node.range.start()).get() as usize;
+        self.record(node.name.as_str(), line, &node.body);
+        self.context.push(node.name.to_string());
+        self.generic_visit_stmt_async_function_def(node);
+        self.context.pop();
+    }
+}
+
+struct FunctionBodyComplexity {
+    ccn: usize,
+}
+
+impl Visitor for FunctionBodyComplexity {
+    fn visit_stmt_function_def(&mut self, _node: ast::StmtFunctionDef) {}
+    fn visit_stmt_async_function_def(&mut self, _node: ast::StmtAsyncFunctionDef) {}
+    fn visit_stmt_class_def(&mut self, _node: ast::StmtClassDef) {}
+    fn visit_stmt_if(&mut self, node: ast::StmtIf) {
+        self.ccn += 1;
+        self.generic_visit_stmt_if(node);
+    }
+    fn visit_stmt_for(&mut self, node: ast::StmtFor) {
+        self.ccn += 1;
+        self.generic_visit_stmt_for(node);
+    }
+    fn visit_stmt_async_for(&mut self, node: ast::StmtAsyncFor) {
+        self.ccn += 1;
+        self.generic_visit_stmt_async_for(node);
+    }
+    fn visit_stmt_while(&mut self, node: ast::StmtWhile) {
+        self.ccn += 1;
+        self.generic_visit_stmt_while(node);
+    }
+    fn visit_stmt_try(&mut self, node: ast::StmtTry) {
+        self.ccn += node.handlers.len();
+        self.generic_visit_stmt_try(node);
+    }
+    fn visit_expr_bool_op(&mut self, node: ast::ExprBoolOp) {
+        self.ccn += node.values.len().saturating_sub(1);
+        self.generic_visit_expr_bool_op(node);
+    }
+}
+
+fn builtin_function_metrics(modules: &[ModuleInfo]) -> HashMap<String, Vec<FunctionMetric>> {
+    let mut result = HashMap::new();
+    for module in modules {
+        let Ok(source) = fs::read_to_string(&module.absolute_path) else {
+            continue;
+        };
+        let Ok(suite) = ast::Suite::parse(&source, &module.relative_path) else {
+            continue;
+        };
+        let index = LineIndex::from_source_text(&source);
+        let mut collector = FunctionCollector {
+            index: &index,
+            context: Vec::new(),
+            metrics: Vec::new(),
+        };
+        for statement in suite {
+            collector.visit_stmt(statement);
+        }
+        result.insert(module.id.clone(), collector.metrics);
+    }
+    result
+}
+
 fn run_lizard(
     root: &Path,
     modules: &[ModuleInfo],
     warnings: &mut Vec<String>,
-) -> Option<HashMap<String, FunctionMetric>> {
+) -> Option<HashMap<String, Vec<FunctionMetric>>> {
     let interpreters: Vec<_> = ["python", "python3"]
         .iter()
         .filter_map(|name| executable(root, name))
@@ -296,7 +416,7 @@ fn run_lizard(
         command.current_dir(root).args(["-I", "-c", LIZARD_SCRIPT]);
         if let Some(bytes) = run_command(command, Some(&input), &[0]) {
             if let Ok(files) = serde_json::from_slice::<Vec<LizardFile>>(&bytes) {
-                let mut result: HashMap<String, FunctionMetric> = HashMap::new();
+                let mut result: HashMap<String, Vec<FunctionMetric>> = HashMap::new();
                 for file in files {
                     let Some(index) = module_index(root, &file.path, &indexes) else {
                         continue;
@@ -306,18 +426,11 @@ fn run_lizard(
                         if function.line == 0 {
                             continue;
                         }
-                        let entry = result.entry(id.clone()).or_insert(FunctionMetric {
+                        result.entry(id.clone()).or_default().push(FunctionMetric {
                             name: function.name.clone(),
                             line: function.line,
                             ccn: function.ccn,
                         });
-                        if function.ccn > entry.ccn {
-                            *entry = FunctionMetric {
-                                name: function.name,
-                                line: function.line,
-                                ccn: function.ccn,
-                            };
-                        }
                     }
                 }
                 return Some(result);
@@ -407,12 +520,18 @@ fn run_jscpd(
 
 fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) -> CloneReport {
     let indexes = module_paths(modules);
-    let physical_lines: Vec<usize> = modules
+    let actionable: Vec<Vec<bool>> = modules
         .iter()
         .map(|module| {
             fs::read_to_string(&module.absolute_path)
-                .map(|source| source.lines().count())
-                .unwrap_or(0)
+                .map(|source| {
+                    if is_generated_file(Path::new(&module.relative_path), &source) {
+                        vec![false; source.lines().count()]
+                    } else {
+                        actionable_lines(&source)
+                    }
+                })
+                .unwrap_or_default()
         })
         .collect();
     let mut duplicated = vec![HashSet::new(); modules.len()];
@@ -432,13 +551,20 @@ fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) ->
         if first == second && item.first.start.abs_diff(item.second.start) < item.lines {
             continue;
         }
+        if actionable_line_count(&actionable[first], item.first.start, item.lines) < 5
+            || actionable_line_count(&actionable[second], item.second.start, item.lines) < 5
+        {
+            continue;
+        }
         for (index, start) in [(first, item.first.start), (second, item.second.start)] {
             for line in start
                 ..start
                     .saturating_add(item.lines)
-                    .min(physical_lines[index] + 1)
+                    .min(actionable[index].len() + 1)
             {
-                duplicated[index].insert(line);
+                if actionable[index][line - 1] {
+                    duplicated[index].insert(line);
+                }
             }
         }
         if blocks.len() < 20 {
@@ -454,6 +580,10 @@ fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) ->
                     "exact"
                 }
                 .into(),
+                first_function: None,
+                second_function: None,
+                first_signature: None,
+                second_signature: None,
             });
         }
     }
@@ -663,5 +793,26 @@ mod tests {
             mapped.duplicated.iter().map(HashSet::len).sum::<usize>(),
             12
         );
+    }
+
+    #[test]
+    fn ignores_jscpd_import_only_matches() {
+        let root = tempfile::tempdir().unwrap();
+        let source = "from pathlib import (\n    Path,\n    PurePath,\n)\nimport os\nimport sys\nvalue = 1\n";
+        fs::write(root.path().join("a.py"), source).unwrap();
+        fs::write(root.path().join("b.py"), source).unwrap();
+        let modules = crate::analyze_directory(root.path()).unwrap().modules;
+        let report: JscpdReport = serde_json::from_value(serde_json::json!({
+            "duplicates": [{
+                "lines": 6,
+                "kind": "exact",
+                "firstFile": {"name": "a.py", "start": 1, "end": 6},
+                "secondFile": {"name": "b.py", "start": 1, "end": 6}
+            }]
+        }))
+        .unwrap();
+        let mapped = map_jscpd_report(root.path(), &modules, report);
+        assert!(mapped.blocks.is_empty());
+        assert!(mapped.duplicated.iter().all(HashSet::is_empty));
     }
 }

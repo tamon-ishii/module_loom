@@ -95,7 +95,8 @@ export interface AnalysisResult {
     code: number;
     duplication: number;
     duplicate_lines: number;
-    duplicate_blocks: { first_module: string; first_line: number; second_module: string; second_line: number; lines: number; kind?: string }[];
+    duplicate_blocks: { first_module: string; first_line: number; second_module: string; second_line: number; lines: number; kind?: string; first_function?: string; second_function?: string; first_signature?: string; second_signature?: string }[];
+    function_complexities?: { module: string; file: string; name: string; line: number; ccn: number; source: string }[];
     hotspots: { module: string; score: number; cycle: boolean; mutual_import: boolean; oversized: boolean; cyclomatic_complexity: number; max_function_complexity?: number | null; max_function_name?: string | null; max_function_line?: number | null; duplicate_lines: number; imports: number; imported_by: number }[];
     code_source?: string;
     duplication_source?: string;

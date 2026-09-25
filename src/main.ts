@@ -2282,7 +2282,25 @@ function renderComplexityDashboard(result: AnalysisResult) {
       : (renamed ? (en ? "Review similar code" : "類似コードを確認") : (en ? "Review copied code" : "コピペ箇所を確認"));
     const firstEnd = block.first_line + block.lines - 1;
     const secondEnd = block.second_line + block.lines - 1;
-    return `<div class="complexity-duplicate-row"><strong>${suggestion}</strong><small>${renamed ? (en ? "Similar structure (identifiers ignored)" : "類似構造（識別子を無視）") : (en ? "Exact match" : "完全一致")} · ${block.lines} ${en ? "lines" : "行"}</small><div class="complexity-duplicate-locations"><button data-module="${escapeHtml(block.first_module)}" data-line="${block.first_line}">${escapeHtml(block.first_module)}:${block.first_line}–${firstEnd}</button><span>↔</span><button data-module="${escapeHtml(block.second_module)}" data-line="${block.second_line}">${escapeHtml(block.second_module)}:${block.second_line}–${secondEnd}</button></div></div>`;
+    const signatureParts = (signature?: string) => {
+      const match = signature?.match(/^(\(.*\))(?: -> (.*))?$/);
+      return { parameters: match?.[1] || "?", returns: match?.[2] || "?" };
+    };
+    const first = signatureParts(block.first_signature);
+    const second = signatureParts(block.second_signature);
+    const parameterComparison = first.parameters === "?" || second.parameters === "?"
+      ? (en ? "unknown" : "不明")
+      : first.parameters === second.parameters ? (en ? "same" : "同じ") : `${escapeHtml(first.parameters)} ↔ ${escapeHtml(second.parameters)}`;
+    const returnComparison = first.returns === "?" || second.returns === "?"
+      ? (en ? "not annotated" : "型注釈なし")
+      : first.returns === second.returns ? (en ? "same" : "同じ") : `${escapeHtml(first.returns)} ↔ ${escapeHtml(second.returns)}`;
+    const functionDetail = block.first_function && block.second_function
+      ? `<small>${en ? "Functions" : "関数"}: ${escapeHtml(block.first_function)} ↔ ${escapeHtml(block.second_function)}</small><small>${en ? "Parameters" : "引数"}: ${parameterComparison} · ${en ? "Return annotation" : "戻り値の型注釈"}: ${returnComparison}</small>`
+      : "";
+    const reason = block.lines >= 10 && block.first_function && block.second_function
+      ? (en ? "Repeated logic inside functions; compare behavior before extracting." : "関数内で処理が重複しています。動作の違いを確認して共通化を検討できます。")
+      : (renamed ? (en ? "The structure matches after identifiers are ignored." : "識別子を除いた処理構造が一致しています。") : (en ? "Consecutive code lines match." : "処理行が連続して一致しています。"));
+    return `<div class="complexity-duplicate-row"><strong>${suggestion}</strong><small>${renamed ? (en ? "Similar structure (identifiers ignored)" : "類似構造（識別子を無視）") : (en ? "Exact match" : "完全一致")} · ${block.lines} ${en ? "lines" : "行"}</small><small>${reason}</small>${functionDetail}<div class="complexity-duplicate-locations"><button data-module="${escapeHtml(block.first_module)}" data-line="${block.first_line}">${escapeHtml(block.first_module)}:${block.first_line}–${firstEnd}</button><span>↔</span><button data-module="${escapeHtml(block.second_module)}" data-line="${block.second_line}">${escapeHtml(block.second_module)}:${block.second_line}–${secondEnd}</button></div></div>`;
   }).join("");
   const literalRows = (summary.literal_findings || []).map((finding) =>
     `<button class="complexity-finding" data-module="${escapeHtml(finding.module)}" data-line="${finding.line}"><span>${finding.kind === "magic-number" ? (en ? "Magic number" : "マジックナンバー") : finding.kind === "repeated-number" ? (en ? "Repeated number" : "重複数値") : (en ? "Repeated string" : "重複文字列")}</span><strong>${escapeHtml(finding.module)}:${finding.line}</strong><small>${escapeHtml(finding.value)}${finding.count > 1 ? ` (${finding.count}×)` : ""}</small></button>`

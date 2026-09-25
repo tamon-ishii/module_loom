@@ -51,6 +51,8 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
     files.extend(file for file in (extension / 'media').rglob('*') if file.is_file())
     if (extension / 'bin').exists():
         files.extend(file for file in (extension / 'bin').rglob('*') if file.is_file())
+    if (extension / 'licenses').exists():
+        files.extend(file for file in (extension / 'licenses').rglob('*') if file.is_file())
     for file in sorted(files):
         archive.write(file, 'extension/' + file.relative_to(extension).as_posix())
 print(output)

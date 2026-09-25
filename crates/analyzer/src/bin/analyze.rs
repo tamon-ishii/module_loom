@@ -1,9 +1,13 @@
-use moduleloom_analyzer::model::AnalysisResult;
-use moduleloom_analyzer::{analyze_directory, analyze_directory_incremental};
+use moduleloom_analyzer::model::{AnalysisResult, DuplicateBlock};
+use moduleloom_analyzer::{analyze_directory, analyze_directory_incremental, load_config};
 use serde::Deserialize;
 use std::env;
+use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+#[path = "analyze/findings.rs"]
+mod findings;
 
 #[derive(Deserialize)]
 struct IncrementalInput {
@@ -20,7 +24,10 @@ fn main() {
     let mut incremental_mode = false;
     let mut quality_mode = false;
     let mut quality_report = false;
+    let mut findings_only = false;
     let mut max_score: Option<usize> = None;
+    let mut max_ccn: Option<usize> = None;
+    let mut selected_rules: Vec<String> = Vec::new();
     let mut chain_from: Option<&str> = None;
     let mut chain_to: Option<&str> = None;
     let mut chain_requested = false;
@@ -30,7 +37,19 @@ fn main() {
 
     let mut arguments = args.iter().skip(1);
     while let Some(arg) = arguments.next() {
-        if arg == "--json" {
+        if arg == "--help" || arg == "-h" {
+            println!("Usage: moduleloom-analyze [OPTIONS] [PROJECT_PATH]");
+            println!("  --diagnostics      Run code diagnostics and print AI-ready JSON");
+            println!("  --quality-report   Alias of --diagnostics");
+            println!("  --quality --json   Print the full analysis with diagnostics");
+            println!("  --max-score N      Exit with status 1 if the score exceeds N");
+            println!("  --max-ccn N        Override the function complexity threshold");
+            println!(
+                "  --rule RULE        Keep matching findings (repeatable, * suffix for prefix)"
+            );
+            println!("  --findings-only    Print compact findings JSON");
+            return;
+        } else if arg == "--json" {
             json_mode = true;
         } else if arg == "--check" {
             check_mode = true;
@@ -48,7 +67,7 @@ fn main() {
             incremental_mode = true;
         } else if arg == "--quality" {
             quality_mode = true;
-        } else if arg == "--quality-report" {
+        } else if arg == "--quality-report" || arg == "--diagnostics" {
             quality_mode = true;
             quality_report = true;
             json_mode = true;
@@ -64,6 +83,36 @@ fn main() {
                 }
             };
             quality_mode = true;
+        } else if arg == "--max-ccn" {
+            max_ccn = match arguments
+                .next()
+                .and_then(|value| value.parse::<usize>().ok())
+            {
+                Some(value) if value > 0 => Some(value),
+                _ => {
+                    eprintln!(
+                        "Usage: moduleloom-analyze --max-ccn POSITIVE_INTEGER [PROJECT_PATH]"
+                    );
+                    std::process::exit(2);
+                }
+            };
+            quality_mode = true;
+            quality_report = true;
+            json_mode = true;
+        } else if arg == "--rule" {
+            let Some(rule) = arguments.next().filter(|value| !value.starts_with("--")) else {
+                eprintln!("Usage: moduleloom-analyze --rule RULE [PROJECT_PATH]");
+                std::process::exit(2);
+            };
+            selected_rules.push(rule.clone());
+            quality_mode = true;
+            quality_report = true;
+            json_mode = true;
+        } else if arg == "--findings-only" {
+            findings_only = true;
+            quality_mode = true;
+            quality_report = true;
+            json_mode = true;
         } else if arg == "--chain" {
             chain_requested = true;
             chain_from = arguments.next().map(String::as_str);
@@ -145,25 +194,69 @@ fn main() {
             }
             if json_mode {
                 let output = if quality_report {
-                    serde_json::json!({
-                        "root_path": res.root_path,
-                        "module_count": res.modules.len(),
-                        "total_loc": res.total_loc,
-                        "complexity": res.complexity,
-                        "type_diagnostics": res.modules.iter().flat_map(|module| {
-                            module.diagnostics.iter()
-                                .filter(|diagnostic| diagnostic.rule.as_deref().is_some_and(|rule| rule.starts_with("ty/")))
-                                .map(move |diagnostic| serde_json::json!({
+                    let threshold = match max_ccn {
+                        Some(value) => value,
+                        None => match load_config(Path::new(target)) {
+                            Ok(config) => config.max_cyclomatic_complexity,
+                            Err(error) => {
+                                eprintln!("{error}");
+                                std::process::exit(2);
+                            }
+                        },
+                    };
+                    let mut findings = findings::build(&res, threshold);
+                    if !selected_rules.is_empty() {
+                        findings.retain(|finding| {
+                            selected_rules.iter().any(|selected| {
+                                let rule = finding["rule"].as_str().unwrap_or("");
+                                selected
+                                    .strip_suffix('*')
+                                    .map_or(rule == selected, |prefix| rule.starts_with(prefix))
+                            })
+                        });
+                    }
+                    if findings_only {
+                        serde_json::json!({
+                            "schema_version": 1,
+                            "thresholds": {"max_cyclomatic_complexity": threshold},
+                            "findings": findings,
+                            "root_path": res.root_path,
+                            "quality_warnings": res.complexity.quality_warnings,
+                        })
+                    } else {
+                        serde_json::json!({
+                            "schema_version": 1,
+                            "thresholds": {"max_cyclomatic_complexity": threshold},
+                            "findings": findings,
+                            "root_path": res.root_path,
+                            "module_count": res.modules.len(),
+                            "total_loc": res.total_loc,
+                            "complexity": res.complexity,
+                            "duplicate_candidates": res.complexity.duplicate_blocks.iter()
+                                .map(|block| duplicate_candidate(&res, block))
+                                .collect::<Vec<_>>(),
+                            "diagnostics": res.modules.iter().flat_map(|module| {
+                                module.diagnostics.iter().map(move |diagnostic| serde_json::json!({
                                     "module": module.id,
                                     "file": module.relative_path,
                                     "diagnostic": diagnostic,
                                 }))
-                        }).collect::<Vec<_>>(),
-                        "cycles": res.cycles,
-                        "architecture_violations": res.architecture_violations,
-                        "dependency_issues": res.dependency_issues,
-                        "analysis_errors": res.analysis_errors,
-                    })
+                            }).collect::<Vec<_>>(),
+                            "type_diagnostics": res.modules.iter().flat_map(|module| {
+                                module.diagnostics.iter()
+                                    .filter(|diagnostic| diagnostic.rule.as_deref().is_some_and(|rule| rule.starts_with("ty/")))
+                                    .map(move |diagnostic| serde_json::json!({
+                                        "module": module.id,
+                                        "file": module.relative_path,
+                                        "diagnostic": diagnostic,
+                                    }))
+                            }).collect::<Vec<_>>(),
+                            "cycles": res.cycles,
+                            "architecture_violations": res.architecture_violations,
+                            "dependency_issues": res.dependency_issues,
+                            "analysis_errors": res.analysis_errors,
+                        })
+                    }
                 } else {
                     serde_json::to_value(&res).unwrap()
                 };
@@ -264,4 +357,41 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+fn duplicate_candidate(res: &AnalysisResult, block: &DuplicateBlock) -> serde_json::Value {
+    let location =
+        |module_id: &str, start: usize, function: &Option<String>, signature: &Option<String>| {
+            let module = res.modules.iter().find(|module| module.id == module_id);
+            let snippet = module
+                .and_then(|module| fs::read_to_string(&module.absolute_path).ok())
+                .map(|source| {
+                    source
+                        .lines()
+                        .skip(start.saturating_sub(1))
+                        .take(block.lines.min(30))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                });
+            serde_json::json!({
+                "module": module_id,
+                "file": module.map(|module| &module.relative_path),
+                "start_line": start,
+                "end_line": start + block.lines - 1,
+                "function": function,
+                "signature": signature,
+                "code": snippet,
+                "code_truncated": block.lines > 30,
+            })
+        };
+    let extraction =
+        block.lines >= 10 && block.first_function.is_some() && block.second_function.is_some();
+    serde_json::json!({
+        "kind": block.kind,
+        "matched_lines": block.lines,
+        "suggestion": if extraction { "consider_shared_function" } else { "review_duplicate" },
+        "reason": if extraction { "repeated_logic_in_functions" } else if block.kind == "renamed" { "matching_structure" } else { "matching_code" },
+        "first": location(&block.first_module, block.first_line, &block.first_function, &block.first_signature),
+        "second": location(&block.second_module, block.second_line, &block.second_function, &block.second_signature),
+    })
 }
