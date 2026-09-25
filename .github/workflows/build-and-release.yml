@@ -37,6 +37,8 @@ jobs:
         run: |
           mkdir -p analyzer-output
           cp "target/release/${{ matrix.executable }}" analyzer-output/
+      - name: Stage jscpd v5 and its license
+        run: python scripts/stage_jscpd_wheel.py analyzer-output
       - uses: actions/upload-artifact@v4
         with:
           name: analyzer-${{ matrix.platform }}
@@ -81,6 +83,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2
       - run: npm ci
+      - name: Stage jscpd v5 and its license
+        run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
       - uses: tauri-apps/tauri-action@v1
         with:
           args: --bundles ${{ matrix.bundles }}${{ matrix.target && format(' --target {0}', matrix.target) || '' }}
@@ -111,7 +115,7 @@ jobs:
         run: python scripts/stage_analyzers.py analyzer-artifacts
       - name: Download PyCharm build SDK
         run: |
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2025.3.1.tar.gz
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2026.2.3.tar.gz
           mkdir -p "$RUNNER_TEMP/pycharm"
           tar -xzf "$RUNNER_TEMP/pycharm.tar.gz" -C "$RUNNER_TEMP/pycharm" --strip-components=1
       - name: Set plugin version

@@ -101,7 +101,7 @@ fn check_function_types(
                 func.name
             ),
             line: Some(line),
-            rule: Some("ty-type-check".to_string()),
+            rule: Some("missing-type-annotation".to_string()),
         });
     }
 
@@ -118,7 +118,7 @@ fn check_function_types(
                     arg.def.arg, func.name
                 ),
                 line: Some(line),
-                rule: Some("ty-type-check".to_string()),
+                rule: Some("missing-type-annotation".to_string()),
             });
         }
     }
@@ -138,7 +138,7 @@ fn check_async_function_types(
                 func.name
             ),
             line: Some(line),
-            rule: Some("ty-type-check".to_string()),
+            rule: Some("missing-type-annotation".to_string()),
         });
     }
 }

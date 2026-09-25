@@ -150,6 +150,15 @@ fn main() {
                         "module_count": res.modules.len(),
                         "total_loc": res.total_loc,
                         "complexity": res.complexity,
+                        "type_diagnostics": res.modules.iter().flat_map(|module| {
+                            module.diagnostics.iter()
+                                .filter(|diagnostic| diagnostic.rule.as_deref().is_some_and(|rule| rule.starts_with("ty/")))
+                                .map(move |diagnostic| serde_json::json!({
+                                    "module": module.id,
+                                    "file": module.relative_path,
+                                    "diagnostic": diagnostic,
+                                }))
+                        }).collect::<Vec<_>>(),
                         "cycles": res.cycles,
                         "architecture_violations": res.architecture_violations,
                         "dependency_issues": res.dependency_issues,

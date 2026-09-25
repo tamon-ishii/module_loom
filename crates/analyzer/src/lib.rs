@@ -27,7 +27,13 @@ pub fn analyze_directory(root: &Path) -> Result<AnalysisResult, String> {
 
 /// Run optional third-party quality tools for an explicitly requested detailed scan.
 pub fn enrich_quality(result: &mut AnalysisResult) {
-    let quality = quality::collect(&result.root_path, &result.modules);
+    let quality = quality::collect(&result.root_path, &result.modules, None);
+    metrics::apply_quality(result, quality);
+}
+
+/// Run detailed quality checks using an application-bundled jscpd executable.
+pub fn enrich_quality_with_jscpd(result: &mut AnalysisResult, jscpd_path: &Path) {
+    let quality = quality::collect(&result.root_path, &result.modules, Some(jscpd_path));
     metrics::apply_quality(result, quality);
 }
 

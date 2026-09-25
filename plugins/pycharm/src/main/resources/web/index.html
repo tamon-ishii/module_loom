@@ -79,12 +79,13 @@
         </div>
       </header>
 
-      <details id="complexity-dashboard" class="complexity-dashboard" aria-label="プロジェクト複雑度">
-        <summary><span id="complexity-dashboard-title">コード診断</span><span id="complexity-dashboard-score"></span><button id="btn-quality" class="btn-secondary btn-sm" type="button" title="現在のコードを診断して結果を更新">診断実行</button></summary>
-        <div id="complexity-dashboard-content" class="complexity-dashboard-content"></div>
-      </details>
+      <div class="workspace-tabs" role="tablist" aria-label="画面の切り替え">
+        <button id="tab-modules" class="workspace-tab active" type="button" role="tab" aria-controls="module-view" aria-selected="true">モジュール一覧</button>
+        <button id="tab-diagnostics" class="workspace-tab" type="button" role="tab" aria-controls="complexity-dashboard" aria-selected="false" tabindex="-1">コード診断</button>
+      </div>
 
-      <div class="main-container">
+      <div class="workspace-content">
+      <div id="module-view" class="main-container" role="tabpanel" aria-labelledby="tab-modules">
         <!-- Python Source Tree Panel -->
         <aside id="tree-panel" class="tree-panel">
           <div class="panel-header">
@@ -101,6 +102,8 @@
           </div>
         </aside>
 
+        <div id="tree-resizer" class="pane-resizer" role="separator" aria-label="ソースツリーの幅" aria-controls="tree-panel" aria-orientation="vertical" tabindex="0"></div>
+
         <div class="graph-wrapper">
           <div id="cy-container" class="graph-canvas"></div>
           <div class="floating-zoom-controls">
@@ -111,6 +114,7 @@
             <button id="btn-float-zoom-fit" class="btn-float" title="全体表示 (Fit)">&#x2922;</button>
           </div>
         </div>
+        <div id="inspector-resizer" class="pane-resizer" role="separator" aria-label="モジュール詳細の幅" aria-controls="inspector-panel" aria-orientation="vertical" tabindex="0"></div>
         <aside id="inspector-panel" class="inspector-panel">
           <div class="panel-header">
             <h3>モジュール詳細</h3>
@@ -120,6 +124,12 @@
             <p class="placeholder-text">グラフ上のノードをクリックすると詳細が表示されます</p>
           </div>
         </aside>
+      </div>
+
+      <section id="complexity-dashboard" class="complexity-dashboard" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
+        <div class="complexity-dashboard-header"><h2 id="complexity-dashboard-title">コード診断</h2><span id="complexity-dashboard-score"></span><button id="btn-quality" class="btn-primary" type="button" title="現在のコードを診断して結果を更新">診断実行</button></div>
+        <div id="complexity-dashboard-content" class="complexity-dashboard-content"><p class="placeholder-text">解析結果を待っています</p></div>
+      </section>
       </div>
 
       <footer class="app-footer">

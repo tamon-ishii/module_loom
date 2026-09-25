@@ -11,6 +11,7 @@ node_modules/
 dist/
 target/
 src-tauri/gen/
+src-tauri/binaries/
 plugins/pycharm/src/main/resources/bin/
 plugins/vscode/bin/
 src-tauri/icons/android/

@@ -95,7 +95,7 @@ export interface AnalysisResult {
     code: number;
     duplication: number;
     duplicate_lines: number;
-    duplicate_blocks: { first_module: string; first_line: number; second_module: string; second_line: number; lines: number }[];
+    duplicate_blocks: { first_module: string; first_line: number; second_module: string; second_line: number; lines: number; kind?: string }[];
     hotspots: { module: string; score: number; cycle: boolean; mutual_import: boolean; oversized: boolean; cyclomatic_complexity: number; max_function_complexity?: number | null; max_function_name?: string | null; max_function_line?: number | null; duplicate_lines: number; imports: number; imported_by: number }[];
     code_source?: string;
     duplication_source?: string;

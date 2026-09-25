@@ -18,10 +18,12 @@ BUILD_DIR = os.path.join(PROJECT_ROOT, "target", "pycharm-plugin")
 CLASSES_DIR = os.path.join(BUILD_DIR, "classes")
 JAR_OUTPUT = os.path.join(BUILD_DIR, "moduleloom.jar")
 
-PYCHARM_HOME = os.environ.get("PYCHARM_HOME", "/home/ishii/pycharm/pycharm-2025.3.1")
-JAVAC_BIN = os.environ.get("JAVAC_BIN", os.path.join(PYCHARM_HOME, "jbr", "bin", "javac"))
+PYCHARM_HOME = os.environ.get("PYCHARM_HOME", "")
+JAVAC_BIN = os.environ.get("JAVAC_BIN") or os.path.join(PYCHARM_HOME, "jbr", "bin", "javac")
 
 def build():
+    if not PYCHARM_HOME:
+        raise RuntimeError("Set PYCHARM_HOME to an unpacked PyCharm installation")
     print("=== Building PyCharm Plugin for ModuleLoom ===")
     shutil.rmtree(os.path.expanduser("~/.cache/moduleloom/web"), ignore_errors=True)
     subprocess.run(["npm", "run", "build"], cwd=PROJECT_ROOT, check=True)
@@ -29,6 +31,7 @@ def build():
     shutil.rmtree(web_resources, ignore_errors=True)
     shutil.copytree(os.path.join(PROJECT_ROOT, "dist"), web_resources)
     stage_local_analyzer()
+    stage_local_jscpd()
     plugin_version = os.environ.get("MODULELOOM_VERSION") or datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M%S")
     if os.path.exists(CLASSES_DIR):
         shutil.rmtree(CLASSES_DIR)
@@ -123,7 +126,15 @@ def stage_local_analyzer():
         os.path.join(PROJECT_ROOT, "target", "debug", filename),
     ]
     valid_candidates = [path for path in candidates if os.path.isfile(path)]
-    source = max(valid_candidates, key=os.path.getmtime) if valid_candidates else None
+    if valid_candidates:
+        # Local builds must include the current analyzer source, even when a
+        # previously built release executable has a newer timestamp.
+        subprocess.run(["cargo", "build", "--locked", "--bin", "analyze"],
+                       cwd=PROJECT_ROOT, check=True)
+        source = os.path.join(PROJECT_ROOT, "target", "debug", filename)
+    else:
+        # CI stages prebuilt binaries for every supported platform here.
+        source = None
     if source is None:
         if os.path.isfile(destination):
             print(f"Keeping existing local analyzer: {destination}")
@@ -136,11 +147,52 @@ def stage_local_analyzer():
         os.chmod(destination, 0o755)
     print(f"Bundled latest local analyzer: {destination} (from {source})")
 
+def stage_local_jscpd():
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    arm64 = machine in ("aarch64", "arm64")
+    if system == "windows" and not arm64:
+        platform_name, filename = "windows-x64", "jscpd.exe"
+    elif system == "linux" and not arm64:
+        platform_name, filename = "linux-x64", "jscpd"
+    elif system == "darwin":
+        platform_name, filename = ("macos-arm64" if arm64 else "macos-x64"), "jscpd"
+    else:
+        return
+
+    destination = os.path.join(SRC_RES, "bin", platform_name, filename)
+    candidates = [
+        os.path.join(PROJECT_ROOT, ".venv", "Scripts" if system == "windows" else "bin", filename),
+        shutil.which(filename),
+    ]
+    source = next((path for path in candidates if path and os.path.isfile(path)), None)
+    if source is not None:
+        version = subprocess.run([source, "--version"], capture_output=True, text=True)
+        if version.returncode != 0 or version.stdout.strip() != "jscpd 5.3.2":
+            source = None
+    if source is not None and not os.path.isfile(destination):
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copy2(source, destination)
+        if system != "windows":
+            os.chmod(destination, 0o755)
+    if os.path.isfile(destination):
+        version = subprocess.run([destination, "--version"], capture_output=True, text=True)
+        if version.returncode != 0 or version.stdout.strip() != "jscpd 5.3.2":
+            raise RuntimeError(f"Bundled jscpd must be v5.3.2: {destination}")
+        license_source = os.path.join(PROJECT_ROOT, "third_party", "jscpd", "LICENSE")
+        license_destination = os.path.join(SRC_RES, "licenses", "jscpd", "LICENSE")
+        os.makedirs(os.path.dirname(license_destination), exist_ok=True)
+        shutil.copy2(license_source, license_destination)
+        print(f"Bundled local jscpd: {destination} with {license_destination}")
+
 def validate_jar(path):
     with zipfile.ZipFile(path) as jar:
         bad_file = jar.testzip()
         if bad_file is not None:
             raise RuntimeError(f"Corrupt JAR entry: {bad_file}")
+        if any(name.startswith("bin/") and os.path.basename(name) in ("jscpd", "jscpd.exe")
+               for name in jar.namelist()) and "licenses/jscpd/LICENSE" not in jar.namelist():
+            raise RuntimeError("Bundled jscpd requires licenses/jscpd/LICENSE")
 
 def install():
     validate_jar(JAR_OUTPUT)

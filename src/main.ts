@@ -38,6 +38,9 @@ const pathInput = document.getElementById("project-path-input") as HTMLInputElem
 const uiLanguage = document.getElementById("ui-language") as HTMLSelectElement;
 const btnAnalyze = document.getElementById("btn-analyze") as HTMLButtonElement;
 const btnQuality = document.getElementById("btn-quality") as HTMLButtonElement;
+const tabModules = document.getElementById("tab-modules") as HTMLButtonElement;
+const tabDiagnostics = document.getElementById("tab-diagnostics") as HTMLButtonElement;
+const moduleView = document.getElementById("module-view") as HTMLElement;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const chkWatch = document.getElementById("chk-watch") as HTMLInputElement;
 const chkOnlyCycles = document.getElementById("chk-only-cycles") as HTMLInputElement;
@@ -80,10 +83,44 @@ function preferredEditor(): "pycharm" | "vscode" {
 const inspectorContent = document.getElementById("inspector-content") as HTMLDivElement;
 const statusBar = document.getElementById("status-bar") as HTMLDivElement;
 const metricsSummary = document.getElementById("metrics-summary") as HTMLDivElement;
-const complexityDashboard = document.getElementById("complexity-dashboard") as HTMLDetailsElement;
+const complexityDashboard = document.getElementById("complexity-dashboard") as HTMLElement;
 const complexityDashboardTitle = document.getElementById("complexity-dashboard-title") as HTMLElement;
 const complexityDashboardScore = document.getElementById("complexity-dashboard-score") as HTMLElement;
 const complexityDashboardContent = document.getElementById("complexity-dashboard-content") as HTMLElement;
+let activeWorkspaceTab: "modules" | "diagnostics" = "modules";
+let graphNeedsFit = false;
+function selectWorkspaceTab(tab: "modules" | "diagnostics") {
+  if (activeWorkspaceTab === tab) return;
+  activeWorkspaceTab = tab;
+  const modules = tab === "modules";
+  moduleView.hidden = !modules;
+  complexityDashboard.hidden = modules;
+  tabModules.classList.toggle("active", modules);
+  tabDiagnostics.classList.toggle("active", !modules);
+  tabModules.setAttribute("aria-selected", String(modules));
+  tabDiagnostics.setAttribute("aria-selected", String(!modules));
+  tabModules.tabIndex = modules ? 0 : -1;
+  tabDiagnostics.tabIndex = modules ? -1 : 0;
+  document.body.dataset.workspaceTab = tab;
+  if (modules) requestAnimationFrame(() => {
+    cy?.resize();
+    if (graphNeedsFit && cy) {
+      const visible = cy.elements().not(".hidden");
+      if (visible.length) cy.fit(visible, 30);
+      graphNeedsFit = false;
+    }
+  });
+}
+for (const [button, tab] of [[tabModules, "modules"], [tabDiagnostics, "diagnostics"]] as const) {
+  button.addEventListener("click", () => selectWorkspaceTab(tab));
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next = tab === "modules" ? tabDiagnostics : tabModules;
+    next.focus();
+    selectWorkspaceTab(tab === "modules" ? "diagnostics" : "modules");
+  });
+}
 const btnResolveCycles = document.getElementById("btn-resolve-cycles") as HTMLButtonElement | null;
 const ruffFixModal = document.getElementById("ruff-fix-modal") as HTMLDivElement;
 const ruffFixFile = document.getElementById("ruff-fix-file") as HTMLElement;
@@ -129,10 +166,12 @@ const callGraphTitle = document.getElementById("callgraph-title") as HTMLElement
 
 // Tree & Inspector DOM Elements
 const treePanel = document.getElementById("tree-panel") as HTMLElement;
+const treeResizer = document.getElementById("tree-resizer") as HTMLElement;
 const treeContent = document.getElementById("tree-content") as HTMLDivElement;
 const btnToggleTree = document.getElementById("btn-toggle-tree") as HTMLButtonElement;
 const treeSearchInput = document.getElementById("tree-search-input") as HTMLInputElement;
 const inspectorPanel = document.getElementById("inspector-panel") as HTMLElement;
+const inspectorResizer = document.getElementById("inspector-resizer") as HTMLElement;
 const btnToggleInspector = document.getElementById("btn-toggle-inspector") as HTMLButtonElement | null;
 const btnSearchIssues = document.getElementById("btn-search-issues") as HTMLButtonElement | null;
 
@@ -846,7 +885,8 @@ function calculateFileCentricGraph(
   };
 }
 
-function switchToOverview() {
+function switchToOverview(showWorkspace = true) {
+  if (showWorkspace) selectWorkspaceTab("modules");
   if (!cy || !currentResult) return;
   currentViewMode = "overview";
   selectedModule = null;
@@ -974,6 +1014,7 @@ function toggleOverviewOrFileView() {
 }
 
 function goBack() {
+  selectWorkspaceTab("modules");
   if (currentViewMode === "file") {
     switchToOverview();
     return;
@@ -1067,10 +1108,12 @@ function findAndHighlightChain() {
   statusBar.innerText = `最短 import 経路 (${path.length - 1} ホップ): ${path.join(" → ")}`;
 }
 
-function jumpToFileCentricDiagram(moduleId: string) {
+function jumpToFileCentricDiagram(moduleId: string, showWorkspace = true) {
   if (!currentResult) return;
   const mod = currentResult.modules.find((m) => m.id === moduleId);
   if (!mod) return;
+
+  if (showWorkspace) selectWorkspaceTab("modules");
 
   currentViewMode = "file";
   selectedModule = mod;
@@ -1135,6 +1178,7 @@ function highlightTreeNode(moduleId: string, scroll = false) {
 }
 
 function updateGraph(result: AnalysisResult) {
+  if (activeWorkspaceTab === "diagnostics") graphNeedsFit = true;
   if (!cy) return;
   const previousSelectedId = selectedModule?.id;
   const wasOverview = currentViewMode === "overview";
@@ -1297,11 +1341,11 @@ function updateGraph(result: AnalysisResult) {
   }
 
   if (wasOverview) {
-    switchToOverview();
+    switchToOverview(false);
     return;
   }
   if (previousSelectedId && result.modules.some((module) => module.id === previousSelectedId)) {
-    jumpToFileCentricDiagram(previousSelectedId);
+    jumpToFileCentricDiagram(previousSelectedId, false);
     return;
   }
 
@@ -1318,9 +1362,9 @@ function updateGraph(result: AnalysisResult) {
         result.modules.find((m) => m.id === "main" || m.id.endsWith(".main") || m.id === "app.api" || m.id.endsWith(".api")) ||
         result.modules[0];
     }
-    jumpToFileCentricDiagram(keyMod.id);
+    jumpToFileCentricDiagram(keyMod.id, false);
   } else {
-    switchToOverview();
+    switchToOverview(false);
   }
 }
 
@@ -2205,7 +2249,6 @@ function renderComplexityDashboard(result: AnalysisResult) {
     complexityDashboardContent.textContent = currentUiLocale() === "en" ? "No Python modules found" : "Python モジュールが見つかりませんでした";
     return;
   }
-  complexityDashboard.hidden = false;
   const en = currentUiLocale() === "en";
   const score = Math.max(0, Math.min(100, summary.score));
   complexityDashboardTitle.textContent = en ? "Code diagnostics" : "コード診断";
@@ -2232,20 +2275,36 @@ function renderComplexityDashboard(result: AnalysisResult) {
       <span>${escapeHtml(item.module)}</span><strong>${item.score}</strong><small>${escapeHtml(reasons || `${en ? "imports" : "依存"} ${item.imports} / ${en ? "imported by" : "被依存"} ${item.imported_by}`)}</small>
     </button>`;
   }).join("");
-  const duplicateRows = summary.duplicate_blocks.slice(0, 5).map((block) =>
-    `<div class="complexity-duplicate-row"><button data-module="${escapeHtml(block.first_module)}" data-line="${block.first_line}">${escapeHtml(block.first_module)}:${block.first_line}</button><span>↔</span><button data-module="${escapeHtml(block.second_module)}" data-line="${block.second_line}">${escapeHtml(block.second_module)}:${block.second_line}</button></div>`
-  ).join("");
+  const duplicateRows = summary.duplicate_blocks.map((block) => {
+    const renamed = block.kind === "renamed";
+    const suggestion = block.lines >= 10
+      ? (en ? "Consider extracting a shared function" : "共通関数化を検討")
+      : (renamed ? (en ? "Review similar code" : "類似コードを確認") : (en ? "Review copied code" : "コピペ箇所を確認"));
+    const firstEnd = block.first_line + block.lines - 1;
+    const secondEnd = block.second_line + block.lines - 1;
+    return `<div class="complexity-duplicate-row"><strong>${suggestion}</strong><small>${renamed ? (en ? "Similar structure (identifiers ignored)" : "類似構造（識別子を無視）") : (en ? "Exact match" : "完全一致")} · ${block.lines} ${en ? "lines" : "行"}</small><div class="complexity-duplicate-locations"><button data-module="${escapeHtml(block.first_module)}" data-line="${block.first_line}">${escapeHtml(block.first_module)}:${block.first_line}–${firstEnd}</button><span>↔</span><button data-module="${escapeHtml(block.second_module)}" data-line="${block.second_line}">${escapeHtml(block.second_module)}:${block.second_line}–${secondEnd}</button></div></div>`;
+  }).join("");
   const literalRows = (summary.literal_findings || []).map((finding) =>
     `<button class="complexity-finding" data-module="${escapeHtml(finding.module)}" data-line="${finding.line}"><span>${finding.kind === "magic-number" ? (en ? "Magic number" : "マジックナンバー") : finding.kind === "repeated-number" ? (en ? "Repeated number" : "重複数値") : (en ? "Repeated string" : "重複文字列")}</span><strong>${escapeHtml(finding.module)}:${finding.line}</strong><small>${escapeHtml(finding.value)}${finding.count > 1 ? ` (${finding.count}×)` : ""}</small></button>`
   ).join("");
   const warnings = (summary.quality_warnings || []).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("");
+  const typeFindings = result.modules.flatMap((module) => module.diagnostics
+    .filter((diagnostic) => diagnostic.rule?.startsWith("ty/"))
+    .map((diagnostic) => ({ module, diagnostic })));
+  const typeRows = typeFindings.slice(0, 30).map(({ module, diagnostic }) =>
+    `<button class="complexity-finding" data-module="${escapeHtml(module.id)}" data-line="${diagnostic.line || 1}"><span>${escapeHtml(diagnostic.rule || "ty")}</span><strong>${escapeHtml(module.id)}:${diagnostic.line || 1}</strong><small>${escapeHtml(diagnostic.message)}</small></button>`
+  ).join("");
+  const typeStatus = summary.quality_warnings?.some((warning) => warning.startsWith("ty "))
+    ? (en ? "ty could not run; see tool warnings" : "ty を実行できませんでした。外部ツールの警告を確認してください")
+    : (en ? "No type diagnostics found" : "型診断は見つかりませんでした");
   const sourceLabel = `${en ? "Code" : "分岐"}: ${escapeHtml(summary.code_source || "ModuleLoom")} · ${en ? "Duplicates" : "重複"}: ${escapeHtml(summary.duplication_source || "ModuleLoom")} · ${en ? "Magic numbers" : "数値"}: ${escapeHtml(summary.magic_source || (summary.quality_ran ? (en ? "unavailable" : "利用不可") : (en ? "not run" : "未実行")))}`;
   complexityDashboardContent.innerHTML = `<div class="complexity-overall">
     <div class="complexity-ring" role="meter" aria-label="${en ? "Overall complexity" : "総合複雑度"}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}" style="--risk:${score}"><strong>${score}</strong><small>/ 100</small></div>
     <div><strong>${en ? "Overall complexity" : "総合複雑度"}</strong><small>${en ? "Higher means more review needed" : "高いほど見直しの目安"}</small>${result.analysis_errors?.length ? `<small class="complexity-incomplete">${en ? "Incomplete: " : "未解析: "}${result.analysis_errors.length} ${en ? "files" : "件"}</small>` : ""}</div>
   </div><div class="complexity-components">${metricHtml}</div><div class="complexity-priorities"><strong>${en ? "Review first" : "優先して確認"}</strong>${hotspots || `<small>${en ? "No findings" : "候補なし"}</small>`}</div>
-  <div class="complexity-quality"><strong>${en ? "Code diagnostics" : "コード診断"}</strong><small>${sourceLabel}</small>${summary.quality_ran ? `<div class="complexity-finding-list">${literalRows || `<small>${en ? "No magic numbers or repeated literals found" : "マジックナンバー・重複リテラルの検出なし"}</small>`}</div>${warnings ? `<details><summary>${en ? "Tool warnings" : "外部ツールの警告"} (${summary.quality_warnings?.length})</summary><ul>${warnings}</ul></details>` : ""}` : `<small>${en ? "Run diagnostics to check the current code" : "「診断実行」で現在のコードを確認できます"}</small>`}</div>
-  <details class="complexity-method"><summary>${en ? "Method and duplicate locations" : "算出方法と重複箇所"} (${summary.duplicate_lines} ${en ? "lines" : "行"})</summary><p>${en ? "Heuristic score: imports 35%, size 25%, branch complexity 20%, duplication 20%. Code and duplicate metrics use Lizard and jscpd when available; otherwise ModuleLoom estimates are used. Ruff PLR2004 checks comparison literals; repeated strings (8+ characters) and numbers (except 0 and 1) occur at least three times." : "目安値: 相互参照35%、肥大化25%、分岐の複雑さ20%、重複20%。分岐と重複は Lizard・jscpd が利用可能なら採用し、なければ ModuleLoom の推定値を使います。Ruff PLR2004 は比較式の数値を検出し、重複リテラルは8文字以上の文字列か0・1以外の数値が3回以上の候補です。"}</p>${duplicateRows}</details>`;
+  <section class="complexity-duplicates"><strong>${en ? "Copy and extraction candidates" : "コピペ・関数化候補"} (${summary.duplicate_blocks.length})</strong><small>${en ? "Matching code from" : "検出元"} ${escapeHtml(summary.duplication_source || "ModuleLoom")}${summary.quality_ran && summary.duplication_source === "jscpd" ? " v5" : ""}. ${en ? "Extraction is a suggestion; check behavior before changing code." : "関数化は提案です。変更前に処理の違いを確認してください。"}</small>${duplicateRows ? `<div class="complexity-duplicate-list">${duplicateRows}</div>` : `<small>${summary.quality_ran ? (en ? "No matches at the 6-line, 30-token threshold" : "6行・30トークン以上の一致は見つかりませんでした") : (en ? "Run diagnostics to check copied code with jscpd v5" : "「診断実行」で jscpd v5 による重複検出を実行できます")}</small>`}</section>
+  <div class="complexity-quality"><strong>${en ? "Code diagnostics" : "コード診断"}</strong><small>${sourceLabel}</small>${summary.quality_ran ? `<div class="complexity-finding-list">${literalRows || `<small>${en ? "No magic numbers or repeated literals found" : "マジックナンバー・重複リテラルの検出なし"}</small>`}</div><strong>${en ? "Type diagnostics (ty)" : "型診断 (ty)"} (${typeFindings.length})</strong><div class="complexity-finding-list">${typeRows || `<small>${typeStatus}</small>`}</div>${typeFindings.length > 30 ? `<small>${en ? "Showing first 30 findings; see the issues list for all results" : "最初の30件を表示。全件は問題一覧で確認できます"}</small>` : ""}${warnings ? `<details><summary>${en ? "Tool warnings" : "外部ツールの警告"} (${summary.quality_warnings?.length})</summary><ul>${warnings}</ul></details>` : ""}` : `<small>${en ? "Run diagnostics to check the current code" : "「診断実行」で現在のコードを確認できます"}</small>`}</div>
+  <details class="complexity-method"><summary>${en ? "Method" : "算出方法"} (${summary.duplicate_lines} ${en ? "duplicate lines" : "重複行"})</summary><p>${en ? "Heuristic score: imports 35%, size 25%, branch complexity 20%, duplication 20%. Code and duplicate metrics use Lizard and jscpd when available; otherwise ModuleLoom estimates are used. Ruff PLR2004 checks comparison literals; repeated strings (8+ characters) and numbers (except 0 and 1) occur at least three times." : "目安値: 相互参照35%、肥大化25%、分岐の複雑さ20%、重複20%。分岐と重複は Lizard・jscpd が利用可能なら採用し、なければ ModuleLoom の推定値を使います。Ruff PLR2004 は比較式の数値を検出し、重複リテラルは8文字以上の文字列か0・1以外の数値が3回以上の候補です。"}</p></details>`;
 }
 
 complexityDashboard.addEventListener("click", (event) => {
@@ -2415,11 +2474,10 @@ async function runAnalysis(quality = false) {
   }
   analysisRunning = true;
   if (quality) {
+    selectWorkspaceTab("diagnostics");
     btnQuality.disabled = true;
     btnQuality.textContent = currentUiLocale() === "en" ? "Diagnosing…" : "診断中…";
     btnQuality.setAttribute("aria-busy", "true");
-    complexityDashboard.hidden = false;
-    complexityDashboard.open = true;
     complexityDashboard.classList.add("quality-loading");
   }
   localStorage.setItem("project_path", path);
@@ -2986,7 +3044,7 @@ function getMockAnalysisResult(root: string): AnalysisResult {
         ],
         is_oversized: false,
         diagnostics: [
-          { severity: "warning", message: "型アノテーションが一部不足しています", line: 24, rule: "ty-type-check" },
+          { severity: "warning", message: "型アノテーションが一部不足しています", line: 24, rule: "missing-type-annotation" },
         ],
       },
       {
@@ -3307,6 +3365,7 @@ function toggleTreePanel(forceState?: boolean) {
   if (!treePanel) return;
   const isCollapsed = forceState !== undefined ? !forceState : !treePanel.classList.contains("collapsed");
   treePanel.classList.toggle("collapsed", isCollapsed);
+  treeResizer.hidden = isCollapsed;
   btnToggleTree.classList.toggle("active", !isCollapsed);
   if (cy) {
     setTimeout(() => cy?.resize(), 200);
@@ -3317,10 +3376,67 @@ function toggleInspectorPanel(forceState?: boolean) {
   if (!inspectorPanel) return;
   const isCollapsed = forceState !== undefined ? !forceState : !inspectorPanel.classList.contains("collapsed");
   inspectorPanel.classList.toggle("collapsed", isCollapsed);
+  inspectorResizer.hidden = isCollapsed;
   btnToggleInspector?.classList.toggle("active", !isCollapsed);
   if (cy) {
     setTimeout(() => cy?.resize(), 200);
   }
+}
+
+function initializePaneResizers() {
+  const setup = (kind: "tree" | "inspector", separator: HTMLElement, panel: HTMLElement) => {
+    const key = `moduleloom-${kind}-width`;
+    const property = kind === "tree" ? "--tree-panel-width" : "--inspector-panel-width";
+    const minimum = kind === "tree" ? 140 : 190;
+    const updateWidth = (requested: number) => {
+      const other = kind === "tree" ? inspectorPanel : treePanel;
+      const otherWidth = other.classList.contains("collapsed") || (kind === "tree" && matchMedia("(max-width: 700px)").matches) ? 0 : other.getBoundingClientRect().width;
+      const max = Math.max(minimum, moduleView.clientWidth - otherWidth - 280);
+      const width = Math.round(Math.min(max, Math.max(minimum, requested)));
+      moduleView.style.setProperty(property, `${width}px`);
+      separator.setAttribute("aria-valuemin", String(minimum));
+      separator.setAttribute("aria-valuemax", String(Math.round(max)));
+      separator.setAttribute("aria-valuenow", String(width));
+      requestAnimationFrame(() => cy?.resize());
+      return width;
+    };
+    const saved = Number(localStorage.getItem(key));
+    if (Number.isFinite(saved) && saved > 0) updateWidth(saved);
+    separator.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      separator.setPointerCapture(event.pointerId);
+      separator.classList.add("dragging");
+      document.body.classList.add("resizing-panes");
+    });
+    separator.addEventListener("pointermove", (event) => {
+      if (!separator.hasPointerCapture(event.pointerId)) return;
+      const rect = moduleView.getBoundingClientRect();
+      updateWidth(kind === "tree" ? event.clientX - rect.left : rect.right - event.clientX);
+    });
+    const finish = (event: PointerEvent) => {
+      if (!separator.hasPointerCapture(event.pointerId)) return;
+      separator.releasePointerCapture(event.pointerId);
+      separator.classList.remove("dragging");
+      document.body.classList.remove("resizing-panes");
+      localStorage.setItem(key, String(Math.round(panel.getBoundingClientRect().width)));
+    };
+    separator.addEventListener("pointerup", finish);
+    separator.addEventListener("pointercancel", finish);
+    separator.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const next = panel.getBoundingClientRect().width + direction * (kind === "tree" ? 20 : -20);
+      localStorage.setItem(key, String(updateWidth(next)));
+    });
+    window.addEventListener("resize", () => {
+      if (moduleView.hidden) return;
+      updateWidth(panel.getBoundingClientRect().width);
+    });
+  };
+  setup("tree", treeResizer, treePanel);
+  setup("inspector", inspectorResizer, inspectorPanel);
 }
 
 // Event Listeners
@@ -3388,11 +3504,7 @@ document.getElementById("btn-find-chain")?.addEventListener("click", findAndHigh
 document.getElementById("btn-back")?.addEventListener("click", goBack);
 btnShowOverview?.addEventListener("click", toggleOverviewOrFileView);
 btnAnalyze.addEventListener("click", () => { void runAnalysis(); });
-btnQuality.addEventListener("click", (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-  void runAnalysis(true);
-});
+btnQuality.addEventListener("click", () => { void runAnalysis(true); });
 searchInput.addEventListener("input", applyFilters);
 searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -3509,8 +3621,20 @@ uiLanguage.addEventListener("change", () => {
 syncHostUiLocale(uiLanguage.value === "en" ? "en" : "ja");
 updateFlowDirectionButton();
 initGraph();
+initializePaneResizers();
 void initFileWatcherEvents();
 void detectEditors();
-pathInput.value = (window as any).__MODULELOOM_PROJECT_PATH__ || localStorage.getItem("project_path") || "";
-if (pathInput.value) runAnalysis();
-else statusBar.innerText = "Python プロジェクトのパスを入力して解析を実行してください";
+async function initializeProjectPath() {
+  let launchPath = "";
+  if ((window as any).__TAURI_INTERNALS__) {
+    try {
+      launchPath = await invokeCommand<string | null>("initial_project_path") || "";
+    } catch (error) {
+      console.warn("Could not read the initial project path", error);
+    }
+  }
+  pathInput.value = (window as any).__MODULELOOM_PROJECT_PATH__ || launchPath || localStorage.getItem("project_path") || "";
+  if (pathInput.value) void runAnalysis();
+  else statusBar.innerText = "Python プロジェクトのパスを入力して解析を実行してください";
+}
+void initializeProjectPath();

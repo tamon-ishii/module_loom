@@ -65,7 +65,7 @@ Marketplaceへのアップロードには既存の掲載が必要です。初回
 
 ## 開発者向けビルド
 
-ビルドには Node.js / npm、`npm ci` 済みのリポジトリ、JDK 21 と、`jbr/bin/javac` および `lib/*.jar` を含む展開済み PyCharm が必要です。`PYCHARM_HOME` で PyCharm の場所を指定して JAR をビルドします。
+ビルドには Node.js / npm、`npm ci` 済みのリポジトリと、`jbr/bin/javac` および `lib/*.jar` を含む展開済み PyCharm 2026.2.3 が必要です。`PYCHARM_HOME` で PyCharm の場所を指定して JAR をビルドします。PyCharm 2026.2 系のビルドには同梱の JDK 25 を使用します。
 
 ```sh
 PYCHARM_HOME=/path/to/pycharm python3 scripts/build_pycharm_plugin.py --build-only

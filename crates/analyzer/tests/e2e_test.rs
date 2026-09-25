@@ -96,8 +96,8 @@ def func2(y):
     assert!(
         mod2.diagnostics
             .iter()
-            .any(|d| d.rule.as_deref() == Some("ty-type-check")),
-        "Should generate type check diagnostic for untyped argument y"
+            .any(|d| d.rule.as_deref() == Some("missing-type-annotation")),
+        "Should generate annotation diagnostic for untyped argument y"
     );
 }
 

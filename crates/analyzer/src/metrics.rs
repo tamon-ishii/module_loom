@@ -101,6 +101,11 @@ pub fn project_complexity(
 
 pub fn apply_quality(result: &mut AnalysisResult, quality: QualityData) {
     result.complexity.quality_ran = true;
+    for (index, diagnostic) in quality.type_diagnostics {
+        if let Some(module) = result.modules.get_mut(index) {
+            module.diagnostics.push(diagnostic);
+        }
+    }
     let modules = &result.modules;
     if modules.is_empty() {
         return;
@@ -193,6 +198,57 @@ pub fn apply_quality(result: &mut AnalysisResult, quality: QualityData) {
     hotspots.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.module.cmp(&b.module)));
     hotspots.truncate(10);
     result.complexity.hotspots = hotspots;
+
+    for block in &result.complexity.duplicate_blocks {
+        for (module_id, line, other_id, other_line) in [
+            (
+                &block.first_module,
+                block.first_line,
+                &block.second_module,
+                block.second_line,
+            ),
+            (
+                &block.second_module,
+                block.second_line,
+                &block.first_module,
+                block.first_line,
+            ),
+        ] {
+            if let Some(module) = result.modules.iter_mut().find(|item| &item.id == module_id) {
+                module.diagnostics.push(Diagnostic {
+                    severity: DiagnosticSeverity::Warning,
+                    message: format!(
+                        "{}: {other_id}:{other_line} と {} 行{}{}",
+                        if block.kind == "renamed" {
+                            "類似コード"
+                        } else {
+                            "重複コード"
+                        },
+                        block.lines,
+                        if block.kind == "renamed" {
+                            "の構造が類似"
+                        } else {
+                            "一致"
+                        },
+                        if block.lines >= 10 {
+                            "。共通関数化を検討"
+                        } else {
+                            ""
+                        }
+                    ),
+                    line: Some(line),
+                    rule: Some(
+                        if block.kind == "renamed" {
+                            "similar-code"
+                        } else {
+                            "duplicate-code"
+                        }
+                        .into(),
+                    ),
+                });
+            }
+        }
+    }
 }
 
 fn percent(part: usize, whole: usize) -> usize {
@@ -260,6 +316,7 @@ fn detect_duplicates(modules: &[ModuleInfo]) -> (Vec<HashSet<usize>>, Vec<Duplic
                         second_module: module.id.clone(),
                         second_line: first_line,
                         lines: DUPLICATE_WINDOW,
+                        kind: "exact".into(),
                     });
                 }
             } else {

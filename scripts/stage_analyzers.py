@@ -13,6 +13,7 @@ TARGETS = {
     "macos-x64": "analyze",
     "macos-arm64": "analyze",
 }
+JSCPD_LICENSE = Path(__file__).resolve().parent.parent / "third_party/jscpd/LICENSE"
 
 
 def stage(artifact_root: Path, project_root: Path) -> None:
@@ -36,6 +37,15 @@ def stage(artifact_root: Path, project_root: Path) -> None:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
 
+        jscpd_name = "jscpd.exe" if platform == "windows-x64" else "jscpd"
+        jscpd_source = source.parent / jscpd_name
+        license_source = source.parent / "jscpd-LICENSE"
+        if not jscpd_source.is_file() or not license_source.is_file():
+            raise FileNotFoundError(f"Missing jscpd binary or license for {platform}")
+        if license_source.read_bytes() != JSCPD_LICENSE.read_bytes():
+            raise ValueError(f"Unexpected jscpd license for {platform}")
+        shutil.copy2(jscpd_source, destinations[0] / platform / jscpd_name)
+
         archive_path = release_dir / f"ModuleLoom-CLI-{platform}.zip"
         info = ZipInfo(filename)
         info.create_system = 3
@@ -44,6 +54,10 @@ def stage(artifact_root: Path, project_root: Path) -> None:
         with ZipFile(archive_path, "w") as archive:
             archive.writestr(info, binary)
         print(f"Staged {platform}: {archive_path}")
+
+    license_target = destinations[0].parent / "licenses/jscpd/LICENSE"
+    license_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(JSCPD_LICENSE, license_target)
 
 
 if __name__ == "__main__":

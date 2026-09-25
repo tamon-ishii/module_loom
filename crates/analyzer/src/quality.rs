@@ -1,4 +1,4 @@
-use crate::model::{DuplicateBlock, LiteralFinding, ModuleInfo};
+use crate::model::{Diagnostic, DiagnosticSeverity, DuplicateBlock, LiteralFinding, ModuleInfo};
 use rustpython_ast::{self as ast, Visitor};
 use rustpython_parser::{source_code::LineIndex, Parse};
 use serde::Deserialize;
@@ -41,15 +41,17 @@ pub struct QualityData {
     pub literals: Vec<LiteralFinding>,
     pub warnings: Vec<String>,
     pub magic_source: String,
+    pub type_diagnostics: Vec<(usize, Diagnostic)>,
 }
 
-pub fn collect(root: &Path, modules: &[ModuleInfo]) -> QualityData {
+pub fn collect(root: &Path, modules: &[ModuleInfo], jscpd_override: Option<&Path>) -> QualityData {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let mut warnings = Vec::new();
     let functions = run_lizard(&root, modules, &mut warnings);
-    let clones = run_jscpd(&root, modules, &mut warnings);
+    let clones = run_jscpd(&root, modules, jscpd_override, &mut warnings);
     let mut literals = repeated_literals(modules);
     let magic = run_ruff(&root, modules, &mut warnings);
+    let type_diagnostics = run_ty(&root, modules, &mut warnings);
     let magic_source = if magic.is_some() {
         "Ruff".to_string()
     } else {
@@ -64,10 +66,111 @@ pub fn collect(root: &Path, modules: &[ModuleInfo]) -> QualityData {
         literals,
         warnings,
         magic_source,
+        type_diagnostics,
+    }
+}
+
+#[derive(Deserialize)]
+struct TyIssue {
+    description: String,
+    check_name: String,
+    severity: String,
+    location: TyLocation,
+}
+
+#[derive(Deserialize)]
+struct TyLocation {
+    path: String,
+    lines: Option<TyLines>,
+    positions: Option<TyPositions>,
+}
+
+#[derive(Deserialize)]
+struct TyLines {
+    begin: usize,
+}
+
+#[derive(Deserialize)]
+struct TyPositions {
+    begin: TyPosition,
+}
+
+#[derive(Deserialize)]
+struct TyPosition {
+    line: usize,
+}
+
+fn map_ty_report(
+    root: &Path,
+    modules: &[ModuleInfo],
+    bytes: &[u8],
+) -> Option<Vec<(usize, Diagnostic)>> {
+    let issues: Vec<TyIssue> = serde_json::from_slice(bytes).ok()?;
+    let indexes = module_paths(modules);
+    Some(
+        issues
+            .into_iter()
+            .filter_map(|issue| {
+                let index = module_index(root, &issue.location.path, &indexes)?;
+                let line = issue.location.lines.map(|lines| lines.begin).or_else(|| {
+                    issue
+                        .location
+                        .positions
+                        .map(|positions| positions.begin.line)
+                })?;
+                Some((
+                    index,
+                    Diagnostic {
+                        severity: match issue.severity.as_str() {
+                            "blocker" | "critical" | "major" => DiagnosticSeverity::Error,
+                            "info" => DiagnosticSeverity::Info,
+                            _ => DiagnosticSeverity::Warning,
+                        },
+                        message: issue.description,
+                        line: Some(line),
+                        rule: Some(format!("ty/{}", issue.check_name)),
+                    },
+                ))
+            })
+            .collect(),
+    )
+}
+
+fn run_ty(
+    root: &Path,
+    modules: &[ModuleInfo],
+    warnings: &mut Vec<String>,
+) -> Vec<(usize, Diagnostic)> {
+    let Some(executable) = executable(root, "ty") else {
+        warnings.push("ty was not found; type checking was skipped".into());
+        return Vec::new();
+    };
+    let mut command = Command::new(executable);
+    command
+        .current_dir(root)
+        .args(["check", "--output-format", "gitlab", "--no-progress"])
+        .arg(root);
+    let Some(bytes) = run_command(command, None, &[0, 1]) else {
+        warnings.push("ty type checking did not complete".into());
+        return Vec::new();
+    };
+    match map_ty_report(root, modules, &bytes) {
+        Some(diagnostics) => diagnostics,
+        None => {
+            warnings.push("ty GitLab report could not be read".into());
+            Vec::new()
+        }
     }
 }
 
 fn executable(root: &Path, name: &str) -> Option<PathBuf> {
+    if name == "jscpd" {
+        if let Some(path) = std::env::var_os("MODULELOOM_JSCPD_PATH").map(PathBuf::from) {
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
     let names = if cfg!(windows) {
         vec![
             format!("{name}.exe"),
@@ -233,6 +336,8 @@ struct JscpdPosition {
 #[derive(Deserialize)]
 struct JscpdDuplicate {
     lines: usize,
+    #[serde(default)]
+    kind: String,
     #[serde(rename = "firstFile")]
     first: JscpdPosition,
     #[serde(rename = "secondFile")]
@@ -246,12 +351,26 @@ struct JscpdReport {
 fn run_jscpd(
     root: &Path,
     modules: &[ModuleInfo],
+    jscpd_override: Option<&Path>,
     warnings: &mut Vec<String>,
 ) -> Option<CloneReport> {
-    let Some(executable) = executable(root, "jscpd") else {
+    let Some(executable) = jscpd_override
+        .filter(|path| path.is_file())
+        .map(Path::to_path_buf)
+        .or_else(|| executable(root, "jscpd"))
+    else {
         warnings.push("jscpd was not found; built-in duplicate detection was used".into());
         return None;
     };
+    let mut version_command = Command::new(&executable);
+    version_command.arg("--version");
+    let version = run_command(version_command, None, &[0])
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_default();
+    if !version.trim().starts_with("jscpd 5.") {
+        warnings.push("jscpd v5 was not available; built-in duplicate detection was used".into());
+        return None;
+    }
     let output_dir = tempfile::tempdir().ok()?;
     let mut command = Command::new(executable);
     command
@@ -265,6 +384,7 @@ fn run_jscpd(
             "6",
             "--min-tokens",
             "30",
+            "--ignore-identifiers",
             "--silent",
             "--absolute",
         ])
@@ -287,9 +407,19 @@ fn run_jscpd(
 
 fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) -> CloneReport {
     let indexes = module_paths(modules);
+    let physical_lines: Vec<usize> = modules
+        .iter()
+        .map(|module| {
+            fs::read_to_string(&module.absolute_path)
+                .map(|source| source.lines().count())
+                .unwrap_or(0)
+        })
+        .collect();
     let mut duplicated = vec![HashSet::new(); modules.len()];
     let mut blocks = Vec::new();
-    for item in report.duplicates {
+    let mut duplicates = report.duplicates;
+    duplicates.sort_by(|a, b| b.lines.cmp(&a.lines));
+    for item in duplicates {
         let (Some(first), Some(second)) = (
             module_index(root, &item.first.name, &indexes),
             module_index(root, &item.second.name, &indexes),
@@ -299,8 +429,15 @@ fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) ->
         if item.lines == 0 || item.first.start == 0 || item.second.start == 0 {
             continue;
         }
+        if first == second && item.first.start.abs_diff(item.second.start) < item.lines {
+            continue;
+        }
         for (index, start) in [(first, item.first.start), (second, item.second.start)] {
-            for line in start..start.saturating_add(item.lines).min(modules[index].loc + 1) {
+            for line in start
+                ..start
+                    .saturating_add(item.lines)
+                    .min(physical_lines[index] + 1)
+            {
                 duplicated[index].insert(line);
             }
         }
@@ -311,6 +448,12 @@ fn map_jscpd_report(root: &Path, modules: &[ModuleInfo], report: JscpdReport) ->
                 second_module: modules[second].id.clone(),
                 second_line: item.second.start,
                 lines: item.lines,
+                kind: if item.kind == "renamed" {
+                    "renamed"
+                } else {
+                    "exact"
+                }
+                .into(),
             });
         }
     }
@@ -454,6 +597,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn maps_ty_diagnostics_to_analyzed_files() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(
+            root.path().join("example.py"),
+            "def answer() -> int:\n    return 'wrong'\n",
+        )
+        .unwrap();
+        let modules = crate::analyze_directory(root.path()).unwrap().modules;
+        let report = br#"[{"description":"Return type mismatch","check_name":"invalid-return-type","severity":"major","location":{"path":"example.py","positions":{"begin":{"line":2,"column":5}}}},{"description":"Outside project","check_name":"invalid-return-type","severity":"major","location":{"path":"outside.py","lines":{"begin":1}}}]"#;
+        let diagnostics = map_ty_report(root.path(), &modules, report).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].0, 0);
+        assert_eq!(diagnostics[0].1.line, Some(2));
+        assert_eq!(
+            diagnostics[0].1.rule.as_deref(),
+            Some("ty/invalid-return-type")
+        );
+        assert_eq!(diagnostics[0].1.severity, DiagnosticSeverity::Error);
+    }
+
+    #[test]
     fn repeated_numbers_skip_common_constants() {
         let root = tempfile::tempdir().unwrap();
         fs::write(
@@ -479,8 +643,14 @@ mod tests {
         let report: JscpdReport = serde_json::from_value(serde_json::json!({
             "duplicates": [{
                 "lines": 6,
+                "kind": "renamed",
                 "firstFile": {"name": "a.py", "start": 2, "end": 7},
                 "secondFile": {"name": "b.py", "start": 2, "end": 7}
+            }, {
+                "lines": 6,
+                "kind": "renamed",
+                "firstFile": {"name": "a.py", "start": 1, "end": 6},
+                "secondFile": {"name": "a.py", "start": 2, "end": 7}
             }]
         }))
         .unwrap();
@@ -488,6 +658,7 @@ mod tests {
         assert_eq!(mapped.blocks.len(), 1);
         assert_eq!(mapped.blocks[0].first_module, "a");
         assert_eq!(mapped.blocks[0].second_module, "b");
+        assert_eq!(mapped.blocks[0].kind, "renamed");
         assert_eq!(
             mapped.duplicated.iter().map(HashSet::len).sum::<usize>(),
             12

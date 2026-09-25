@@ -778,7 +778,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         return "ruff";
     }
     private static String runProcess(Path cwd, List<String> command, String stdin, boolean allowDiffExit) throws Exception {
-        Process process = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(false).start();
+        ProcessBuilder builder = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(false);
+        String bundledJscpd = findBundledJscpd();
+        if (bundledJscpd != null) builder.environment().put("MODULELOOM_JSCPD_PATH", bundledJscpd);
+        Process process = builder.start();
         if (stdin != null) process.getOutputStream().write(stdin.getBytes(StandardCharsets.UTF_8));
         process.getOutputStream().close();
         String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -1054,42 +1057,57 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
     }
 
     private static String findAnalyzerBinary(Project project) {
-        String osName = System.getProperty("os.name", "").toLowerCase();
-        String architecture = System.getProperty("os.arch", "").toLowerCase();
-        boolean arm64 = architecture.equals("aarch64") || architecture.equals("arm64");
-        String platform = null;
-        if (osName.contains("win") && !arm64) platform = "windows-x64";
-        else if (osName.contains("linux") && !arm64) platform = "linux-x64";
-        else if (osName.contains("mac")) platform = arm64 ? "macos-arm64" : "macos-x64";
-
+        String platform = currentPlatform();
+        String filename = System.getProperty("os.name", "").toLowerCase().contains("win") ? "analyze.exe" : "analyze";
         if (platform != null) {
-            String filename = osName.contains("win") ? "analyze.exe" : "analyze";
-            String resource = "/bin/" + platform + "/" + filename;
-            try (InputStream input = ModuleLoomToolWindowFactory.class.getResourceAsStream(resource)) {
-                if (input != null) {
-                    byte[] data = input.readAllBytes();
-                    byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
-                    String hash = HexFormat.of().formatHex(digest, 0, 8);
-                    Path target = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "bin", platform, hash, filename);
-                    Files.createDirectories(target.getParent());
-                    if (!Files.exists(target)) Files.write(target, data);
-                    if (!osName.contains("win")) target.toFile().setExecutable(true, false);
-                    return target.toString();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            String bundled = extractBundledExecutable(platform, filename);
+            if (bundled != null) return bundled;
         }
 
         String projectBase = project.getBasePath();
         if (projectBase != null) {
             // Prefer the debug build while developing the plugin; it tracks the current source.
-            Path debugPath = Path.of(projectBase, "target", "debug", osName.contains("win") ? "analyze.exe" : "analyze");
+            Path debugPath = Path.of(projectBase, "target", "debug", filename);
             if (Files.isRegularFile(debugPath)) return debugPath.toString();
-            Path releasePath = Path.of(projectBase, "target", "release", osName.contains("win") ? "analyze.exe" : "analyze");
+            Path releasePath = Path.of(projectBase, "target", "release", filename);
             if (Files.isRegularFile(releasePath)) return releasePath.toString();
         }
         return "analyze";
+    }
+
+    private static String findBundledJscpd() {
+        String platform = currentPlatform();
+        if (platform == null) return null;
+        String filename = platform.startsWith("windows") ? "jscpd.exe" : "jscpd";
+        return extractBundledExecutable(platform, filename);
+    }
+
+    private static String currentPlatform() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        String architecture = System.getProperty("os.arch", "").toLowerCase();
+        boolean arm64 = architecture.equals("aarch64") || architecture.equals("arm64");
+        if (osName.contains("win") && !arm64) return "windows-x64";
+        if (osName.contains("linux") && !arm64) return "linux-x64";
+        if (osName.contains("mac")) return arm64 ? "macos-arm64" : "macos-x64";
+        return null;
+    }
+
+    private static String extractBundledExecutable(String platform, String filename) {
+        String resource = "/bin/" + platform + "/" + filename;
+        try (InputStream input = ModuleLoomToolWindowFactory.class.getResourceAsStream(resource)) {
+            if (input == null) return null;
+            byte[] data = input.readAllBytes();
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
+            String hash = HexFormat.of().formatHex(digest, 0, 8);
+            Path target = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "bin", platform, hash, filename);
+            Files.createDirectories(target.getParent());
+            if (!Files.exists(target)) Files.write(target, data);
+            if (!platform.startsWith("windows")) target.toFile().setExecutable(true, false);
+            return target.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     private Path prepareWebAssets(String initialProjectPath, JBCefJSQuery jsQuery) {

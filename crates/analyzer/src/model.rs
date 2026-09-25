@@ -300,6 +300,8 @@ pub struct DuplicateBlock {
     pub second_module: String,
     pub second_line: usize,
     pub lines: usize,
+    #[serde(default)]
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

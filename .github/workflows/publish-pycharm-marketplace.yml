@@ -79,7 +79,7 @@ jobs:
         run: python scripts/stage_analyzers.py analyzer-artifacts
       - name: Download PyCharm build SDK
         run: |
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2025.3.1.tar.gz
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/pycharm.tar.gz" https://download.jetbrains.com/python/pycharm-2026.2.3.tar.gz
           mkdir -p "$RUNNER_TEMP/pycharm"
           tar -xzf "$RUNNER_TEMP/pycharm.tar.gz" -C "$RUNNER_TEMP/pycharm" --strip-components=1
       - name: Set plugin version

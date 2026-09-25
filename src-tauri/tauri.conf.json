@@ -24,6 +24,10 @@
   },
   "bundle": {
     "active": true,
+    "resources": {
+      "binaries/jscpd*": "binaries/",
+      "../third_party/jscpd/LICENSE": "licenses/jscpd/LICENSE"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

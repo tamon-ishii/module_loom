@@ -7,11 +7,19 @@ use moduleloom_analyzer::model::AnalysisResult;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager, State};
 
 struct WatchState {
     watcher: Mutex<Option<RecommendedWatcher>>,
     cached_result: Mutex<Option<AnalysisResult>>,
+}
+
+#[tauri::command]
+fn initial_project_path() -> Option<String> {
+    std::env::var_os("MODULELOOM_INITIAL_PROJECT_PATH")
+        .map(PathBuf::from)
+        .filter(|path| path.is_dir())
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -62,6 +70,7 @@ fn analyze_project(
     path: String,
     changed_files: Option<Vec<PathBuf>>,
     quality: Option<bool>,
+    app: AppHandle,
     state: State<'_, WatchState>,
 ) -> Result<AnalysisResult, String> {
     let p = PathBuf::from(path);
@@ -80,7 +89,13 @@ fn analyze_project(
         _ => moduleloom_analyzer::analyze_directory(&p)?,
     };
     if quality.unwrap_or(false) {
-        moduleloom_analyzer::enrich_quality(&mut result);
+        let filename = if cfg!(windows) { "jscpd.exe" } else { "jscpd" };
+        let bundled = app.path().resolve(format!("binaries/{filename}"), BaseDirectory::Resource);
+        if let Some(path) = bundled.ok().filter(|path| path.is_file()) {
+            moduleloom_analyzer::enrich_quality_with_jscpd(&mut result, &path);
+        } else {
+            moduleloom_analyzer::enrich_quality(&mut result);
+        }
     }
     *cached = Some(result.clone());
     Ok(result)
@@ -268,7 +283,7 @@ fn detect_editors() -> Vec<String> {
 
 #[tauri::command]
 fn open_in_editor(editor: String, file_path: String, line: Option<usize>) -> Result<(), String> {
-    let line_num = line.unwrap_or(1);
+    let line_num = line.unwrap_or(1).max(1);
     match editor.as_str() {
         "vscode" => {
             let url = format!("vscode://file/{}:{}", file_path, line_num);
@@ -280,32 +295,44 @@ fn open_in_editor(editor: String, file_path: String, line: Option<usize>) -> Res
             }
         }
         "pycharm" => {
-            let url = format!(
-                "jetbrains://pycharm/navigate/reference?path={}:{}",
-                file_path, line_num
-            );
-            if open::that(&url).is_err() {
-                // Try pycharm CLI commands in order
-                let commands = ["pycharm", "pycharm-community", "pycharm.sh"];
-                let mut launched = false;
-                for cmd in commands {
-                    if let Ok(_) = std::process::Command::new(cmd)
-                        .arg("--line")
-                        .arg(line_num.to_string())
-                        .arg(&file_path)
-                        .spawn()
-                    {
-                        launched = true;
-                        break;
+            let file = std::fs::canonicalize(&file_path)
+                .map_err(|error| format!("ファイルを開けません: {file_path}: {error}"))?;
+            let mut commands: Vec<PathBuf> = [
+                "pycharm",
+                "pycharm.sh",
+                "pycharm-community",
+                "pycharm64.exe",
+            ]
+            .into_iter()
+            .map(PathBuf::from)
+            .collect();
+            if let Some(home) = std::env::var_os("HOME") {
+                commands.push(
+                    PathBuf::from(home).join(".local/share/JetBrains/Toolbox/scripts/pycharm"),
+                );
+            }
+            let mut launch_error = None;
+            for command in commands {
+                match std::process::Command::new(&command)
+                    .arg("--line")
+                    .arg(line_num.to_string())
+                    .arg(&file)
+                    .spawn()
+                {
+                    Ok(mut child) => {
+                        std::thread::spawn(move || {
+                            let _ = child.wait();
+                        });
+                        return Ok(());
                     }
-                }
-                if !launched {
-                    eprintln!(
-                        "Warning: Could not launch PyCharm CLI automatically. URL: {}",
-                        url
-                    );
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => launch_error = Some(error),
                 }
             }
+            if let Some(error) = launch_error {
+                return Err(format!("PyCharm を起動できません: {error}"));
+            }
+            return Err("PyCharm のコマンドライン起動スクリプトが見つかりません。Toolbox でシェルスクリプトを有効にしてください".into());
         }
         _ => return Err(format!("Unsupported editor: {}", editor)),
     }
@@ -320,6 +347,7 @@ fn main() {
         })
         .manage(ruff_fix::FixState::default())
         .invoke_handler(tauri::generate_handler![
+            initial_project_path,
             analyze_project,
             generate_mkdocs,
             list_fix_tools,
