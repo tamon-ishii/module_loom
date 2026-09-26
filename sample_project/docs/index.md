@@ -18,5 +18,6 @@ ModuleLoom は、Python プロジェクトのモジュール依存関係の可�
 - **はじめに・ツールウィンドウの起動**: [ツールウィンドウの開き方](open-tool-window.md)
 - **モジュールの可視化と依存関係の確認**: [モジュール依存図の確認](dependency-graph.md)
 - **プロジェクトの品質向上**: [コード診断の実行と改善](diagnostics.md)
-- **CLI と MkDocs の連携**: [ドキュメント生成とプレビュー](documentation-preview.md)
+- **生きたドキュメントと自動同期エンジン**: [ドキュメント生成とプレビュー](documentation-preview.md)（UI Map、Manual Dependency Graph、⚡ 影響分析、アノテーション撮影）
+- **API ドキュメント**: [API カタログ](api.md)
 <!-- /ai:draft -->

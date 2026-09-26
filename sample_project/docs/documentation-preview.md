@@ -22,6 +22,7 @@ ModuleLoom の「ドキュメント生成」は、手書きマニュアル内の
 | **📸 全スクショ一括撮影** | 全タブ（モジュール一覧・コード診断・マニュアル等）を自動巡回し、原稿内の全スクリーンショットを最新の実画面から一括再撮影・差し替えます。 |
 | **📊 全ダイアグラム更新** | プロジェクトの最新 Python コード構造（AST）を解析し、原稿内の Mermaid モジュール依存図を一括自動再生成します。 |
 | **📖 APIドキュメント生成** | 全 Python モジュールの Docstring・クラス・関数・型ヒントから、`docs/modules/*.md` および `docs/api.md` を一瞬で自動生成します。 |
+| **⚡ 影響分析** | Git 差分（コミット間または作業ツリー）を解析し、コードや UI の改修によって更新が必要になったマニュアルページやタスクを即座に検出・警告します。 |
 | **⚙️ 設定** | HTML出力先（`manual/`）、Markdown原稿元（`docs/`）、AI CLI、MkDocsテーマなどを設定するポップアップを開きます。 |
 | **下書きビルド** | 未撮影・未生成の箇所をプレースホルダーとして残したまま、最新の原稿から MkDocs 下書きサイトを高速ビルドします。 |
 | **🚀 完成版ビルド** | アセットが揃っていることを検証し、公開・配布用の完全な静的 Web サイト（`manual/`）を出力します。 |
@@ -201,4 +202,130 @@ UI デザインの変更や機能追加が行われた場合：
 * **完成版ビルド（厳格ビルド）**:
   * 原稿内のすべての `ai:task` に対応する実アセット（画像ファイル、Mermaid 図、文章）が揃っていることが必須です。
   * 未解決のタスクや、指示文が変更されて stale 状態のブロックが 1 つでも残っている場合はビルドが中断され、問題箇所がエラーとして報告されます。
+
+---
+
+## 6. アプリケーション理解に基づくマニュアル構成の自動起草 (`draft`)
+
+ModuleLoom は、単なる文章の穴埋めにとどまらず、**コードベース・UI構造・プロジェクト仕様をAIが深く理解した上で、マニュアル全体の章立てと構成案をゼロから自動起草**します。
+
+```text
+ソースコード (AST 解析)
++ README.md (概要・仕様)
++ UI 構造 (HTML / DOM / TS)
++ プロジェクト設定 (pyproject.toml)
+        ↓
+    ModuleLoom (コンテキスト統合エンジン)
+        ↓
+AI 自動起草 (章構成 + 実在UI/コードに紐づく ai:task の配置)
+        ↓
+1. はじめに (概要・インストール)
+2. ツールウィンドウの起動 (UIセレクタ連動スクショ)
+3. 依存関係の可視化 (Mermaid図自動同期)
+4. コード診断と品質改善
+5. 設定とカスタマイズ
+```
+
+### 動作の仕組み
+1. **多面的コンテキスト収集 (`context.rs`)**:
+   - プロジェクトの AST 解析からモジュール数、循環インポート数、主要クラス・関数を抽出。
+   - `README.md` や `pyproject.toml` からプロジェクト概要・バージョン・目的を把握。
+   - 後述の **UI Map** からアプリに実在する全画面・全操作要素を収集。
+2. **AI による構造化目次 & `ai:task` の最適配置**:
+   - 架空の UI や機能を捏造（幻覚）することなく、実在する画面やボタン名・クラス名に基づいた章立てを作成。
+   - 「どこにスクリーンショットが必要か」「どこに Mermaid 依存図を配置すべきか」を AI 自らが判断し、適切な `ai:task` タグを Markdown 内に自動埋め込み。
+3. **自動下書きビルド & 依存関係の初期化**:
+   - 起草完了と同時に、下書き HTML プレビューを自動ビルドし、後述の `manual_deps.json` を生成します。
+
+---
+
+## 7. UI Map 自動探索機能 (`ui-map`)
+
+人間が画面構成を一から指示しなくても、ModuleLoom がアプリケーションの UI 定義（HTML、DOM、TypeScript/JavaScript コード）を巡回・探索し、**アプリに何が存在するかを示す「UI Map」を自動生成**します。
+
+```text
+アプリケーション (HTML / DOM / TS)
+        ↓
+    UI Map 抽出エンジン
+        ↓
+MainWindow (メイン画面)
+├─ #btn-analyze (解析実行ボタン)
+├─ #btn-quality (コード診断ボタン)
+└─ #btn-manual (ドキュメント生成タブ)
+    ├─ #btn-manual-capture-all (全スクショ一括撮影)
+    ├─ #btn-manual-diagram-all (全ダイアグラム更新)
+    ├─ #btn-manual-generate-api (APIドキュメント生成)
+    └─ #btn-manual-impact (⚡ 影響分析)
+```
+
+### UI Map の特徴とメリット
+* **セレクタ (`#id`) とラベルの完全対応**:
+  - ボタンの ID、クラス、テキストラベル、ツールチップ（`title` 属性）、モーダルダイアログを自動インデックス化。
+  - 出力結果は `manual/ui_map.json` に保存され、いつでも参照・カスタマイズ可能です。
+* **正確なアノテーション指示の自動化**:
+  - AI がマニュアルを書く際、この UI Map を参照するため、実在するセレクタ（例: `#btn-manual-impact`）を指定した高精度な赤枠・赤丸撮影タスクが自動構成されます。
+
+---
+
+## 8. Manual Dependency Graph（マニュアルとコードの依存関係DB）
+
+ModuleLoom の最大の特徴は、**「コードや UI と、ドキュメントの各ページ・タスクの間の依存関係」をグラフとして保持・追跡**する点にあります。
+
+```text
+docs/documentation-preview.md
+  │
+  ├── Python シンボル: analyzer::manual::deps
+  ├── UI 要素: #btn-manual-impact (影響分析ボタン)
+  ├── UI 要素: #manual-impact-banner (影響警告バナー)
+  ├── UI 要素: #btn-manual-capture-all (全スクショ撮影ボタン)
+  └── 画像アセット: assets/manual-tab-screenshot.png
+```
+
+### 依存関係追跡の仕組み
+* 原稿 Markdown（`docs/*.md`）内のコード記法（`` `module.name` ``）や UI セレクタ（`#btn-id`）、`ai:task` の指示文を自動走査。
+* AST 解析から得られた Python モジュール・クラス・関数名、および UI Map のセレクタと突合し、双方向インデックス（`symbol_to_pages`, `ui_to_pages`, `task_dependencies`）を構築します。
+* グラフ情報は `manual/manual_deps.json` に永続化され、CI やツールウィンドウからいつでも高速に参照できます。
+
+---
+
+## 9. Git 差分によるマニュアル影響分析 (`⚡ 影響分析`)
+
+コードを修正したり UI を改修した際、**「どのマニュアルページが古くなったか」「どこを書き直すべきか」を人間が探す必要はありません。**
+
+ModuleLoom の **「⚡ 影響分析」** は、Git のコミット差分（`git diff`）または現在の作業ツリー（`git status`）を解析し、Manual Dependency Graph と照合して影響を受けるドキュメントを即座に割り出します。
+
+```text
+git diff / 作業ツリー変更
+   (例: src/main.ts, crates/analyzer/src/manual/deps.rs)
+        ↓
+変更されたシンボル & UI 要素の特定
+   (例: #btn-manual-impact, analyzer::manual::deps)
+        ↓
+Manual Dependency Graph (manual_deps.json) と照合
+        ↓
+影響を受けるマニュアルページと更新理由を即時レポート
+   ⚠ documentation-preview.md (UI要素 #btn-manual-impact が更新されました)
+```
+
+### UI での利用手順
+1. マニュアル画面上部のツールバーにある **「⚡ 影響分析」** ボタンをクリックします。
+2. 変更による影響が検知されると、エディタ上部にオレンジ色の **影響警告バナー**（`#manual-impact-banner`）が表示されます。
+   > ⚡ コード/UIの変更により 2 件のページ（documentation-preview.md, diagnostics.md）が影響を受けています
+3. バナー内の **「詳細」** ボタンを押すとモーダルが開き、変更されたファイル一覧、影響を受けたマニュアルページ、および**具体的な変更理由**（どの要素やシンボルが変更されたか）を一覧確認できます。
+4. 影響のあるタスクだけを対象に、ワンクリックで最新スクリーンショットの再撮影やダイアグラムの更新を実行できます。
+
+---
+
+## 10. CLI による自動化と CI/CD 連携
+
+GUI だけでなく、CLI からもすべてのマニュアル・ドキュメント操作を実行可能です。CI/CD パイプラインに組み込むことで、マニュアルが常に最新のコードと同期していることを自動保証できます。
+
+| CLI コマンド | 説明と用途 |
+| :--- | :--- |
+| `moduleloom-analyze --manual ui-map --root .` | UI Map を探索・抽出し、`manual/ui_map.json` に出力します。 |
+| `moduleloom-analyze --manual context --root .` | アプリケーションの AST メトリクス、README、UI Map を統合したコンテキスト情報を JSON 出力します。 |
+| `moduleloom-analyze --manual deps --root .` | 全マニュアルページとコード・UI 要素の依存関係グラフを構築し、`manual/manual_deps.json` に保存します。 |
+| `moduleloom-analyze --manual impact --root .` | 直近の Git 変更（作業ツリー差分）から影響を受けるマニュアルページを解析し、レポートを出力します。 |
+| `moduleloom-analyze --manual impact --ref HEAD~1 --root .` | 特定のコミット（例: 1 つ前のコミット）と比較して影響分析を実行します。 |
+| `moduleloom-analyze --manual build --root .` | 全タスクの充足を検証し、完成版 HTML サイトを `manual/` に出力します（未完了があれば exit code 1）。 |
 <!-- /ai:draft -->
