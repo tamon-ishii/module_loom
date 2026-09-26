@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="documentation-preview.html">
+        <link rel="prev" href="dependency-graph.html">
       
       
-        <link rel="next" href="modules/0000.html">
+        <link rel="next" href="documentation-preview.html">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>ModuleLoom マニュアル</title>
+        <title>diagnostics - ModuleLoom マニュアル</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#moduleloom-for-pycharm" class="md-skip">
+        <a href="#_1" class="md-skip">
           コンテンツにスキップ
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              index
+              diagnostics
             
           </span>
         </div>
@@ -247,10 +247,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="diagnostics.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    diagnostics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="diagnostics.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -266,6 +293,104 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コード診断の実行
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コーディングエージェントとの連携
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="コーディングエージェントとの連携">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. ボタンの概要と動作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 対象コーディングエージェントの検出仕様
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 追加されるスキルと仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 追加されるスキルと仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skillmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スキル（SKILL.md）の具体的な内容・機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -301,37 +426,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    index
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -347,48 +445,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="目次">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      目次
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        概要
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ドキュメント構成
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -960,10 +1016,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        概要
+        コード診断の実行
       
     </span>
   </a>
@@ -971,13 +1027,69 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
+  <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ドキュメント構成
+        コーディングエージェントとの連携
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="コーディングエージェントとの連携">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. ボタンの概要と動作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 対象コーディングエージェントの検出仕様
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 追加されるスキルと仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 追加されるスキルと仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skillmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スキル（SKILL.md）の具体的な内容・機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -999,22 +1111,85 @@
 
 
 <!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
-<h1 id="moduleloom-for-pycharm">ModuleLoom for PyCharm 利用ガイド</h1>
-<p>最終ビルド: 2026-09-26T16:45:31Z</p>
-<p>ModuleLoom は、Python プロジェクトのモジュール依存関係の可視化、循環インポートの検知、およびコード診断（肥大化・重複検出など）を支援する PyCharm プラグインおよび解析ツールです。</p>
-<h2 id="_1">概要</h2>
-<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-26T15:49:10Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
-<p><img alt="overview-screenshot" src="assets/overview-screenshot.png" /></p>
+<h1 id="_1">コード診断を実行する</h1>
+<p>ModuleLoom の「コード診断」タブでは、プロジェクト全体の複雑度、モジュール肥大化、重複コード等の品質メトリクスを測定・確認できます。</p>
+<h2 id="_2">コード診断の実行</h2>
+<ol>
+<li>上部のタブバーから「コード診断」を選択します。</li>
+<li>「診断実行」ボタンをクリックします。</li>
+<li>プロジェクト全体のスコアおよび検出された問題（肥大化モジュール、重複箇所、循環インポート等）が一覧表示されます。</li>
+</ol>
+<!-- ai:generated id=diagnostics-screenshot kind=screenshot created-at=2026-09-26T12:44:43Z source-sha256=49d7cddec740b5965cbb752f9be57d8b4cba6104e6d0dac1d3e1deef5c98ea3a approved-at=2026-09-26T12:44:56Z -->
+<p><img alt="diagnostics-screenshot" src="assets/diagnostics-screenshot.png" /></p>
 <!-- /ai:generated -->
 
-<p>本ガイドでは、PyCharm 上でのツールの開き方、モジュール依存図やコード診断の活用法、および MkDocs によるドキュメント連携について説明します。</p>
-<h2 id="_2">ドキュメント構成</h2>
+<h2 id="_3">コーディングエージェントとの連携</h2>
+<!-- ai:generated id=diagnostics-skill-install kind=text created-at=2026-09-26T11:28:23Z source-sha256=0aed97d3a92b30756bb3e765ec2533a979b5d9aa052c50effad8f76b5ba17c4b approved-at=2026-09-26T11:39:58Z -->
+<p>「コード診断」画面の「コード診断スキルをインストール」ボタンについて、実装に基づき説明します。</p>
+<hr />
+<h3 id="1">1. ボタンの概要と動作</h3>
 <ul>
-<li><strong>はじめに・ツールウィンドウの起動</strong>: <a href="open-tool-window.html">ツールウィンドウの開き方</a></li>
-<li><strong>モジュールの可視化と依存関係の確認</strong>: <a href="dependency-graph.html">モジュール依存図の確認</a></li>
-<li><strong>プロジェクトの品質向上</strong>: <a href="diagnostics.html">コード診断の実行と改善</a></li>
-<li><strong>CLI と MkDocs の連携</strong>: <a href="documentation-preview.html">ドキュメント生成とプレビュー</a></li>
+<li><strong>UI 要素</strong>:</li>
+<li><strong>配置場所</strong>: 「コード診断」タブ（ヘッダー:「コード診断」）</li>
+<li><strong>ボタン表示名</strong>: 「コード診断スキルをインストール」（<code>title</code>: <code>検出したコーディングエージェントにコード診断スキルをインストール</code>）</li>
+<li><strong>隣接ボタン</strong>: 「診断実行」（<code>title</code>: <code>現在のコードを診断して結果を更新</code>）</li>
+<li><strong>実行時の挙動</strong>:</li>
+<li>ボタンをクリックすると一時的にボタンが無効化（<code>disabled</code>）され、ステータス欄に「コード診断スキルをインストール中...」が表示されます。</li>
+<li>バックエンド処理（Tauri コマンド <code>install_agent_skill</code> または CLI <code>analyze --install-skill</code>）を呼び出し、ローカル環境で検出されたコーディングエージェントの設定ディレクトリ配下へ専用のスキルファイルを自動配置します。</li>
+<li>完了後、エージェントごとの処理結果（インストール完了、既にインストール済み、保護などのメッセージ）が表示されます。※Web ブラウザ版では「スキルのインストールにはアプリ版が必要です」のエラーとなります。</li>
 </ul>
+<hr />
+<h3 id="2">2. 対象コーディングエージェントの検出仕様</h3>
+<p>ユーザーのホームディレクトリ（<code>HOME</code> または <code>USERPROFILE</code>）を基準に、以下の 3 種類のエージェントを検出します。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">エージェント名</th>
+<th style="text-align: left;">ルートディレクトリ</th>
+<th style="text-align: left;">検出条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Codex</strong></td>
+<td style="text-align: left;">環境変数 <code>CODEX_HOME</code>（未設定時は <code>~/.codex</code>）</td>
+<td style="text-align: left;"><code>CODEX_HOME</code> が指定されている、ルートディレクトリが存在する、または PATH 上に <code>codex</code> コマンドが存在する</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Claude Code</strong></td>
+<td style="text-align: left;"><code>~/.claude</code></td>
+<td style="text-align: left;"><code>~/.claude</code> ディレクトリが存在する、または PATH 上に <code>claude</code> コマンドが存在する</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Cursor</strong></td>
+<td style="text-align: left;"><code>~/.cursor</code></td>
+<td style="text-align: left;"><code>~/.cursor</code> ディレクトリが存在する、または PATH 上に <code>cursor</code> コマンドが存在する</td>
+</tr>
+</tbody>
+</table>
+<p>※いずれのエージェントも検出されなかった場合は「Codex、Claude Code、Cursor が見つかりませんでした」というエラーが返されます。</p>
+<hr />
+<h3 id="3">3. 追加されるスキルと仕様</h3>
+<ul>
+<li><strong>スキル名</strong>: <code>moduleloom-diagnostics</code></li>
+<li><strong>配置先パス</strong>: <code>&lt;各エージェントのルートディレクトリ&gt;/skills/moduleloom-diagnostics/SKILL.md</code></li>
+<li><strong>既存ファイルの保護（安全性）</strong>:</li>
+<li>既に同パスに同一内容のファイルが存在する場合は、新規書き込みを行わず「既にインストール済み」として報告されます。</li>
+<li>内容が異なる同名ファイルが存在する場合は上書きせず、「既存のスキルを保護しました」として既存の内容を保持します。</li>
+</ul>
+<h4 id="skillmd">スキル（SKILL.md）の具体的な内容・機能</h4>
+<p>エージェントに対して、ModuleLoom のコード診断 CLI（<code>analyze</code> / <code>moduleloom-analyze</code>）を利用した Python コードの修正と再検証手順を指示します。</p>
+<ol>
+<li><strong>CLI 診断の実行と証跡取得</strong>:</li>
+<li><code>analyze --diagnostics --findings-only .</code> や <code>--rule 'ty/*'</code> 等のオプションを用いて、構造化された JSON 形式でプロジェクトの診断結果（指摘事項 <code>findings</code>、警告 <code>quality_warnings</code>）を取得する手順。</li>
+<li><strong>指摘事項の精査</strong>:</li>
+<li>指摘の <code>rule</code>, <code>severity</code>, <code>location</code>, <code>message</code>, <code>evidence</code>, <code>verification.recheck_rule</code> を確認した上で該当コードを把握し、<code>info</code> レベルの指摘（型アノテーション欠落など）はレビューのヒントとして扱う方針。</li>
+<li><strong>コード修正と再検証（Edit and verify）</strong>:</li>
+<li>単に警告を隠すためのルール抑制や閾値変更を行わず、ソースコード側で根本原因を解消すること。</li>
+<li>変更後は同一の CLI ルールを再実行して問題解消を確認し、既存のテストスイートや <code>ty</code>（<code>uv run ty check</code>）による整合性確認を行うこと。</li>
+<li>完了報告時には、実行コマンド、残存件数、検証結果、JSON ファイルのパスを明示すること。</li>
+</ol>
+<!-- /ai:generated -->
 <!-- /ai:draft -->
 
 

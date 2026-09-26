@@ -1,0 +1,1692 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+        <link rel="next" href="dependency-graph.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>api - ModuleLoom マニュアル</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="index.html" title="ModuleLoom マニュアル" class="md-header__button md-logo" aria-label="ModuleLoom マニュアル" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ModuleLoom マニュアル
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              api
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="ModuleLoom マニュアル" class="md-nav__button md-logo" aria-label="ModuleLoom マニュアル" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ModuleLoom マニュアル
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    api
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="api.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    api
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.api
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommondatabase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.database
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommonlogger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.logger
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommonutils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.utils
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appordercontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.controller
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderexport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderpayment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.payment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderprocessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.processor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuseractivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.activity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserauth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserrouter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.router
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appusersession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール main
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="dependency-graph.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    dependency-graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="diagnostics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="documentation-preview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    documentation-preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0000.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0000
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0001.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0002.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0003.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0004.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0005.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0005
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0006.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0006
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0007.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0007
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0008.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0008
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0009.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0009
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0010.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0010
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0011.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0011
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0012.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0012
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0013.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0013
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0014.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0014
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0015.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0015
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0016.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0016
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0017.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0017
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0018.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0018
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="open-tool-window.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    open-tool-window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.api
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommondatabase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.database
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommonlogger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.logger
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appcommonutils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.common.utils
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appordercontroller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.controller
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderexport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderpayment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.payment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apporderprocessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.order.processor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuseractivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.activity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserauth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserrouter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.router
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appuserservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#appusersession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール app.user.session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール main
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<!-- Generated by ModuleLoom. Edits will be replaced. -->
+
+<h1 id="api">APIリファレンス</h1>
+<h2 id="app">モジュール <a href="modules/0000.html">app</a></h2>
+<p>説明なし</p>
+<h2 id="appapi">モジュール <a href="modules/0001.html">app.api</a></h2>
+<p>Main API router aggregating User and Order subsystems.</p>
+<ul>
+<li><strong>クラス</strong> <a href="modules/0001.html#api-class-8"><code>ApiServer</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0001.html#api-function-9"><code>ApiServer.__init__(self)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0001.html#api-function-12"><code>ApiServer.route_request(self, path: str, method: str, data: dict)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0001.html#api-function-21"><code>start_api_server()</code></a> — 説明なし</li>
+</ul>
+<h2 id="appcommon">モジュール <a href="modules/0002.html">app.common</a></h2>
+<p>説明なし</p>
+<h2 id="appcommondatabase">モジュール <a href="modules/0003.html">app.common.database</a></h2>
+<p>Database connection and session pooling module.</p>
+<ul>
+<li><strong>クラス</strong> <a href="modules/0003.html#api-class-7"><code>DatabaseConnection</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0003.html#api-function-8"><code>DatabaseConnection.__init__(self, uri: str = 'sqlite:///sample.db')</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0003.html#api-function-12"><code>DatabaseConnection.connect(self) -&gt; None</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0003.html#api-function-16"><code>DatabaseConnection.execute_query(self, query: str, params: dict = None) -&gt; list</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0003.html#api-function-22"><code>DatabaseConnection.close(self) -&gt; None</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0003.html#api-function-28"><code>get_db() -&gt; DatabaseConnection</code></a> — 説明なし</li>
+</ul>
+<h2 id="appcommonlogger">モジュール <a href="modules/0004.html">app.common.logger</a></h2>
+<p>Common logger module.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0004.html#api-function-4"><code>log_info(message: str) -&gt; None</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0004.html#api-function-8"><code>log_error(message: str) -&gt; None</code></a> — 説明なし</li>
+</ul>
+<h2 id="appcommonutils">モジュール <a href="modules/0005.html">app.common.utils</a></h2>
+<p>Common utility helpers.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0005.html#api-function-5"><code>generate_uuid() -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0005.html#api-function-8"><code>hash_password(plain_text: str) -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0005.html#api-function-11"><code>format_currency(amount: float) -&gt; str</code></a> — 説明なし</li>
+</ul>
+<h2 id="appconfig">モジュール <a href="modules/0006.html">app.config</a></h2>
+<p>Application configuration module.</p>
+<ul>
+<li><strong>クラス</strong> <a href="modules/0006.html#api-class-3"><code>Config</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0006.html#api-function-9"><code>get_config() -&gt; Config</code></a> — 説明なし</li>
+</ul>
+<h2 id="apporder">モジュール <a href="modules/0007.html">app.order</a></h2>
+<p>説明なし</p>
+<h2 id="appordercontroller">モジュール <a href="modules/0008.html">app.order.controller</a></h2>
+<p>Order controller HTTP endpoints.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0008.html#api-function-9"><code>handle_create_order(req)</code></a> — 説明なし</li>
+</ul>
+<h2 id="apporderexport">モジュール <a href="modules/0009.html">app.order.export</a></h2>
+<p>注文と返金のCSV出力例。短いコピペ箇所の検出に使う。</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0009.html#api-function-4"><code>export_orders(rows: list[dict]) -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0009.html#api-function-14"><code>export_refunds(rows: list[dict]) -&gt; str</code></a> — 説明なし</li>
+</ul>
+<h2 id="apporderpayment">モジュール <a href="modules/0010.html">app.order.payment</a></h2>
+<p>Payment processing gateway module.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0010.html#api-function-6"><code>process_payment_gateway(order_id: int, amount: float) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0010.html#api-function-13"><code>refund_payment(payment_id: int) -&gt; bool</code></a> — 説明なし</li>
+</ul>
+<h2 id="apporderprocessor">モジュール <a href="modules/0011.html">app.order.processor</a></h2>
+<p>Order processing engine.</p>
+<ul>
+<li><strong>クラス</strong> <a href="modules/0011.html#api-class-9"><code>OrderItem</code></a> — 説明なし</li>
+<li><strong>クラス</strong> <a href="modules/0011.html#api-class-19"><code>OrderProcessor</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-10"><code>OrderItem.__init__(self, item_id: int, name: str, unit_price: float, quantity: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-16"><code>OrderItem.subtotal(self) -&gt; float</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-20"><code>OrderProcessor.__init__(self)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-24"><code>OrderProcessor.calculate_tax(self, subtotal: float) -&gt; float</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-27"><code>OrderProcessor.calculate_discount(self, subtotal: float, coupon_code: str = None) -&gt; float</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-34"><code>OrderProcessor.calculate_shipping(self, subtotal: float, region: str = 'tokyo') -&gt; float</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-41"><code>OrderProcessor.validate_inventory(self, items: list) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-47"><code>OrderProcessor.create_order(self, customer_id: int, items: list, coupon: str = None) -&gt; dict</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-77"><code>update_order_status(order_id: int, new_status: str) -&gt; None</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-82"><code>audit_order_step_1(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-85"><code>audit_order_step_2(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-88"><code>audit_order_step_3(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-91"><code>audit_order_step_4(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-94"><code>audit_order_step_5(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-97"><code>audit_order_step_6(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-100"><code>audit_order_step_7(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-103"><code>audit_order_step_8(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-106"><code>audit_order_step_9(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-109"><code>audit_order_step_10(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-112"><code>audit_order_step_11(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-115"><code>audit_order_step_12(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-118"><code>audit_order_step_13(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-121"><code>audit_order_step_14(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-124"><code>audit_order_step_15(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-127"><code>audit_order_step_16(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-130"><code>audit_order_step_17(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-133"><code>audit_order_step_18(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-136"><code>audit_order_step_19(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-139"><code>audit_order_step_20(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-142"><code>audit_order_step_21(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-145"><code>audit_order_step_22(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-148"><code>audit_order_step_23(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-151"><code>audit_order_step_24(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-154"><code>audit_order_step_25(order_id: int)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-158"><code>check_item_batch_availability(batch_id: str, quantity: int) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-161"><code>lock_inventory_batch(batch_id: str, quantity: int) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-164"><code>release_inventory_batch(batch_id: str, quantity: int) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-167"><code>sync_warehouse_status(warehouse_id: str) -&gt; dict</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-170"><code>calculate_handling_fees(weight_kg: float) -&gt; float</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-173"><code>generate_packaging_slip(order_id: int) -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-176"><code>verify_postal_code(postal_code: str) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-179"><code>estimate_delivery_date(postal_code: str) -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-182"><code>notify_shipping_carrier(tracking_number: str) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-185"><code>notify_warehouse_dock(order_id: int) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-189"><code>rule_engine_evaluate_01()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-190"><code>rule_engine_evaluate_02()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-191"><code>rule_engine_evaluate_03()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-192"><code>rule_engine_evaluate_04()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-193"><code>rule_engine_evaluate_05()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-194"><code>rule_engine_evaluate_06()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-195"><code>rule_engine_evaluate_07()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-196"><code>rule_engine_evaluate_08()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-197"><code>rule_engine_evaluate_09()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-198"><code>rule_engine_evaluate_10()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-199"><code>rule_engine_evaluate_11()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-200"><code>rule_engine_evaluate_12()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-201"><code>rule_engine_evaluate_13()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-202"><code>rule_engine_evaluate_14()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-203"><code>rule_engine_evaluate_15()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-204"><code>rule_engine_evaluate_16()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-205"><code>rule_engine_evaluate_17()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-206"><code>rule_engine_evaluate_18()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-207"><code>rule_engine_evaluate_19()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-208"><code>rule_engine_evaluate_20()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-209"><code>rule_engine_evaluate_21()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-210"><code>rule_engine_evaluate_22()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-211"><code>rule_engine_evaluate_23()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-212"><code>rule_engine_evaluate_24()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-213"><code>rule_engine_evaluate_25()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-214"><code>rule_engine_evaluate_26()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-215"><code>rule_engine_evaluate_27()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-216"><code>rule_engine_evaluate_28()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-217"><code>rule_engine_evaluate_29()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-218"><code>rule_engine_evaluate_30()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-219"><code>rule_engine_evaluate_31()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-220"><code>rule_engine_evaluate_32()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-221"><code>rule_engine_evaluate_33()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-222"><code>rule_engine_evaluate_34()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-223"><code>rule_engine_evaluate_35()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-224"><code>rule_engine_evaluate_36()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-225"><code>rule_engine_evaluate_37()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-226"><code>rule_engine_evaluate_38()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-227"><code>rule_engine_evaluate_39()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-228"><code>rule_engine_evaluate_40()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-229"><code>rule_engine_evaluate_41()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-230"><code>rule_engine_evaluate_42()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-231"><code>rule_engine_evaluate_43()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-232"><code>rule_engine_evaluate_44()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-233"><code>rule_engine_evaluate_45()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-234"><code>rule_engine_evaluate_46()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-235"><code>rule_engine_evaluate_47()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-236"><code>rule_engine_evaluate_48()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-237"><code>rule_engine_evaluate_49()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-238"><code>rule_engine_evaluate_50()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-239"><code>rule_engine_evaluate_51()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-240"><code>rule_engine_evaluate_52()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-241"><code>rule_engine_evaluate_53()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-242"><code>rule_engine_evaluate_54()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-243"><code>rule_engine_evaluate_55()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-244"><code>rule_engine_evaluate_56()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-245"><code>rule_engine_evaluate_57()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-246"><code>rule_engine_evaluate_58()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-247"><code>rule_engine_evaluate_59()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-248"><code>rule_engine_evaluate_60()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-249"><code>rule_engine_evaluate_61()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-250"><code>rule_engine_evaluate_62()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-251"><code>rule_engine_evaluate_63()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-252"><code>rule_engine_evaluate_64()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-253"><code>rule_engine_evaluate_65()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-254"><code>rule_engine_evaluate_66()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-255"><code>rule_engine_evaluate_67()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-256"><code>rule_engine_evaluate_68()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-257"><code>rule_engine_evaluate_69()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-258"><code>rule_engine_evaluate_70()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-259"><code>rule_engine_evaluate_71()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-260"><code>rule_engine_evaluate_72()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-261"><code>rule_engine_evaluate_73()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-262"><code>rule_engine_evaluate_74()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-263"><code>rule_engine_evaluate_75()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-264"><code>rule_engine_evaluate_76()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-265"><code>rule_engine_evaluate_77()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-266"><code>rule_engine_evaluate_78()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-267"><code>rule_engine_evaluate_79()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-268"><code>rule_engine_evaluate_80()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-269"><code>rule_engine_evaluate_81()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-270"><code>rule_engine_evaluate_82()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-271"><code>rule_engine_evaluate_83()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-272"><code>rule_engine_evaluate_84()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-273"><code>rule_engine_evaluate_85()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-274"><code>rule_engine_evaluate_86()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-275"><code>rule_engine_evaluate_87()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-276"><code>rule_engine_evaluate_88()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-277"><code>rule_engine_evaluate_89()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-278"><code>rule_engine_evaluate_90()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-279"><code>rule_engine_evaluate_91()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-280"><code>rule_engine_evaluate_92()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-281"><code>rule_engine_evaluate_93()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-282"><code>rule_engine_evaluate_94()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-283"><code>rule_engine_evaluate_95()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-284"><code>rule_engine_evaluate_96()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-285"><code>rule_engine_evaluate_97()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-286"><code>rule_engine_evaluate_98()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-287"><code>rule_engine_evaluate_99()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-288"><code>rule_engine_evaluate_100()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-291"><code>compliance_check_gdpr()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-294"><code>compliance_check_pci_dss()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-297"><code>compliance_check_tax_report()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-300"><code>compliance_check_iso27001()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-303"><code>compliance_check_soc2()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-306"><code>compliance_check_local_regulations()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-309"><code>compliance_check_data_retention()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-312"><code>compliance_check_export_restrictions()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-315"><code>compliance_check_fraud_indicators()</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0011.html#api-function-318"><code>compliance_check_ip_blacklist()</code></a> — 説明なし</li>
+</ul>
+<h2 id="appuser">モジュール <a href="modules/0012.html">app.user</a></h2>
+<p>説明なし</p>
+<h2 id="appuseractivity">モジュール <a href="modules/0013.html">app.user.activity</a></h2>
+<p>利用履歴の集計例。共通関数化できる長い重複を含む。</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0013.html#api-function-4"><code>summarize_logins(events: list[dict]) -&gt; dict</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0013.html#api-function-23"><code>summarize_sessions(events: list[dict]) -&gt; dict</code></a> — 説明なし</li>
+</ul>
+<h2 id="appuserauth">モジュール <a href="modules/0014.html">app.user.auth</a></h2>
+<p>User authentication service.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0014.html#api-function-6"><code>authenticate_user(username: str, password_hash: str) -&gt; bool</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0014.html#api-function-14"><code>verify_auth_token(token: str) -&gt; bool</code></a> — 説明なし</li>
+</ul>
+<h2 id="appuserrouter">モジュール <a href="modules/0015.html">app.user.router</a></h2>
+<p>User HTTP routing endpoints.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0015.html#api-function-6"><code>handle_login(req)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0015.html#api-function-9"><code>handle_get_user(user_id: int)</code></a> — 説明なし</li>
+</ul>
+<h2 id="appuserservice">モジュール <a href="modules/0016.html">app.user.service</a></h2>
+<p>User domain service.</p>
+<ul>
+<li><strong>クラス</strong> <a href="modules/0016.html#api-class-9"><code>UserService</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0016.html#api-function-10"><code>UserService.__init__(self)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0016.html#api-function-13"><code>UserService.login(self, username: str, password_hash: str)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0016.html#api-function-18"><code>UserService.get_profile(self, user_id: int)</code></a> — 説明なし</li>
+</ul>
+<h2 id="appusersession">モジュール <a href="modules/0017.html">app.user.session</a></h2>
+<p>Session management module.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0017.html#api-function-11"><code>create_session(user_id: int) -&gt; str</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0017.html#api-function-18"><code>get_active_session(username: str)</code></a> — 説明なし</li>
+<li><strong>関数・メソッド</strong> <a href="modules/0017.html#api-function-21"><code>validate_session(token: str) -&gt; bool</code></a> — 説明なし</li>
+</ul>
+<h2 id="main">モジュール <a href="modules/0018.html">main</a></h2>
+<p>Application entry point.</p>
+<ul>
+<li><strong>関数・メソッド</strong> <a href="modules/0018.html#api-function-8"><code>main()</code></a> — 説明なし</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

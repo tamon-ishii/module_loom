@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="documentation-preview.html">
+        <link rel="prev" href="api.html">
       
       
-        <link rel="next" href="modules/0000.html">
+        <link rel="next" href="diagnostics.html">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>ModuleLoom マニュアル</title>
+        <title>dependency-graph - ModuleLoom マニュアル</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#moduleloom-for-pycharm" class="md-skip">
+        <a href="#_1" class="md-skip">
           コンテンツにスキップ
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              index
+              dependency-graph
             
           </span>
         </div>
@@ -220,10 +220,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="dependency-graph.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    dependency-graph
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="dependency-graph.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -239,6 +266,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        画面構成
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        循環インポートの確認
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI によるモジュール図出力の例
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -301,37 +381,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    index
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -347,48 +400,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="目次">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      目次
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        概要
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ドキュメント構成
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -960,10 +971,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        概要
+        画面構成
       
     </span>
   </a>
@@ -971,10 +982,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_2" class="md-nav__link">
+  <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ドキュメント構成
+        循環インポートの確認
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI によるモジュール図出力の例
       
     </span>
   </a>
@@ -999,22 +1021,68 @@
 
 
 <!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
-<h1 id="moduleloom-for-pycharm">ModuleLoom for PyCharm 利用ガイド</h1>
-<p>最終ビルド: 2026-09-26T16:45:31Z</p>
-<p>ModuleLoom は、Python プロジェクトのモジュール依存関係の可視化、循環インポートの検知、およびコード診断（肥大化・重複検出など）を支援する PyCharm プラグインおよび解析ツールです。</p>
-<h2 id="_1">概要</h2>
-<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-26T15:49:10Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
-<p><img alt="overview-screenshot" src="assets/overview-screenshot.png" /></p>
+<h1 id="_1">モジュール依存図を読む</h1>
+<p>「モジュール一覧」タブでは、Python プロジェクト内のモジュール間の依存・被依存関係をグラフィカルに確認できます。</p>
+<h2 id="_2">画面構成</h2>
+<ul>
+<li><strong>ソースツリー (.py)</strong>: 左側パネルに Python ファイルの一覧が表示されます。</li>
+<li><strong>依存グラフ領域</strong>: 中央に Cytoscape による依存関係図が表示されます。</li>
+<li><strong>モジュール詳細</strong>: 右側パネルに選択中ノードのパス、LOC、依存・被依存モジュール一覧、行番号等が表示されます。</li>
+</ul>
+<!-- ai:generated id=graph-view-screenshot kind=screenshot created-at=2026-09-26T12:44:41Z source-sha256=bc7f8c1beaf10b41c59e3ac29976cd8d293b31e6fdb25b0c6bf1c2c03c20a024 approved-at=2026-09-26T12:52:29Z -->
+<p><img alt="graph-view-screenshot" src="assets/graph-view-screenshot.png" /></p>
 <!-- /ai:generated -->
 
-<p>本ガイドでは、PyCharm 上でのツールの開き方、モジュール依存図やコード診断の活用法、および MkDocs によるドキュメント連携について説明します。</p>
-<h2 id="_2">ドキュメント構成</h2>
-<ul>
-<li><strong>はじめに・ツールウィンドウの起動</strong>: <a href="open-tool-window.html">ツールウィンドウの開き方</a></li>
-<li><strong>モジュールの可視化と依存関係の確認</strong>: <a href="dependency-graph.html">モジュール依存図の確認</a></li>
-<li><strong>プロジェクトの品質向上</strong>: <a href="diagnostics.html">コード診断の実行と改善</a></li>
-<li><strong>CLI と MkDocs の連携</strong>: <a href="documentation-preview.html">ドキュメント生成とプレビュー</a></li>
-</ul>
+<h2 id="_3">循環インポートの確認</h2>
+<p>直接の循環インポートや、下流の依存先で発生している循環インポートは、赤色バッジや警告表示、破線エッジ等によって視覚的に特定できます。</p>
+<h2 id="cli">CLI によるモジュール図出力の例</h2>
+<p>ModuleLoom CLI の <code>--mkdocs</code> オプションにより抽出される Mermaid 形式の依存図例です。</p>
+<!-- ai:generated id=example-module-diagram kind=diagram created-at=2026-09-26T15:41:15Z source-sha256=b832e8cfd08e624470a97dd892f2d046655ceb0aea5c5a9f82762488d7fbd98b -->
+<div class="highlight"><pre><span></span><code>flowchart LR
+  n0["app"]
+  n1["app.api"]
+  n2["app.common"]
+  n3["app.common.database"]
+  n4["app.common.logger"]
+  n5["app.common.utils"]
+  n6["app.config"]
+  n7["app.order"]
+  n8["app.order.controller"]
+  n9["app.order.export"]
+  n10["app.order.payment"]
+  n11["app.order.processor"]
+  n12["app.user"]
+  n13["app.user.activity"]
+  n14["app.user.auth"]
+  n15["app.user.router"]
+  n16["app.user.service"]
+  n17["app.user.session"]
+  n18["main"]
+  n1 --&gt; n6
+  n1 --&gt; n8
+  n1 --&gt; n15
+  n3 --&gt; n4
+  n8 --&gt; n5
+  n8 --&gt; n11
+  n10 --&gt; n3
+  n10 --&gt; n11
+  n11 --&gt; n3
+  n11 --&gt; n5
+  n11 --&gt; n10
+  n14 --&gt; n5
+  n14 --&gt; n17
+  n15 --&gt; n16
+  n16 --&gt; n3
+  n16 --&gt; n14
+  n16 --&gt; n17
+  n17 --&gt; n3
+  n17 --&gt; n5
+  n17 --&gt; n14
+  n18 --&gt; n1
+  n18 --&gt; n4
+  n18 --&gt; n6
+</code></pre></div>
+<!-- /ai:generated -->
 <!-- /ai:draft -->
 
 
