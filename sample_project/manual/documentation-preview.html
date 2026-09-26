@@ -514,7 +514,7 @@
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
-        実践的な活用例
+        実践的な活用例（実際のスクリーンショット画像）
       
     </span>
   </a>
@@ -1332,7 +1332,7 @@
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
-        実践的な活用例
+        実践的な活用例（実際のスクリーンショット画像）
       
     </span>
   </a>
@@ -1554,14 +1554,7 @@
 </code></pre></div>
 <h3 id="3_1">3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）</h3>
 <p>スクリーンショットタスクの指示文（プロンプト）または GUI の「💬 修正指示」に要素名やキーワード、アノテーション指示を含めることで、撮影時に自動で <strong>赤丸・角丸赤枠</strong>、<strong>指示矢印</strong>、および <strong>吹き出し説明文ラベル</strong> を合成できます。</p>
-<div class="highlight"><pre><span></span><code>       ┌─────────────────────────────────────┐
-       │ 💬 1. ここをクリックして全スクショ更新 │  ← 吹き出し説明文ラベル（半透明ダーク背景・赤枠）
-       └──────────────────┬──────────────────┘
-                          ▼                         ← 指示矢印（赤色ハイライト）
-                   ╭─────────────╮
-                   │ 📸 全スクショ │                  ← 赤丸 または 角丸赤枠ハイライト
-                   ╰─────────────╯
-</code></pre></div>
+<p><img alt="アノテーション合成の構成要素（赤枠・矢印・説明文ラベル）" src="assets/annotation-components-preview.png" /></p>
 <h4 id="_4">アノテーション指示の構文キーワード</h4>
 <table>
 <thead>
@@ -1594,15 +1587,15 @@
 </tr>
 </tbody>
 </table>
-<h4 id="_5">実践的な活用例</h4>
+<h4 id="_5">実践的な活用例（実際のスクリーンショット画像）</h4>
 <ul>
 <li>
-<p><strong>活用例 1: 操作手順マニュアルで重要ボタンを赤枠・矢印・吹き出しで案内</strong>
+<p><strong>活用例 1: 操作手順マニュアルで重要ボタンを角丸赤枠・矢印・吹き出しで案内</strong>
   <div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=step-batch-capture kind=screenshot
-<span class="gh">#btn-manual-batch-capture を赤枠で囲み、矢印を付けて「1. ここをクリックして全スクショを一括更新」と説明</span>
+<span class="gh">#btn-manual-capture-all を赤枠で囲み、矢印を付けて「1. ここをクリックして全スクショを一括更新」と説明</span>
 --&amp;gt;
 </code></pre></div>
-  <em>効果</em>: ボタンが角丸赤枠で強調され、その真上に矢印と「1. ここをクリックして全スクショを一括更新」のラベルが付いた画像がワンクリックで撮影・保存されます。</p>
+  <img alt="全スクショ撮影ボタンの角丸赤枠・矢印・吹き出しアノテーション実例" src="assets/annotation-rect-example.png" /></p>
 </li>
 <li>
 <p><strong>活用例 2: 設定アイコンを赤丸と矢印で注目させる</strong>
@@ -1610,7 +1603,7 @@
 設定ボタンを赤丸と矢印で指して「出力先やAIモデルを変更」と説明
 --&amp;gt;
 </code></pre></div>
-  <em>効果</em>: 設定アイコンが綺麗な赤丸でマークされ、矢印と説明ラベルが付加されるため、読者が一目で操作場所を理解できます。</p>
+  <img alt="設定ボタンの赤丸・矢印・吹き出しアノテーション実例" src="assets/annotation-circle-example.png" /></p>
 </li>
 <li>
 <p><strong>活用例 3: GUIの「💬 修正指示」からの即座リテイク</strong></p>
