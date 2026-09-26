@@ -165,7 +165,6 @@
             <button id="btn-manual-capture-all" class="btn-secondary" type="button" title="すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます">📸 全スクショ一括撮影</button>
             <button id="btn-manual-diagram-all" class="btn-secondary" type="button" title="プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します">📊 全ダイアグラム更新</button>
             <button id="btn-manual-generate-api" class="btn-secondary" type="button" title="DocstringからPythonモジュールのAPIリファレンス（docs/modules/）を自動生成します">📖 APIドキュメント生成</button>
-            <button id="btn-manual-impact" class="btn-secondary" type="button" title="Gitの変更差分から影響を受けるマニュアルページとタスクを自動検出します">⚡ 影響分析</button>
             <button id="btn-manual-open-settings" class="btn-secondary" type="button" title="HTML出力先、Markdown原稿パス、AI設定を開きます">⚙️ 設定</button>
             <button id="manual-build-draft" class="btn-secondary" type="button" title="未完成タスクをプレースホルダーとして残したまま下書きサイトをビルドします">下書きビルド</button>
             <button id="manual-build" class="btn-primary" type="button" title="全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します">🚀 完成版ビルド</button>
@@ -173,15 +172,6 @@
         </div>
         <div class="manual-layout">
           <div class="manual-editor">
-            <!-- Git 影響分析アラートバナー -->
-            <div id="manual-impact-banner" class="manual-impact-banner hidden" style="margin-bottom: 12px; padding: 10px 14px; background: rgba(245, 169, 127, 0.12); border: 1px solid #f5a97f; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.1rem;">⚡</span>
-                <span id="manual-impact-text" style="font-size: 0.85rem; font-weight: 500; color: #f5a97f;">Git差分による影響を検出中...</span>
-              </div>
-              <button id="btn-manual-impact-details" class="btn-secondary btn-sm" type="button">詳細</button>
-            </div>
-
             <!-- 1. 自動同期アセット一覧（スクリーンショット & ダイアグラム） -->
             <div class="manual-card">
               <div class="manual-card-header">
@@ -529,21 +519,6 @@ def example_function():
             <button id="btn-cancel-manual-settings" class="btn-secondary btn-sm" type="button">キャンセル</button>
             <button id="manual-save" class="btn-primary btn-sm" type="button">設定を保存</button>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 影響分析モーダル -->
-    <div id="manual-impact-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-impact-title">
-      <div class="modal-card" style="max-width: 650px;">
-        <div class="modal-header">
-          <strong id="manual-impact-title" class="modal-title">⚡ コード・UI変更によるマニュアル影響分析</strong>
-          <button id="btn-close-manual-impact" class="btn-icon modal-close" title="閉じる">&times;</button>
-        </div>
-        <div class="modal-body" id="manual-impact-modal-body" style="max-height: 420px; overflow-y: auto; font-size: 0.88rem; line-height: 1.6; padding: 16px;">
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--border-color);">
-          <button id="btn-close-manual-impact-footer" class="btn-secondary btn-sm">閉じる</button>
         </div>
       </div>
     </div>

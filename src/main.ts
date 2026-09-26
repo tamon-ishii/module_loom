@@ -615,10 +615,37 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
 
   if (!targetEl) targetEl = document.body;
 
-  // アノテーション（赤枠・赤丸囲み、矢印、説明文ラベル）の処理
-  let highlightEl: HTMLDivElement | null = null;
-  let annotationLabelEl: HTMLDivElement | null = null;
-  let prevPosition = "";
+function drawSvgOnCanvas(canvas: HTMLCanvasElement, svgString: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      }
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    img.onerror = (err) => {
+      console.warn("MarkIts SVG render error on canvas:", err);
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    img.src = url;
+  });
+}
+
+  // キャプチャ実行
+  const canvas = await html2canvas(targetEl, {
+    backgroundColor: "#1e1e2e",
+    scale: 1.5,
+    logging: false,
+    useCORS: true,
+  });
+
+  // MarkIts（crates/markits）による高品質ベクターアノテーションの合成
   if (annotationHint) {
     const hint = annotationHint.trim();
     let selector = "";
@@ -649,29 +676,8 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
       const targetRect = targetEl.getBoundingClientRect();
       const elRect = foundEl.getBoundingClientRect();
       const isCircle = hint.includes("丸") || hint.includes("円") || hint.includes("circle");
-
-      highlightEl = document.createElement("div");
-      highlightEl.className = "manual-screenshot-highlight";
-      highlightEl.style.position = "absolute";
-      highlightEl.style.left = `${elRect.left - targetRect.left + targetEl.scrollLeft - 6}px`;
-      highlightEl.style.top = `${elRect.top - targetRect.top + targetEl.scrollTop - 6}px`;
-      highlightEl.style.width = `${elRect.width + 12}px`;
-      highlightEl.style.height = `${elRect.height + 12}px`;
-      highlightEl.style.border = "4px solid #ff3344";
-      highlightEl.style.borderRadius = isCircle ? "50%" : "8px";
-      highlightEl.style.boxShadow = "0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 16px rgba(255, 50, 50, 0.85)";
-      highlightEl.style.pointerEvents = "none";
-      highlightEl.style.zIndex = "999999";
-      highlightEl.style.boxSizing = "border-box";
-
-      prevPosition = targetEl.style.position;
-      if (!prevPosition || prevPosition === "static") {
-        targetEl.style.position = "relative";
-      }
-      targetEl.appendChild(highlightEl);
-
-      // 矢印と説明文ラベル（吹き出し）の合成
       const hasArrow = hint.includes("矢印") || hint.includes("arrow");
+
       let labelText = "";
       const quoteMatch = hint.match(/[「『"']([^「『"']+)["'」』]/);
       if (quoteMatch) {
@@ -681,63 +687,84 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
         if (descMatch) labelText = descMatch[1];
       }
 
-      if (hasArrow || labelText) {
-        annotationLabelEl = document.createElement("div");
-        annotationLabelEl.className = "manual-screenshot-annotation-label";
-        annotationLabelEl.style.position = "absolute";
-        annotationLabelEl.style.pointerEvents = "none";
-        annotationLabelEl.style.zIndex = "999999";
-        annotationLabelEl.style.display = "flex";
-        annotationLabelEl.style.alignItems = "center";
-        annotationLabelEl.style.gap = "6px";
-        annotationLabelEl.style.fontFamily = "sans-serif";
-        annotationLabelEl.style.fontWeight = "bold";
+      const x = Math.max(0, elRect.left - targetRect.left + targetEl.scrollLeft);
+      const y = Math.max(0, elRect.top - targetRect.top + targetEl.scrollTop);
+      const width = Math.max(10, elRect.width);
+      const height = Math.max(10, elRect.height);
 
-        const topSpace = elRect.top - targetRect.top;
-        const placeBelow = topSpace < 40;
-        const labelTop = placeBelow
-          ? elRect.top - targetRect.top + targetEl.scrollTop + elRect.height + 14
-          : elRect.top - targetRect.top + targetEl.scrollTop - 36;
-        const labelLeft = Math.max(10, elRect.left - targetRect.left + targetEl.scrollLeft);
+      const annotations: any[] = [];
+      if (isCircle) {
+        annotations.push({
+          type: "circle",
+          target: { x, y, width, height },
+          style: "danger",
+          shadow: true,
+        });
+      } else {
+        annotations.push({
+          type: "rounded-rect",
+          target: { x, y, width, height },
+          rx: 8,
+          ry: 8,
+          style: "danger",
+          shadow: true,
+        });
+      }
 
-        annotationLabelEl.style.top = `${labelTop}px`;
-        annotationLabelEl.style.left = `${labelLeft}px`;
-
-        let html = "";
-        if (hasArrow) {
-          const arrowSymbol = placeBelow ? "⬆" : "⬇";
-          html += `<span style="color: #ff3344; font-size: 1.3rem; filter: drop-shadow(0 0 4px rgba(255,50,50,0.8)); line-height: 1;">${arrowSymbol}</span>`;
+      if (labelText) {
+        if (hint.includes("ピン") || hint.includes("pin")) {
+          annotations.push({
+            type: "pin",
+            target: { x, y, width, height },
+            text: labelText,
+            style: "danger",
+            position: "auto",
+            shadow: true,
+          });
+        } else {
+          annotations.push({
+            type: "callout",
+            target: { x, y, width, height },
+            text: labelText,
+            style: "danger",
+            position: "auto",
+            shadow: true,
+            outline: true,
+          });
         }
-        if (labelText) {
-          html += `<span style="background: rgba(20, 20, 30, 0.94); color: #ffffff; border: 1.5px solid #ff3344; border-radius: 4px; padding: 3px 8px; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(0,0,0,0.5); white-space: nowrap;">${escapeHtml(labelText)}</span>`;
+      } else if (hasArrow) {
+        annotations.push({
+          type: "arrow",
+          target: { x, y, width, height },
+          style: "danger",
+          position: "auto",
+          shadow: true,
+        });
+      }
+
+      const scene = {
+        canvas: {
+          width: Math.round(targetRect.width),
+          height: Math.round(targetRect.height),
+        },
+        shadow: true,
+        annotations,
+      };
+
+      try {
+        const svg = await callManual("markits-render", { json: JSON.stringify(scene) });
+        if (svg && svg.includes("<svg")) {
+          await drawSvgOnCanvas(canvas, svg);
         }
-        annotationLabelEl.innerHTML = html;
-        targetEl.appendChild(annotationLabelEl);
+      } catch (err) {
+        console.warn("MarkIts rendering fallback:", err);
       }
     }
   }
 
-  try {
-    const canvas = await html2canvas(targetEl, {
-      backgroundColor: "#1e1e2e",
-      scale: 1.5,
-      logging: false,
-      useCORS: true,
-    });
-    const dataUrl = canvas.toDataURL("image/png");
-    manualScreenshotCache[taskId] = dataUrl;
-    return dataUrl;
-  } finally {
-    if (highlightEl) {
-      highlightEl.remove();
-      if (targetEl && (!prevPosition || prevPosition === "static")) {
-        targetEl.style.position = prevPosition;
-      }
-    }
-    if (annotationLabelEl) {
-      annotationLabelEl.remove();
-    }
-  }
+  const dataUrl = canvas.toDataURL("image/png");
+  manualScreenshotCache[taskId] = dataUrl;
+  return dataUrl;
 }
 
 async function captureAllScreenshots(): Promise<void> {
@@ -1338,106 +1365,6 @@ async function runGenerateApi(): Promise<void> {
 }
 btnManualGenerateApi?.addEventListener("click", () => void runGenerateApi());
 btnManualApiRun?.addEventListener("click", () => void runGenerateApi());
-
-interface ImpactReport {
-  git_ref: string;
-  changed_files: string[];
-  affected_symbols: string[];
-  affected_ui_elements: string[];
-  impacted_pages: {
-    path: string;
-    reasons: string[];
-    impacted_tasks: string[];
-    requires_rebuild: boolean;
-  }[];
-  total_impacted_pages: number;
-  total_impacted_tasks: number;
-}
-
-let lastImpactReport: ImpactReport | null = null;
-
-async function runCheckImpact(): Promise<void> {
-  const btn = document.getElementById("btn-manual-impact") as HTMLButtonElement | null;
-  const banner = document.getElementById("manual-impact-banner");
-  const textEl = document.getElementById("manual-impact-text");
-  if (!btn) return;
-
-  btn.disabled = true;
-  manualStatus.textContent = "Git差分からマニュアル影響分析を実行中…";
-  try {
-    const raw = await callManual("impact");
-    const report = JSON.parse(raw) as ImpactReport;
-    lastImpactReport = report;
-
-    if (banner && textEl) {
-      if (report.total_impacted_pages > 0) {
-        banner.classList.remove("hidden");
-        textEl.textContent = `⚡ コード/UIの変更により ${report.total_impacted_pages} 件のページ（${report.impacted_pages.map((p) => p.path).join(", ")}）が影響を受けています`;
-        manualStatus.textContent = `影響分析完了: ${report.total_impacted_pages} 件のページに影響があります`;
-      } else {
-        banner.classList.add("hidden");
-        manualStatus.textContent = "影響分析完了: 直近のコード変更によるマニュアルへの影響はありません";
-      }
-    }
-  } catch (e) {
-    manualStatus.textContent = `影響分析失敗: ${String(e)}`;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-document.getElementById("btn-manual-impact")?.addEventListener("click", () => void runCheckImpact());
-
-const manualImpactModal = document.getElementById("manual-impact-modal");
-const manualImpactModalBody = document.getElementById("manual-impact-modal-body");
-
-function openImpactModal() {
-  if (!manualImpactModal || !manualImpactModalBody || !lastImpactReport) return;
-  let html = `<p style="margin-top:0;"><strong>比較対象:</strong> <code>${escapeHtml(lastImpactReport.git_ref)}</code></p>`;
-  if (lastImpactReport.changed_files.length > 0) {
-    html += `<p style="margin-bottom:6px;"><strong>変更ファイル (${lastImpactReport.changed_files.length} 件):</strong></p>`;
-    html += `<ul style="margin-top:0; padding-left: 20px; color: var(--text-muted); font-size: 0.82rem;">`;
-    for (const f of lastImpactReport.changed_files.slice(0, 10)) {
-      html += `<li><code>${escapeHtml(f)}</code></li>`;
-    }
-    if (lastImpactReport.changed_files.length > 10) {
-      html += `<li>他 ${lastImpactReport.changed_files.length - 10} 件...</li>`;
-    }
-    html += `</ul>`;
-  }
-
-  html += `<h4 style="margin: 14px 0 8px 0; color: #f5a97f;">影響を受けるマニュアルページ (${lastImpactReport.total_impacted_pages} 件)</h4>`;
-  if (lastImpactReport.impacted_pages.length === 0) {
-    html += `<p style="color: var(--text-muted);">影響を受けるページはありません。</p>`;
-  } else {
-    for (const page of lastImpactReport.impacted_pages) {
-      html += `<div style="background: rgba(30, 30, 46, 0.6); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">`;
-      html += `<div style="font-weight: bold; color: var(--text-color); margin-bottom: 4px;">📄 ${escapeHtml(page.path)}</div>`;
-      html += `<ul style="margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-muted);">`;
-      for (const r of page.reasons) {
-        html += `<li>${escapeHtml(r)}</li>`;
-      }
-      html += `</ul>`;
-      html += `</div>`;
-    }
-  }
-
-  manualImpactModalBody.innerHTML = html;
-  manualImpactModal.classList.remove("hidden");
-}
-
-document.getElementById("btn-manual-impact-details")?.addEventListener("click", openImpactModal);
-document.getElementById("btn-close-manual-impact")?.addEventListener("click", () => {
-  manualImpactModal?.classList.add("hidden");
-});
-document.getElementById("btn-close-manual-impact-footer")?.addEventListener("click", () => {
-  manualImpactModal?.classList.add("hidden");
-});
-manualImpactModal?.addEventListener("click", (e) => {
-  if (e.target === manualImpactModal) {
-    manualImpactModal.classList.add("hidden");
-  }
-});
 
 manualTasks.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {

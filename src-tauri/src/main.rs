@@ -157,6 +157,8 @@ async fn manual_action(
     asset: Option<String>,
     feedback: Option<String>,
     draft: Option<bool>,
+    json: Option<String>,
+    git_ref: Option<String>,
     app: AppHandle,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -171,6 +173,8 @@ async fn manual_action(
         if let Some(ref value) = page { options.push(("--page", value)); }
         if let Some(ref value) = asset { options.push(("--asset", value)); }
         if let Some(ref value) = feedback { options.push(("--feedback", value)); }
+        if let Some(ref value) = json { options.push(("--json", value)); }
+        if let Some(ref value) = git_ref { options.push(("--git-ref", value)); }
         if draft.unwrap_or(false) { options.push(("--draft", "")); }
         let binary_name = if cfg!(windows) { "analyze.exe" } else { "analyze" };
         let bundled = app.path().resolve(format!("binaries/{binary_name}"), BaseDirectory::Resource).ok();

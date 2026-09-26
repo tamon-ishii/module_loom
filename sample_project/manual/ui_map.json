@@ -78,14 +78,6 @@
           "parent_view": "manual-view"
         },
         {
-          "id": "btn-manual-impact",
-          "selector": "#btn-manual-impact",
-          "name": "⚡ 影響分析",
-          "role": "button",
-          "title": "Gitの変更差分から影響を受けるマニュアルページとタスクを自動検出します",
-          "parent_view": "manual-view"
-        },
-        {
           "id": "btn-manual-open-settings",
           "selector": "#btn-manual-open-settings",
           "name": "⚙️ 設定",
@@ -107,14 +99,6 @@
           "name": "🚀 完成版ビルド",
           "role": "button",
           "title": "全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します",
-          "parent_view": "manual-view"
-        },
-        {
-          "id": "btn-manual-impact-details",
-          "selector": "#btn-manual-impact-details",
-          "name": "詳細",
-          "role": "button",
-          "title": null,
           "parent_view": "manual-view"
         },
         {
@@ -373,30 +357,7 @@
           "parent_view": "manual-settings-modal"
         }
       ]
-    },
-    {
-      "id": "manual-impact-modal",
-      "name": "⚡ コード・UI変更によるマニュアル影響分析",
-      "description": "ダイアログ/モーダル",
-      "elements": [
-        {
-          "id": "btn-close-manual-impact",
-          "selector": "#btn-close-manual-impact",
-          "name": "&times;",
-          "role": "button",
-          "title": "閉じる",
-          "parent_view": "manual-impact-modal"
-        },
-        {
-          "id": "btn-close-manual-impact-footer",
-          "selector": "#btn-close-manual-impact-footer",
-          "name": "閉じる",
-          "role": "button",
-          "title": null,
-          "parent_view": "manual-impact-modal"
-        }
-      ]
     }
   ],
-  "total_elements": 40
+  "total_elements": 36
 }

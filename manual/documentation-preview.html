@@ -660,22 +660,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-git" class="md-nav__link">
+  <a href="#9-git-ci-ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. Git 差分によるマニュアル影響分析 (⚡ 影響分析)
+        9. Git 差分によるマニュアル影響分析（CI / AI 向けバックエンド連携）
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="9. Git 差分によるマニュアル影響分析 (⚡ 影響分析)">
+    <nav class="md-nav" aria-label="9. Git 差分によるマニュアル影響分析（CI / AI 向けバックエンド連携）">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ui" class="md-nav__link">
+  <a href="#ai-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
-        UI での利用手順
+        AI / CI からの利用方法
       
     </span>
   </a>
@@ -1623,22 +1623,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#9-git" class="md-nav__link">
+  <a href="#9-git-ci-ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        9. Git 差分によるマニュアル影響分析 (⚡ 影響分析)
+        9. Git 差分によるマニュアル影響分析（CI / AI 向けバックエンド連携）
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="9. Git 差分によるマニュアル影響分析 (⚡ 影響分析)">
+    <nav class="md-nav" aria-label="9. Git 差分によるマニュアル影響分析（CI / AI 向けバックエンド連携）">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ui" class="md-nav__link">
+  <a href="#ai-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
-        UI での利用手順
+        AI / CI からの利用方法
       
     </span>
   </a>
@@ -1709,10 +1709,6 @@
 <tr>
 <td style="text-align: left;"><strong>📖 APIドキュメント生成</strong></td>
 <td style="text-align: left;">全 Python モジュールの Docstring・クラス・関数・型ヒントから、<code>docs/modules/*.md</code> および <code>docs/api.md</code> を一瞬で自動生成します。</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>⚡ 影響分析</strong></td>
-<td style="text-align: left;">Git 差分（コミット間または作業ツリー）を解析し、コードや UI の改修によって更新が必要になったマニュアルページやタスクを即座に検出・警告します。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>⚙️ 設定</strong></td>
@@ -2038,7 +2034,7 @@ MainWindow (メイン画面)
     ├─ #btn-manual-capture-all (全スクショ一括撮影)
     ├─ #btn-manual-diagram-all (全ダイアグラム更新)
     ├─ #btn-manual-generate-api (APIドキュメント生成)
-    └─ #btn-manual-impact (⚡ 影響分析)
+    └─ #btn-manual-open-settings (⚙️ 設定)
 </code></pre></div>
 <h3 id="ui-map">UI Map の特徴とメリット</h3>
 <ul>
@@ -2046,7 +2042,7 @@ MainWindow (メイン画面)
 <li>ボタンの ID、クラス、テキストラベル、ツールチップ（<code>title</code> 属性）、モーダルダイアログを自動インデックス化。</li>
 <li>出力結果は <code>manual/ui_map.json</code> に保存され、いつでも参照・カスタマイズ可能です。</li>
 <li><strong>正確なアノテーション指示の自動化</strong>:</li>
-<li>AI がマニュアルを書く際、この UI Map を参照するため、実在するセレクタ（例: <code>#btn-manual-impact</code>）を指定した高精度な赤枠・赤丸撮影タスクが自動構成されます。</li>
+<li>AI がマニュアルを書く際、この UI Map を参照するため、実在するセレクタ（例: <code>#btn-manual-capture-all</code>）を指定した高精度な赤枠・赤丸撮影タスクが自動構成されます。</li>
 </ul>
 <hr />
 <h2 id="8-manual-dependency-graphdb">8. Manual Dependency Graph（マニュアルとコードの依存関係DB）</h2>
@@ -2054,9 +2050,8 @@ MainWindow (メイン画面)
 <div class="highlight"><pre><span></span><code>docs/documentation-preview.md
   │
   ├── Python シンボル: analyzer::manual::deps
-  ├── UI 要素: #btn-manual-impact (影響分析ボタン)
-  ├── UI 要素: #manual-impact-banner (影響警告バナー)
   ├── UI 要素: #btn-manual-capture-all (全スクショ撮影ボタン)
+  ├── UI 要素: #btn-manual-open-settings (設定ボタン)
   └── 画像アセット: assets/manual-tab-screenshot.png
 </code></pre></div>
 <h3 id="_8">依存関係追跡の仕組み</h3>
@@ -2066,30 +2061,30 @@ MainWindow (メイン画面)
 <li>グラフ情報は <code>manual/manual_deps.json</code> に永続化され、CI やツールウィンドウからいつでも高速に参照できます。</li>
 </ul>
 <hr />
-<h2 id="9-git">9. Git 差分によるマニュアル影響分析 (<code>⚡ 影響分析</code>)</h2>
+<h2 id="9-git-ci-ai">9. Git 差分によるマニュアル影響分析（CI / AI 向けバックエンド連携）</h2>
 <p>コードを修正したり UI を改修した際、<strong>「どのマニュアルページが古くなったか」「どこを書き直すべきか」を人間が探す必要はありません。</strong></p>
-<p>ModuleLoom の <strong>「⚡ 影響分析」</strong> は、Git のコミット差分（<code>git diff</code>）または現在の作業ツリー（<code>git status</code>）を解析し、Manual Dependency Graph と照合して影響を受けるドキュメントを即座に割り出します。</p>
+<p>ModuleLoom の <strong>マニュアル影響分析機能</strong> は、エンドユーザーの操作画面を複雑にしないよう GUI 上には配置せず、<strong>CI パイプラインや AI コーディングエージェント（Antigravity, Cursor, GitHub Actions 等）がバックエンドから利用する自動化ツール</strong>として提供されます。</p>
+<p>Git のコミット差分（<code>git diff</code>）または現在の作業ツリー（<code>git status</code>）を解析し、Manual Dependency Graph と照合して影響を受けるドキュメントを即座に割り出します。</p>
 <div class="highlight"><pre><span></span><code>git diff / 作業ツリー変更
    (例: src/main.ts, crates/analyzer/src/manual/deps.rs)
         ↓
 変更されたシンボル &amp; UI 要素の特定
-   (例: #btn-manual-impact, analyzer::manual::deps)
+   (例: #btn-manual-capture-all, analyzer::manual::deps)
         ↓
 Manual Dependency Graph (manual_deps.json) と照合
         ↓
-影響を受けるマニュアルページと更新理由を即時レポート
-   ⚠ documentation-preview.md (UI要素 #btn-manual-impact が更新されました)
+影響を受けるマニュアルページと更新理由を JSON 出力
+   ⚠ documentation-preview.md (UI要素 #btn-manual-capture-all が更新されました)
 </code></pre></div>
-<h3 id="ui">UI での利用手順</h3>
-<ol>
-<li>マニュアル画面上部のツールバーにある <strong>「⚡ 影響分析」</strong> ボタンをクリックします。</li>
-<li>変更による影響が検知されると、エディタ上部にオレンジ色の <strong>影響警告バナー</strong>（<code>#manual-impact-banner</code>）が表示されます。<blockquote>
-<p>⚡ コード/UIの変更により 2 件のページ（documentation-preview.md, diagnostics.md）が影響を受けています</p>
-</blockquote>
-</li>
-<li>バナー内の <strong>「詳細」</strong> ボタンを押すとモーダルが開き、変更されたファイル一覧、影響を受けたマニュアルページ、および<strong>具体的な変更理由</strong>（どの要素やシンボルが変更されたか）を一覧確認できます。</li>
-<li>影響のあるタスクだけを対象に、ワンクリックで最新スクリーンショットの再撮影やダイアグラムの更新を実行できます。</li>
-</ol>
+<h3 id="ai-ci">AI / CI からの利用方法</h3>
+<p>CI や AI エージェントは、以下の CLI コマンドを実行して JSON レポートを取得します。</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 作業ツリーの未コミット差分から影響分析を実行</span>
+moduleloom-analyze<span class="w"> </span>--manual<span class="w"> </span>impact<span class="w"> </span>--root<span class="w"> </span>.
+
+<span class="c1"># 特定のコミットやブランチ（例: main と比較）で影響分析を実行</span>
+moduleloom-analyze<span class="w"> </span>--manual<span class="w"> </span>impact<span class="w"> </span>--ref<span class="w"> </span>origin/main<span class="w"> </span>--root<span class="w"> </span>.
+</code></pre></div>
+<p>返却される JSON レポートには、変更されたファイル一覧、影響を受けたマニュアルページ（<code>impacted_pages</code>）、具体的な更新理由（<code>reasons</code>）が含まれます。AI エージェントはこの出力を参照し、影響のあるページだけをピンポイントで再生成・リテイクできます。</p>
 <hr />
 <h2 id="10-cli-cicd">10. CLI による自動化と CI/CD 連携</h2>
 <p>GUI だけでなく、CLI からもすべてのマニュアル・ドキュメント操作を実行可能です。CI/CD パイプラインに組み込むことで、マニュアルが常に最新のコードと同期していることを自動保証できます。</p>
