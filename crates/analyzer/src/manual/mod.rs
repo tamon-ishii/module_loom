@@ -9,7 +9,7 @@ pub mod task;
 pub mod uimap;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use config::{project_path, read_config, save_settings};
 use preview::{get_state, preview_asset, preview_html, preview_page};
@@ -37,6 +37,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "deps",
         "impact",
         "context",
+        "markits-render",
     ];
     if !allowed.contains(&action) {
         return Err(format!("Unsupported manual action: {action}"));
@@ -63,6 +64,8 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut project_opt: Option<&str> = None;
     let mut lang_opt: Option<&str> = None;
     let mut ref_opt: Option<&str> = None;
+    let mut json_opt: Option<&str> = None;
+    let mut input_opt: Option<&str> = None;
 
     for (key, value) in options {
         match *key {
@@ -84,6 +87,8 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--project" => project_opt = Some(*value),
             "--lang" => lang_opt = Some(*value),
             "--git-ref" | "--ref" => ref_opt = Some(*value),
+            "--json" => json_opt = Some(*value),
+            "--input" => input_opt = Some(*value),
             _ => return Err(format!("Unsupported manual option: {key}")),
         }
     }
@@ -228,6 +233,21 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "context" => {
             let ctx = context::build_application_context(root);
             serde_json::to_string_pretty(&ctx).map_err(|e| e.to_string())
+        }
+        "markits-render" => {
+            let json_content = if let Some(j) = json_opt {
+                j.to_string()
+            } else if let Some(inp) = input_opt {
+                let p = if Path::new(inp).is_absolute() {
+                    PathBuf::from(inp)
+                } else {
+                    root.join(inp)
+                };
+                fs::read_to_string(&p).map_err(|e| format!("Failed to read {}: {e}", p.display()))?
+            } else {
+                return Err("markits-render requires --json or --input".to_string());
+            };
+            markits::render_from_json(&json_content).map_err(|e| e.to_string())
         }
         _ => unreachable!(),
     }
@@ -424,6 +444,27 @@ mod tests {
 
         assert!(graph.symbol_to_pages.contains_key("myapp.engine"));
         assert!(graph.task_dependencies.contains_key("shot-engine"));
+    }
+
+    #[test]
+    fn test_markits_render() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let scene_json = r#"{
+            "canvas": { "width": 800, "height": 600 },
+            "annotations": [
+                {
+                    "type": "callout",
+                    "target": [100.0, 100.0, 200.0, 50.0],
+                    "text": "保存ボタン",
+                    "style": "primary"
+                }
+            ]
+        }"#;
+
+        let res = run(root, "markits-render", &[("--json", scene_json)]).unwrap();
+        assert!(res.contains("<svg"));
+        assert!(res.contains("保存ボタン"));
     }
 }
 

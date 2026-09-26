@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/analyzer",
+    "crates/markits",
     "src-tauri",
 ]
 resolver = "2"

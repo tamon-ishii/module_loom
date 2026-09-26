@@ -31,9 +31,27 @@ Explain the main layout and what key items the user should observe in the overvi
   - `screenshot`: Must ONLY output the pure image tag (`![id](assets/<filename>.png)`). Do not include captions, notes, or descriptions.
   - `diagram`: Must ONLY output the pure fenced code block (````mermaid ... ````). Do not include footers, captions, or disclaimers.
   - `text`: Dedicated task for any explanations, walkthroughs, annotations, or guides.
-- **Annotation Hint in Screenshot Tasks**:
-  - You can specify DOM selectors (`#btn-id` or `.class`) or natural language keywords (`全スクショ`, `保存`, `ダイアグラム`, `API`, `ビルド`, etc.) in the prompt.
-  - If the prompt includes `丸`, `円`, or `circle`, a red circular highlight is overlaid; otherwise, a rounded red rectangular frame is drawn.
+- **Annotation Processing with MarkIts (`crates/markits`)**:
+  - **MANDATORY**: All screenshot post-processing and annotations MUST use the `markits` module (`crates/markits`) to ensure visual harmony, unified styling, and professional polish across all manual pages.
+  - **Philosophy**: *"AI decides WHAT to explain; MarkIts decides HOW to render it beautifully."* Do not attempt manual pixel coordinate hacking; specify the target UI element (`#btn-id` or bounds) and semantic intent, and let MarkIts handle deterministic 8-direction layout, canvas boundary protection, collision avoidance, and SVG rendering.
+  - **Supported MarkIts Annotation Types**:
+    - `callout`: Text pill with automatic arrow routing towards the target.
+    - `pin`: Number/icon pinhead with pointer and connected pill label (Skitch style).
+    - `badge`: Circular step marker (e.g. `step: 1`, `text: "1"`).
+    - `spotlight`: Darkens the canvas with a translucent backdrop, cutting out the target area for high contrast.
+    - `rounded-rect` / `rect`: Clean, rounded highlight boundary around the target element.
+    - `circle` / `ellipse`: Circular highlight.
+    - `arrow`: Clear directional indicator arrow.
+    - `label`: Readable text with white outline for high contrast against any UI theme.
+    - `bullseye`: Concentric focus rings with center dot.
+  - **Semantic Styles**:
+    - `primary` (blue), `danger` (red), `warning` (amber), `info` (cyan), `step` (emerald), `pink` (Skitch magenta).
+  - **Rendering**:
+    - Use `moduleloom-analyze --manual markits-render --json '<Scene JSON>'` (or `crates/markits` binary) to generate high-resolution SVG overlays.
+  - **In `ai:task` Screenshot Prompts**:
+    - Specify UI elements and semantic MarkIts instructions, e.g.:
+      `<!-- ai:task id=step-analyze kind=screenshot\n#btn-analyze を markits callout: "解析を実行", style: primary, position: bottom でハイライト\n-->`
+      `<!-- ai:task id=step-settings kind=screenshot\n#btn-settings を markits pin: "?", text: "設定画面", style: info でハイライト\n-->`
 
 Markdown outside tags is human-authored and must be preserved. `{{BUILD_TIMESTAMP}}` is replaced with the UTC build time.
 

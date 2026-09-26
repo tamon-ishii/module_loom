@@ -552,7 +552,7 @@ def draft(root: Path) -> None:
         "Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI or real screenshots. "
         "IMPORTANT RULES FOR TASKS & LAYOUT:\n"
         "- In the top page (index.md), place the overview/key-visual screenshot prominently near the top (immediately following the introduction paragraph), so readers see what the product looks like first. Place table of contents and page navigation links BELOW the overview.\n"
-        "- kind=screenshot tasks must ONLY request capturing the raw UI image (no descriptions, explanations, or annotations in the screenshot task itself).\n"
+        "- kind=screenshot tasks must ONLY request capturing the raw UI image, using MarkIts (crates/markits) semantic annotation instructions (e.g. markits callout: '説明文', pin: '?', badge: 1, spotlight, rounded-rect, style: primary|danger|warning|info|pink) to keep manual screenshots visually unified and professional.\n"
         "- kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI.\n"
         "- If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n"
         "Do not invent UI labels. Return at most 8 pages. Brief:\n" + brief

@@ -56,7 +56,7 @@ pub fn draft(root: &Path) -> Result<(), String> {
         Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI, real screenshots, or Mermaid diagrams.\n\
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
         - In the top page (index.md), place the overview/key-visual screenshot prominently near the top (immediately following the introduction paragraph), so readers see what the product looks like first. Place table of contents and page navigation links BELOW the overview.\n\
-        - kind=screenshot tasks must ONLY request capturing the raw UI image, referencing real UI elements and views from the UI Map (e.g. #btn-id or button label), with optional annotation instructions (e.g. 赤枠, 赤丸, 矢印, 説明文).\n\
+        - kind=screenshot tasks must ONLY request capturing the raw UI image, referencing real UI elements and views from the UI Map (e.g. #btn-id or button label), using MarkIts (crates/markits) semantic annotation instructions (e.g. markits callout: '説明文', pin: '?', badge: 1, spotlight, rounded-rect, style: primary|danger|warning|info|pink) to keep all manual screenshots visually unified and professional.\n\
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
         - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\
