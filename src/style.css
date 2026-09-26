@@ -772,11 +772,20 @@ body.resizing-panes .tree-panel, body.resizing-panes .inspector-panel { transiti
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-width: 0;
   padding: 6px 16px;
   background: var(--header-bg);
   border-top: 1px solid var(--border-color);
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+#status-bar {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #app-version { white-space: nowrap; margin-left: 12px; }

@@ -6,7 +6,6 @@ import { escapeHtml } from "./utils";
 import { currentUiLocale, initUiLocale, setUiLocale, translateUiText, type UiLocale } from "./i18n";
 import { cycleGuidance, cyclePath, cycleSuggestion } from "./cycle-insights";
 import {
-  compareAnalysisResults,
   compareAnalysisIssues,
   readAnalysisHistory,
   recordAnalysisHistory,
@@ -26,7 +25,6 @@ let cy: Core | null = null;
 let currentResult: AnalysisResult | null = null;
 let selectedModule: ModuleInfo | null = null;
 let gitChangedModuleIds = new Set<string>();
-let lastBreakingChanges: string[] = [];
 let clusterMemberOf = new Map<string, string>();
 let lastCollapseActive = false;
 interface FixToolInfo { id: string; label: string; kinds: string[] }
@@ -82,7 +80,6 @@ function preferredEditor(): "pycharm" | "vscode" {
 }
 const inspectorContent = document.getElementById("inspector-content") as HTMLDivElement;
 const statusBar = document.getElementById("status-bar") as HTMLDivElement;
-const metricsSummary = document.getElementById("metrics-summary") as HTMLDivElement;
 const complexityDashboard = document.getElementById("complexity-dashboard") as HTMLElement;
 const complexityDashboardTitle = document.getElementById("complexity-dashboard-title") as HTMLElement;
 const complexityDashboardScore = document.getElementById("complexity-dashboard-score") as HTMLElement;
@@ -1183,11 +1180,6 @@ function updateGraph(result: AnalysisResult) {
   const previousSelectedId = selectedModule?.id;
   const wasOverview = currentViewMode === "overview";
   const freshAnalysis = result !== currentResult;
-  if (freshAnalysis) {
-    const history = readAnalysisHistory(result.root_path);
-    const previous = history.length > 0 ? history[history.length - 1].result : undefined;
-    lastBreakingChanges = compareAnalysisResults(previous, result);
-  }
   currentResult = result;
   const previousChainFrom = chainFrom.value;
   const previousChainTo = chainTo.value;
@@ -2338,13 +2330,7 @@ complexityDashboard.addEventListener("click", (event) => {
 function updateSummary(result: AnalysisResult) {
   renderComplexityDashboard(result);
   const cycleCount = result.cycles.length;
-  const bloatCount = result.modules.filter((m) => m.is_oversized).length;
   const errorCount = result.analysis_errors?.length || 0;
-  const architectureCount = result.architecture_violations?.length || 0;
-  const packageCount = result.package_dependencies?.length || 0;
-  const dependencyIssueCount = result.dependency_issues?.length || 0;
-  const unusedCount = result.modules.reduce((sum, module) => sum + (module.unused_symbol_candidates?.length || 0), 0);
-  metricsSummary.innerText = `モジュール数: ${result.modules.length} | 肥大化警告: ${bloatCount} | 設計違反: ${architectureCount} | 依存宣言の問題: ${dependencyIssueCount} | パッケージ: ${packageCount} | 未使用候補: ${unusedCount} | 破壊的変更候補: ${lastBreakingChanges.length} | 解析エラー: ${errorCount} | 総行数: ${result.total_loc}`;
 
   if (btnResolveCycles) {
     if (cycleCount > 0) {
