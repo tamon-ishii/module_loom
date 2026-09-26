@@ -159,12 +159,12 @@
         <div class="manual-header">
           <div class="manual-header-title">
             <h2>ドキュメント生成</h2>
-            <span class="manual-header-sub">スクショ・ダイアグラム・APIリファレンスを自動同期</span>
+            <span class="manual-header-sub">スクショ・ダイアグラム・AIテキストを自動同期</span>
           </div>
           <div class="manual-header-actions">
             <button id="btn-manual-capture-all" class="btn-secondary" type="button" title="すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます">📸 全スクショ一括撮影</button>
             <button id="btn-manual-diagram-all" class="btn-secondary" type="button" title="プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します">📊 全ダイアグラム更新</button>
-            <button id="btn-manual-generate-api" class="btn-secondary" type="button" title="DocstringからPythonモジュールのAPIリファレンス（docs/modules/）を自動生成します">📖 APIドキュメント生成</button>
+            <button id="btn-manual-text-all" class="btn-secondary" type="button" title="原稿内のすべてのAIテキストタスク（ai:task）をAIで一括生成・最新化します">✍️ 全AIテキスト更新</button>
             <button id="btn-manual-open-settings" class="btn-secondary" type="button" title="HTML出力先、Markdown原稿パス、AI設定を開きます">⚙️ 設定</button>
             <button id="manual-build-draft" class="btn-secondary" type="button" title="未完成タスクをプレースホルダーとして残したまま下書きサイトをビルドします">下書きビルド</button>
             <button id="manual-build" class="btn-primary" type="button" title="全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します">🚀 完成版ビルド</button>
@@ -172,35 +172,14 @@
         </div>
         <div class="manual-layout">
           <div class="manual-editor">
-            <!-- 1. 自動同期アセット一覧（スクリーンショット & ダイアグラム） -->
+            <!-- 1. 自動同期アセット一覧（スクリーンショット・ダイアグラム・AIテキスト） -->
             <div class="manual-card">
               <div class="manual-card-header">
                 <h3>同期アセット一覧</h3>
                 <span id="manual-assets-summary" class="manual-assets-summary">0 件のアセット</span>
               </div>
-              <p>Markdown 原稿内の <code>ai:task</code> に基づき、実画面画像や Mermaid 図を自動で同期・差し替えます。</p>
+              <p>Markdown 原稿内の <code>ai:task</code> に基づき、実画面画像や Mermaid 図、解説文を自動で同期・差し替えます。</p>
               <div id="manual-tasks" class="manual-tasks"></div>
-            </div>
-
-            <!-- 2. API リファレンス自動生成 -->
-            <div class="manual-card">
-              <div class="manual-card-header">
-                <h3>API リファレンス生成</h3>
-                <button id="btn-manual-api-run" class="btn-secondary btn-sm" type="button">今すぐ生成</button>
-              </div>
-              <p>解析した全 Python モジュールの Docstring・クラス・関数・依存図から、MkDocs 用の API リファレンス（<code>docs/modules/*.md</code>）を自動生成します。</p>
-              <div class="form-row">
-                <label>出力言語
-                  <select id="manual-api-lang">
-                    <option value="auto">自動 (ロケール依存)</option>
-                    <option value="ja">日本語 (ja)</option>
-                    <option value="en">English (en)</option>
-                  </select>
-                </label>
-                <div style="font-size: 0.8rem; color: var(--text-muted); align-self: center; margin-top: 14px;">
-                  ※ Markdown 原稿内（<code>docs/modules/</code>）に自動出力されます
-                </div>
-              </div>
             </div>
 
             <p id="manual-status" role="status"></p>

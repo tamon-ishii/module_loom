@@ -70,11 +70,11 @@
           "parent_view": "manual-view"
         },
         {
-          "id": "btn-manual-generate-api",
-          "selector": "#btn-manual-generate-api",
-          "name": "📖 APIドキュメント生成",
+          "id": "btn-manual-text-all",
+          "selector": "#btn-manual-text-all",
+          "name": "✍️ 全AIテキスト更新",
           "role": "button",
-          "title": "DocstringからPythonモジュールのAPIリファレンス（docs/modules/）を自動生成します",
+          "title": "原稿内のすべてのAIテキストタスク（ai:task）をAIで一括生成・最新化します",
           "parent_view": "manual-view"
         },
         {
@@ -99,14 +99,6 @@
           "name": "🚀 完成版ビルド",
           "role": "button",
           "title": "全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します",
-          "parent_view": "manual-view"
-        },
-        {
-          "id": "btn-manual-api-run",
-          "selector": "#btn-manual-api-run",
-          "name": "今すぐ生成",
-          "role": "button",
-          "title": null,
           "parent_view": "manual-view"
         },
         {
@@ -147,14 +139,6 @@
           "name": "🔄 プレビュー更新",
           "role": "button",
           "title": "ドキュメント状態とプレビューを最新に更新",
-          "parent_view": "manual-view"
-        },
-        {
-          "id": "manual-api-lang",
-          "selector": "#manual-api-lang",
-          "name": "manual-api-lang",
-          "role": "input",
-          "title": null,
           "parent_view": "manual-view"
         },
         {
@@ -359,5 +343,5 @@
       ]
     }
   ],
-  "total_elements": 36
+  "total_elements": 34
 }

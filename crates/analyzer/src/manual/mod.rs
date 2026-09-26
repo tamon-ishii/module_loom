@@ -26,6 +26,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "save",
         "draft",
         "generate-task",
+        "generate-text-all",
         "generate-diagram-all",
         "generate-api",
         "approve",
@@ -156,6 +157,22 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let feedback = feedback_opt.unwrap_or("");
             author::generate_task(root, task_id, cli, feedback)?;
             Ok(String::new())
+        }
+        "generate-text-all" => {
+            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let task_list = task::tasks(&templates_path)?;
+            let mut updated = 0;
+            for t in task_list {
+                if t.kind == "text" {
+                    if author::generate_task(root, &t.id, cli, "").is_ok() {
+                        updated += 1;
+                    }
+                }
+            }
+            let res = serde_json::json!({
+                "updated": updated
+            });
+            Ok(res.to_string())
         }
         "generate-diagram-all" => {
             let cli = cli_opt.unwrap_or("target/debug/analyze");

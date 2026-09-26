@@ -289,9 +289,7 @@ const manualMkdocsDirUrls = document.getElementById("manual-mkdocs-dir-urls") as
 const manualTasks = document.getElementById("manual-tasks") as HTMLElement;
 const btnManualCaptureAll = document.getElementById("btn-manual-capture-all") as HTMLButtonElement | null;
 const btnManualDiagramAll = document.getElementById("btn-manual-diagram-all") as HTMLButtonElement | null;
-const btnManualGenerateApi = document.getElementById("btn-manual-generate-api") as HTMLButtonElement | null;
-const btnManualApiRun = document.getElementById("btn-manual-api-run") as HTMLButtonElement | null;
-const manualApiLang = document.getElementById("manual-api-lang") as HTMLSelectElement | null;
+const btnManualTextAll = document.getElementById("btn-manual-text-all") as HTMLButtonElement | null;
 const manualStatus = document.getElementById("manual-status") as HTMLElement;
 const manualPage = document.getElementById("manual-page") as HTMLSelectElement;
 const manualPreview = document.getElementById("manual-preview") as HTMLElement;
@@ -877,8 +875,12 @@ function renderManualTasks(tasks: ManualTask[]): void {
         <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="ダイアグラムの調整指示を出します">💬 修正指示</button>
       `;
     } else {
+      const textBtnLabel = task.status === "missing" ? "✍️ AIテキスト作成" : "✍️ AIテキスト更新";
+      const textBtnTitle = task.status === "missing"
+        ? "AIがこのタスクの解説文を生成します"
+        : "最新のコードと設定を参照してAIテキストを再生成・更新します";
       actions = `
-        <button type="button" data-manual-generate="${escapeHtml(task.id)}" class="btn-secondary">AIで作成</button>
+        <button type="button" data-manual-generate="${escapeHtml(task.id)}" class="btn-secondary" title="${textBtnTitle}">${textBtnLabel}</button>
         <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="文章の修正指示を出します">💬 修正指示</button>
       `;
     }
@@ -1345,26 +1347,23 @@ btnManualDiagramAll?.addEventListener("click", async () => {
   }
 });
 
-async function runGenerateApi(): Promise<void> {
+btnManualTextAll?.addEventListener("click", async () => {
   if (manualBusy) return;
   manualBusy = true;
-  manualStatus.textContent = "DocstringからAPIドキュメントを生成中…";
+  manualStatus.textContent = "全AIテキストタスク（ai:task）を一括更新中…";
   manualView.setAttribute("aria-busy", "true");
   try {
-    const lang = manualApiLang?.value || "auto";
-    const res = JSON.parse(await callManual("generate-api", { lang })) as { count: number; api_page: string };
+    const res = JSON.parse(await callManual("generate-text-all")) as { updated: number };
     await callManual("build", { draft: true });
-    manualStatus.textContent = `${res.count} 件のモジュールから最新 API ドキュメント（docs/modules/, docs/api.md）を自動生成しました！`;
+    manualStatus.textContent = `${res.updated} 件のAIテキスト（ai:task）を一括更新しました`;
   } catch (e) {
-    manualStatus.textContent = `APIドキュメント生成失敗: ${String(e)}`;
+    manualStatus.textContent = `AIテキスト更新失敗: ${String(e)}`;
   } finally {
     manualBusy = false;
     manualView.removeAttribute("aria-busy");
     await refreshManual();
   }
-}
-btnManualGenerateApi?.addEventListener("click", () => void runGenerateApi());
-btnManualApiRun?.addEventListener("click", () => void runGenerateApi());
+});
 
 manualTasks.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
