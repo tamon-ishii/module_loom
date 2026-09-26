@@ -1,0 +1,1787 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-09-26T17:24:15Z",
+  "pages": {
+    "modules/0008.md": {
+      "path": "modules/0008.md",
+      "title": "app.order.controller",
+      "symbols": [
+        "app.common.utils",
+        "app.api",
+        "app.order",
+        "app.common",
+        "app.order.processor",
+        "handle_create_order",
+        "create_order",
+        "app",
+        "app.order.controller"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0010.md": {
+      "path": "modules/0010.md",
+      "title": "app.order.payment",
+      "symbols": [
+        "app.order.payment",
+        "refund_payment",
+        "app",
+        "app.order.processor",
+        "app.common.database",
+        "app.order",
+        "process_payment_gateway",
+        "app.common"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0007.md": {
+      "path": "modules/0007.md",
+      "title": "app.order",
+      "symbols": [
+        "app",
+        "app.order"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0003.md": {
+      "path": "modules/0003.md",
+      "title": "app.common.database",
+      "symbols": [
+        "app.user.service",
+        "app.user",
+        "close",
+        "get_db",
+        "app.user.session",
+        "__init__",
+        "app.order",
+        "app.order.processor",
+        "DatabaseConnection",
+        "app.common.logger",
+        "app.order.payment",
+        "execute_query",
+        "connect",
+        "app.common",
+        "app",
+        "app.common.database"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0012.md": {
+      "path": "modules/0012.md",
+      "title": "app.user",
+      "symbols": [
+        "app.user",
+        "app"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "diagnostics.md": {
+      "path": "diagnostics.md",
+      "title": "コード診断を実行する",
+      "symbols": [
+        "app"
+      ],
+      "ui_elements": [
+        "#btn-install-skill",
+        "#btn-quality"
+      ],
+      "configs": [],
+      "assets": [
+        "assets/diagnostics-screenshot.png"
+      ],
+      "tasks": []
+    },
+    "modules/0013.md": {
+      "path": "modules/0013.md",
+      "title": "app.user.activity",
+      "symbols": [
+        "login",
+        "summarize_logins",
+        "summarize_sessions",
+        "app",
+        "app.user",
+        "app.user.activity"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "api.md": {
+      "path": "api.md",
+      "title": "APIリファレンス",
+      "symbols": [
+        "audit_order_step_8",
+        "export_refunds",
+        "rule_engine_evaluate_98",
+        "validate_session",
+        "start_api_server",
+        "app.common",
+        "compliance_check_gdpr",
+        "calculate_handling_fees",
+        "audit_order_step_7",
+        "process_payment_gateway",
+        "rule_engine_evaluate_13",
+        "compliance_check_iso27001",
+        "audit_order_step_23",
+        "rule_engine_evaluate_96",
+        "summarize_sessions",
+        "rule_engine_evaluate_53",
+        "rule_engine_evaluate_01",
+        "app",
+        "rule_engine_evaluate_17",
+        "summarize_logins",
+        "release_inventory_batch",
+        "validate_inventory",
+        "rule_engine_evaluate_12",
+        "rule_engine_evaluate_40",
+        "audit_order_step_12",
+        "rule_engine_evaluate_93",
+        "login",
+        "create_order",
+        "rule_engine_evaluate_43",
+        "app.user.activity",
+        "connect",
+        "rule_engine_evaluate_88",
+        "rule_engine_evaluate_25",
+        "__init__",
+        "rule_engine_evaluate_63",
+        "app.user.auth",
+        "rule_engine_evaluate_03",
+        "rule_engine_evaluate_36",
+        "rule_engine_evaluate_16",
+        "rule_engine_evaluate_83",
+        "notify_shipping_carrier",
+        "app.user.service",
+        "rule_engine_evaluate_31",
+        "OrderItem",
+        "rule_engine_evaluate_68",
+        "rule_engine_evaluate_21",
+        "rule_engine_evaluate_07",
+        "hash_password",
+        "app.order.export",
+        "audit_order_step_4",
+        "rule_engine_evaluate_45",
+        "verify_auth_token",
+        "rule_engine_evaluate_72",
+        "rule_engine_evaluate_91",
+        "audit_order_step_24",
+        "calculate_discount",
+        "rule_engine_evaluate_59",
+        "rule_engine_evaluate_73",
+        "verify_postal_code",
+        "rule_engine_evaluate_95",
+        "rule_engine_evaluate_26",
+        "rule_engine_evaluate_99",
+        "audit_order_step_25",
+        "rule_engine_evaluate_51",
+        "rule_engine_evaluate_10",
+        "app.api",
+        "compliance_check_export_restrictions",
+        "rule_engine_evaluate_28",
+        "close",
+        "rule_engine_evaluate_38",
+        "rule_engine_evaluate_42",
+        "app.common.logger",
+        "rule_engine_evaluate_47",
+        "rule_engine_evaluate_97",
+        "rule_engine_evaluate_60",
+        "rule_engine_evaluate_44",
+        "audit_order_step_6",
+        "rule_engine_evaluate_20",
+        "rule_engine_evaluate_54",
+        "rule_engine_evaluate_18",
+        "audit_order_step_3",
+        "notify_warehouse_dock",
+        "audit_order_step_19",
+        "rule_engine_evaluate_50",
+        "rule_engine_evaluate_64",
+        "audit_order_step_14",
+        "rule_engine_evaluate_84",
+        "rule_engine_evaluate_04",
+        "sync_warehouse_status",
+        "rule_engine_evaluate_87",
+        "UserService",
+        "rule_engine_evaluate_11",
+        "ApiServer",
+        "audit_order_step_5",
+        "rule_engine_evaluate_81",
+        "compliance_check_data_retention",
+        "rule_engine_evaluate_35",
+        "rule_engine_evaluate_06",
+        "rule_engine_evaluate_56",
+        "rule_engine_evaluate_92",
+        "get_config",
+        "OrderProcessor",
+        "audit_order_step_17",
+        "rule_engine_evaluate_94",
+        "rule_engine_evaluate_69",
+        "rule_engine_evaluate_57",
+        "rule_engine_evaluate_08",
+        "compliance_check_local_regulations",
+        "compliance_check_fraud_indicators",
+        "compliance_check_tax_report",
+        "app.common.database",
+        "rule_engine_evaluate_67",
+        "rule_engine_evaluate_39",
+        "rule_engine_evaluate_82",
+        "route_request",
+        "rule_engine_evaluate_37",
+        "rule_engine_evaluate_78",
+        "get_profile",
+        "execute_query",
+        "app.order.processor",
+        "main",
+        "rule_engine_evaluate_71",
+        "rule_engine_evaluate_74",
+        "check_item_batch_availability",
+        "export_orders",
+        "log_error",
+        "rule_engine_evaluate_48",
+        "audit_order_step_2",
+        "refund_payment",
+        "generate_packaging_slip",
+        "rule_engine_evaluate_05",
+        "rule_engine_evaluate_77",
+        "rule_engine_evaluate_14",
+        "rule_engine_evaluate_89",
+        "calculate_shipping",
+        "audit_order_step_9",
+        "compliance_check_ip_blacklist",
+        "estimate_delivery_date",
+        "compliance_check_soc2",
+        "rule_engine_evaluate_02",
+        "rule_engine_evaluate_27",
+        "handle_create_order",
+        "rule_engine_evaluate_90",
+        "app.user.session",
+        "rule_engine_evaluate_19",
+        "rule_engine_evaluate_61",
+        "DatabaseConnection",
+        "app.user",
+        "rule_engine_evaluate_76",
+        "rule_engine_evaluate_46",
+        "rule_engine_evaluate_79",
+        "rule_engine_evaluate_15",
+        "rule_engine_evaluate_100",
+        "handle_login",
+        "rule_engine_evaluate_58",
+        "rule_engine_evaluate_55",
+        "app.common.utils",
+        "audit_order_step_21",
+        "get_db",
+        "rule_engine_evaluate_23",
+        "rule_engine_evaluate_09",
+        "rule_engine_evaluate_70",
+        "log_info",
+        "app.order",
+        "app.user.router",
+        "subtotal",
+        "rule_engine_evaluate_33",
+        "format_currency",
+        "rule_engine_evaluate_49",
+        "audit_order_step_16",
+        "audit_order_step_22",
+        "rule_engine_evaluate_75",
+        "audit_order_step_11",
+        "handle_get_user",
+        "rule_engine_evaluate_65",
+        "create_session",
+        "rule_engine_evaluate_29",
+        "rule_engine_evaluate_24",
+        "authenticate_user",
+        "audit_order_step_20",
+        "lock_inventory_batch",
+        "audit_order_step_1",
+        "get_active_session",
+        "rule_engine_evaluate_86",
+        "update_order_status",
+        "rule_engine_evaluate_52",
+        "app.order.controller",
+        "rule_engine_evaluate_62",
+        "generate_uuid",
+        "rule_engine_evaluate_34",
+        "rule_engine_evaluate_30",
+        "app.config",
+        "rule_engine_evaluate_66",
+        "compliance_check_pci_dss",
+        "audit_order_step_15",
+        "audit_order_step_13",
+        "rule_engine_evaluate_85",
+        "calculate_tax",
+        "rule_engine_evaluate_41",
+        "audit_order_step_18",
+        "rule_engine_evaluate_32",
+        "Config",
+        "rule_engine_evaluate_80",
+        "rule_engine_evaluate_22",
+        "audit_order_step_10",
+        "app.order.payment"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0006.md": {
+      "path": "modules/0006.md",
+      "title": "app.config",
+      "symbols": [
+        "app.api",
+        "main",
+        "Config",
+        "get_config",
+        "app",
+        "app.config"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0016.md": {
+      "path": "modules/0016.md",
+      "title": "app.user.service",
+      "symbols": [
+        "login",
+        "app.common",
+        "app",
+        "app.user",
+        "main",
+        "app.common.database",
+        "app.user.router",
+        "app.user.auth",
+        "app.user.session",
+        "app.user.service",
+        "get_profile",
+        "UserService",
+        "__init__"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "open-tool-window.md": {
+      "path": "open-tool-window.md",
+      "title": "ツールウィンドウを開く",
+      "symbols": [
+        "app"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [
+        "assets/tool-window-settings-screenshot.png"
+      ],
+      "tasks": []
+    },
+    "modules/0005.md": {
+      "path": "modules/0005.md",
+      "title": "app.common.utils",
+      "symbols": [
+        "app.user.session",
+        "app.order.controller",
+        "hash_password",
+        "app.common.utils",
+        "generate_uuid",
+        "app.order",
+        "app.user.auth",
+        "app.common",
+        "format_currency",
+        "app.order.processor",
+        "app",
+        "app.user"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "dependency-graph.md": {
+      "path": "dependency-graph.md",
+      "title": "モジュール依存図を読む",
+      "symbols": [
+        "app.user.service",
+        "app.common.logger",
+        "main",
+        "app.user.activity",
+        "app.config",
+        "app.order",
+        "app.user",
+        "app",
+        "app.common.utils",
+        "app.order.export",
+        "app.order.processor",
+        "app.common",
+        "app.user.session",
+        "app.user.router",
+        "app.order.controller",
+        "app.user.auth",
+        "app.order.payment",
+        "app.common.database",
+        "app.api"
+      ],
+      "ui_elements": [],
+      "configs": [
+        "mkdocs.theme"
+      ],
+      "assets": [
+        "assets/graph-view-screenshot.png"
+      ],
+      "tasks": []
+    },
+    "modules/0011.md": {
+      "path": "modules/0011.md",
+      "title": "app.order.processor",
+      "symbols": [
+        "rule_engine_evaluate_31",
+        "rule_engine_evaluate_81",
+        "audit_order_step_17",
+        "rule_engine_evaluate_74",
+        "audit_order_step_20",
+        "rule_engine_evaluate_80",
+        "rule_engine_evaluate_79",
+        "audit_order_step_8",
+        "rule_engine_evaluate_25",
+        "rule_engine_evaluate_51",
+        "rule_engine_evaluate_26",
+        "rule_engine_evaluate_92",
+        "OrderItem",
+        "rule_engine_evaluate_78",
+        "rule_engine_evaluate_50",
+        "compliance_check_soc2",
+        "rule_engine_evaluate_19",
+        "rule_engine_evaluate_83",
+        "rule_engine_evaluate_54",
+        "audit_order_step_7",
+        "rule_engine_evaluate_01",
+        "audit_order_step_19",
+        "rule_engine_evaluate_99",
+        "rule_engine_evaluate_41",
+        "rule_engine_evaluate_68",
+        "rule_engine_evaluate_48",
+        "rule_engine_evaluate_14",
+        "audit_order_step_3",
+        "audit_order_step_6",
+        "compliance_check_local_regulations",
+        "audit_order_step_1",
+        "rule_engine_evaluate_58",
+        "rule_engine_evaluate_47",
+        "rule_engine_evaluate_16",
+        "rule_engine_evaluate_05",
+        "audit_order_step_21",
+        "rule_engine_evaluate_15",
+        "rule_engine_evaluate_55",
+        "rule_engine_evaluate_85",
+        "validate_inventory",
+        "app.common.database",
+        "rule_engine_evaluate_100",
+        "rule_engine_evaluate_43",
+        "rule_engine_evaluate_59",
+        "rule_engine_evaluate_37",
+        "rule_engine_evaluate_71",
+        "rule_engine_evaluate_86",
+        "audit_order_step_23",
+        "audit_order_step_14",
+        "verify_postal_code",
+        "rule_engine_evaluate_03",
+        "audit_order_step_22",
+        "rule_engine_evaluate_61",
+        "rule_engine_evaluate_62",
+        "rule_engine_evaluate_24",
+        "audit_order_step_10",
+        "compliance_check_tax_report",
+        "sync_warehouse_status",
+        "compliance_check_data_retention",
+        "rule_engine_evaluate_21",
+        "app",
+        "app.order.payment",
+        "rule_engine_evaluate_11",
+        "audit_order_step_15",
+        "calculate_handling_fees",
+        "rule_engine_evaluate_44",
+        "rule_engine_evaluate_63",
+        "rule_engine_evaluate_42",
+        "rule_engine_evaluate_22",
+        "rule_engine_evaluate_65",
+        "rule_engine_evaluate_49",
+        "calculate_shipping",
+        "rule_engine_evaluate_29",
+        "rule_engine_evaluate_13",
+        "audit_order_step_16",
+        "update_order_status",
+        "rule_engine_evaluate_07",
+        "__init__",
+        "rule_engine_evaluate_69",
+        "lock_inventory_batch",
+        "subtotal",
+        "rule_engine_evaluate_34",
+        "rule_engine_evaluate_87",
+        "rule_engine_evaluate_27",
+        "rule_engine_evaluate_76",
+        "audit_order_step_13",
+        "rule_engine_evaluate_06",
+        "check_item_batch_availability",
+        "app.order.processor",
+        "rule_engine_evaluate_23",
+        "compliance_check_iso27001",
+        "rule_engine_evaluate_36",
+        "rule_engine_evaluate_77",
+        "rule_engine_evaluate_97",
+        "release_inventory_batch",
+        "app.order.controller",
+        "calculate_tax",
+        "rule_engine_evaluate_64",
+        "rule_engine_evaluate_73",
+        "rule_engine_evaluate_28",
+        "compliance_check_gdpr",
+        "compliance_check_export_restrictions",
+        "audit_order_step_11",
+        "rule_engine_evaluate_46",
+        "rule_engine_evaluate_91",
+        "compliance_check_ip_blacklist",
+        "rule_engine_evaluate_39",
+        "rule_engine_evaluate_94",
+        "rule_engine_evaluate_84",
+        "estimate_delivery_date",
+        "rule_engine_evaluate_75",
+        "rule_engine_evaluate_89",
+        "rule_engine_evaluate_66",
+        "rule_engine_evaluate_70",
+        "rule_engine_evaluate_93",
+        "rule_engine_evaluate_56",
+        "compliance_check_fraud_indicators",
+        "rule_engine_evaluate_96",
+        "rule_engine_evaluate_02",
+        "create_order",
+        "rule_engine_evaluate_53",
+        "rule_engine_evaluate_98",
+        "compliance_check_pci_dss",
+        "rule_engine_evaluate_60",
+        "rule_engine_evaluate_38",
+        "audit_order_step_2",
+        "rule_engine_evaluate_57",
+        "audit_order_step_18",
+        "calculate_discount",
+        "notify_warehouse_dock",
+        "rule_engine_evaluate_12",
+        "audit_order_step_9",
+        "audit_order_step_12",
+        "rule_engine_evaluate_72",
+        "app.order",
+        "OrderProcessor",
+        "app.common.utils",
+        "rule_engine_evaluate_20",
+        "rule_engine_evaluate_18",
+        "audit_order_step_4",
+        "rule_engine_evaluate_04",
+        "rule_engine_evaluate_33",
+        "rule_engine_evaluate_95",
+        "rule_engine_evaluate_67",
+        "rule_engine_evaluate_52",
+        "rule_engine_evaluate_90",
+        "rule_engine_evaluate_82",
+        "app.common",
+        "rule_engine_evaluate_17",
+        "notify_shipping_carrier",
+        "audit_order_step_5",
+        "audit_order_step_25",
+        "rule_engine_evaluate_45",
+        "rule_engine_evaluate_30",
+        "rule_engine_evaluate_35",
+        "rule_engine_evaluate_32",
+        "generate_packaging_slip",
+        "rule_engine_evaluate_08",
+        "rule_engine_evaluate_40",
+        "rule_engine_evaluate_10",
+        "audit_order_step_24",
+        "rule_engine_evaluate_88",
+        "rule_engine_evaluate_09"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0018.md": {
+      "path": "modules/0018.md",
+      "title": "main",
+      "symbols": [
+        "main",
+        "app",
+        "app.common.logger",
+        "app.common",
+        "app.config",
+        "app.api"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0014.md": {
+      "path": "modules/0014.md",
+      "title": "app.user.auth",
+      "symbols": [
+        "app",
+        "verify_auth_token",
+        "app.user.auth",
+        "app.user",
+        "app.user.session",
+        "app.user.service",
+        "app.common.utils",
+        "app.common",
+        "authenticate_user"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0009.md": {
+      "path": "modules/0009.md",
+      "title": "app.order.export",
+      "symbols": [
+        "app.order.export",
+        "export_refunds",
+        "export_orders",
+        "app",
+        "app.order"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0017.md": {
+      "path": "modules/0017.md",
+      "title": "app.user.session",
+      "symbols": [
+        "app.user.auth",
+        "app.common.utils",
+        "app.common.database",
+        "app.user.service",
+        "app.common",
+        "app.user.session",
+        "create_session",
+        "get_active_session",
+        "app",
+        "app.user",
+        "validate_session"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0004.md": {
+      "path": "modules/0004.md",
+      "title": "app.common.logger",
+      "symbols": [
+        "app.common",
+        "log_error",
+        "app",
+        "app.common.database",
+        "app.common.logger",
+        "log_info",
+        "main"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "documentation-preview.md": {
+      "path": "documentation-preview.md",
+      "title": "ドキュメント生成とプレビュー",
+      "symbols": [
+        "app",
+        "main"
+      ],
+      "ui_elements": [
+        "#btn-preview-mode-md",
+        "#btn-preview-mode-html",
+        "#btn-manual-open-settings",
+        "#btn-manual-diagram-all",
+        "#btn-manual-capture-all",
+        "#manual-build",
+        "#btn-manual-generate-api",
+        "#manual-build-draft"
+      ],
+      "configs": [
+        "mkdocs.language"
+      ],
+      "assets": [
+        "assets/<ファイル名>.png",
+        "assets/annotation-rect-example.png",
+        "assets/manual-tab-screenshot.png",
+        "assets/annotation-circle-example.png",
+        "assets/annotation-components-preview.png",
+        "assets/overview-screenshot.png"
+      ],
+      "tasks": []
+    },
+    "index.md": {
+      "path": "index.md",
+      "title": "ModuleLoom for PyCharm 利用ガイド",
+      "symbols": [],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [
+        "assets/overview-screenshot.png"
+      ],
+      "tasks": []
+    },
+    "modules/0001.md": {
+      "path": "modules/0001.md",
+      "title": "app.api",
+      "symbols": [
+        "app.order.controller",
+        "app.config",
+        "start_api_server",
+        "app.order",
+        "__init__",
+        "app.user",
+        "main",
+        "ApiServer",
+        "route_request",
+        "app",
+        "app.api",
+        "app.user.router"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0000.md": {
+      "path": "modules/0000.md",
+      "title": "app",
+      "symbols": [
+        "app"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0002.md": {
+      "path": "modules/0002.md",
+      "title": "app.common",
+      "symbols": [
+        "app.common",
+        "app"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    },
+    "modules/0015.md": {
+      "path": "modules/0015.md",
+      "title": "app.user.router",
+      "symbols": [
+        "app",
+        "app.api",
+        "handle_login",
+        "app.user",
+        "login",
+        "app.user.router",
+        "handle_get_user",
+        "app.user.service"
+      ],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [],
+      "tasks": []
+    }
+  },
+  "symbol_to_pages": {
+    "audit_order_step_12": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_06": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "check_item_batch_availability": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "estimate_delivery_date": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_65": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "calculate_tax": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "notify_warehouse_dock": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_40": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_93": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "log_info": [
+      "api.md",
+      "modules/0004.md"
+    ],
+    "rule_engine_evaluate_07": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_16": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_24": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "login": [
+      "api.md",
+      "modules/0013.md",
+      "modules/0015.md",
+      "modules/0016.md"
+    ],
+    "rule_engine_evaluate_41": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_6": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_11": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_46": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_98": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app": [
+      "api.md",
+      "dependency-graph.md",
+      "diagnostics.md",
+      "documentation-preview.md",
+      "modules/0000.md",
+      "modules/0001.md",
+      "modules/0002.md",
+      "modules/0003.md",
+      "modules/0004.md",
+      "modules/0005.md",
+      "modules/0006.md",
+      "modules/0007.md",
+      "modules/0008.md",
+      "modules/0009.md",
+      "modules/0010.md",
+      "modules/0011.md",
+      "modules/0012.md",
+      "modules/0013.md",
+      "modules/0014.md",
+      "modules/0015.md",
+      "modules/0016.md",
+      "modules/0017.md",
+      "modules/0018.md",
+      "open-tool-window.md"
+    ],
+    "rule_engine_evaluate_14": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.api": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0006.md",
+      "modules/0008.md",
+      "modules/0015.md",
+      "modules/0018.md"
+    ],
+    "rule_engine_evaluate_100": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_14": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "log_error": [
+      "api.md",
+      "modules/0004.md"
+    ],
+    "audit_order_step_23": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_68": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_66": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_60": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "summarize_sessions": [
+      "api.md",
+      "modules/0013.md"
+    ],
+    "rule_engine_evaluate_76": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.common.utils": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0005.md",
+      "modules/0008.md",
+      "modules/0011.md",
+      "modules/0014.md",
+      "modules/0017.md"
+    ],
+    "OrderProcessor": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "hash_password": [
+      "api.md",
+      "modules/0005.md"
+    ],
+    "audit_order_step_21": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "Config": [
+      "api.md",
+      "modules/0006.md"
+    ],
+    "process_payment_gateway": [
+      "api.md",
+      "modules/0010.md"
+    ],
+    "export_refunds": [
+      "api.md",
+      "modules/0009.md"
+    ],
+    "rule_engine_evaluate_28": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_95": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "validate_inventory": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_94": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_82": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "get_db": [
+      "api.md",
+      "modules/0003.md"
+    ],
+    "rule_engine_evaluate_86": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.common.logger": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0004.md",
+      "modules/0018.md"
+    ],
+    "rule_engine_evaluate_81": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_2": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user.session": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0005.md",
+      "modules/0014.md",
+      "modules/0016.md",
+      "modules/0017.md"
+    ],
+    "app.order.payment": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0010.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_34": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_54": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_55": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_23": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "format_currency": [
+      "api.md",
+      "modules/0005.md"
+    ],
+    "create_session": [
+      "api.md",
+      "modules/0017.md"
+    ],
+    "audit_order_step_15": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_77": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_21": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "create_order": [
+      "api.md",
+      "modules/0008.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_27": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "connect": [
+      "api.md",
+      "modules/0003.md"
+    ],
+    "rule_engine_evaluate_10": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_15": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "UserService": [
+      "api.md",
+      "modules/0016.md"
+    ],
+    "rule_engine_evaluate_38": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_13": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_39": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_44": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_19": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_export_restrictions": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "lock_inventory_batch": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_43": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_11": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_52": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_62": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_local_regulations": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_47": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_13": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_17": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "route_request": [
+      "api.md",
+      "modules/0001.md"
+    ],
+    "rule_engine_evaluate_30": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_32": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_1": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "validate_session": [
+      "api.md",
+      "modules/0017.md"
+    ],
+    "rule_engine_evaluate_80": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user.auth": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0005.md",
+      "modules/0014.md",
+      "modules/0016.md",
+      "modules/0017.md"
+    ],
+    "rule_engine_evaluate_05": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "handle_login": [
+      "api.md",
+      "modules/0015.md"
+    ],
+    "rule_engine_evaluate_12": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_79": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user.service": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0014.md",
+      "modules/0015.md",
+      "modules/0016.md",
+      "modules/0017.md"
+    ],
+    "app.common.database": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0004.md",
+      "modules/0010.md",
+      "modules/0011.md",
+      "modules/0016.md",
+      "modules/0017.md"
+    ],
+    "subtotal": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_19": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0003.md",
+      "modules/0005.md",
+      "modules/0012.md",
+      "modules/0013.md",
+      "modules/0014.md",
+      "modules/0015.md",
+      "modules/0016.md",
+      "modules/0017.md"
+    ],
+    "rule_engine_evaluate_50": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "update_order_status": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_18": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_99": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_67": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_17": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_48": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_58": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_75": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_63": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_53": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "verify_postal_code": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_59": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "close": [
+      "api.md",
+      "modules/0003.md"
+    ],
+    "refund_payment": [
+      "api.md",
+      "modules/0010.md"
+    ],
+    "OrderItem": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "sync_warehouse_status": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "generate_packaging_slip": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_18": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_iso27001": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_03": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_25": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.order.export": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0009.md"
+    ],
+    "rule_engine_evaluate_92": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_69": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_tax_report": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.order.processor": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0003.md",
+      "modules/0005.md",
+      "modules/0008.md",
+      "modules/0010.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_25": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_soc2": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.order": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0003.md",
+      "modules/0005.md",
+      "modules/0007.md",
+      "modules/0008.md",
+      "modules/0009.md",
+      "modules/0010.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_20": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_36": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_16": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_97": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_64": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_fraud_indicators": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "execute_query": [
+      "api.md",
+      "modules/0003.md"
+    ],
+    "rule_engine_evaluate_83": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_88": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_8": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_42": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_35": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.common": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0002.md",
+      "modules/0003.md",
+      "modules/0004.md",
+      "modules/0005.md",
+      "modules/0008.md",
+      "modules/0010.md",
+      "modules/0011.md",
+      "modules/0014.md",
+      "modules/0016.md",
+      "modules/0017.md",
+      "modules/0018.md"
+    ],
+    "get_profile": [
+      "api.md",
+      "modules/0016.md"
+    ],
+    "rule_engine_evaluate_90": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_4": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_09": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_20": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_01": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.config": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0006.md",
+      "modules/0018.md"
+    ],
+    "rule_engine_evaluate_51": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user.activity": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0013.md"
+    ],
+    "compliance_check_data_retention": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_ip_blacklist": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "notify_shipping_carrier": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_29": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_22": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "generate_uuid": [
+      "api.md",
+      "modules/0005.md"
+    ],
+    "calculate_handling_fees": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.order.controller": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0005.md",
+      "modules/0008.md",
+      "modules/0011.md"
+    ],
+    "summarize_logins": [
+      "api.md",
+      "modules/0013.md"
+    ],
+    "get_config": [
+      "api.md",
+      "modules/0006.md"
+    ],
+    "audit_order_step_5": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_49": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_7": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_73": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_24": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_85": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_gdpr": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_72": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_9": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "compliance_check_pci_dss": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_10": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_56": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_78": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_04": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "get_active_session": [
+      "api.md",
+      "modules/0017.md"
+    ],
+    "start_api_server": [
+      "api.md",
+      "modules/0001.md"
+    ],
+    "rule_engine_evaluate_91": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_57": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_31": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_70": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "DatabaseConnection": [
+      "api.md",
+      "modules/0003.md"
+    ],
+    "rule_engine_evaluate_37": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "app.user.router": [
+      "api.md",
+      "dependency-graph.md",
+      "modules/0001.md",
+      "modules/0015.md",
+      "modules/0016.md"
+    ],
+    "calculate_discount": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_02": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_3": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "handle_create_order": [
+      "api.md",
+      "modules/0008.md"
+    ],
+    "rule_engine_evaluate_26": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "ApiServer": [
+      "api.md",
+      "modules/0001.md"
+    ],
+    "rule_engine_evaluate_08": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "main": [
+      "api.md",
+      "dependency-graph.md",
+      "documentation-preview.md",
+      "modules/0001.md",
+      "modules/0004.md",
+      "modules/0006.md",
+      "modules/0016.md",
+      "modules/0018.md"
+    ],
+    "rule_engine_evaluate_89": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "export_orders": [
+      "api.md",
+      "modules/0009.md"
+    ],
+    "rule_engine_evaluate_61": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "audit_order_step_22": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "authenticate_user": [
+      "api.md",
+      "modules/0014.md"
+    ],
+    "__init__": [
+      "api.md",
+      "modules/0001.md",
+      "modules/0003.md",
+      "modules/0011.md",
+      "modules/0016.md"
+    ],
+    "rule_engine_evaluate_71": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "handle_get_user": [
+      "api.md",
+      "modules/0015.md"
+    ],
+    "release_inventory_batch": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "calculate_shipping": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_33": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "verify_auth_token": [
+      "api.md",
+      "modules/0014.md"
+    ],
+    "rule_engine_evaluate_84": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_87": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_74": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_96": [
+      "api.md",
+      "modules/0011.md"
+    ],
+    "rule_engine_evaluate_45": [
+      "api.md",
+      "modules/0011.md"
+    ]
+  },
+  "ui_to_pages": {
+    "#btn-manual-generate-api": [
+      "documentation-preview.md"
+    ],
+    "#btn-manual-diagram-all": [
+      "documentation-preview.md"
+    ],
+    "#manual-build": [
+      "documentation-preview.md"
+    ],
+    "#btn-preview-mode-html": [
+      "documentation-preview.md"
+    ],
+    "#btn-install-skill": [
+      "diagnostics.md"
+    ],
+    "#btn-manual-open-settings": [
+      "documentation-preview.md"
+    ],
+    "#btn-manual-capture-all": [
+      "documentation-preview.md"
+    ],
+    "#btn-preview-mode-md": [
+      "documentation-preview.md"
+    ],
+    "#manual-build-draft": [
+      "documentation-preview.md"
+    ],
+    "#btn-quality": [
+      "diagnostics.md"
+    ]
+  },
+  "task_dependencies": {}
+}

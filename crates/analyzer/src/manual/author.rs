@@ -47,16 +47,23 @@ pub fn draft(root: &Path) -> Result<(), String> {
     }
     let brief = fs::read_to_string(&brief_path).map_err(|e| e.to_string())?;
 
+    let app_context = super::context::build_application_context(root);
+
     let draft_prompt = format!(
-        "Read the project and this manual brief. Create an initial Japanese MkDocs manual outline as JSON pages. \
+        "Read the application context, AST module structure, UI Map, and manual brief below. \
+        Create a comprehensive Japanese MkDocs manual outline as JSON pages for this specific application. \
         Use Markdown files, with index.md required. \
-        Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI or real screenshots. \
+        Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI, real screenshots, or Mermaid diagrams.\n\
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
         - In the top page (index.md), place the overview/key-visual screenshot prominently near the top (immediately following the introduction paragraph), so readers see what the product looks like first. Place table of contents and page navigation links BELOW the overview.\n\
-        - kind=screenshot tasks must ONLY request capturing the raw UI image (no descriptions, explanations, or annotations in the screenshot task itself).\n\
-        - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI.\n\
+        - kind=screenshot tasks must ONLY request capturing the raw UI image, referencing real UI elements and views from the UI Map (e.g. #btn-id or button label), with optional annotation instructions (e.g. 赤枠, 赤丸, 矢印, 説明文).\n\
+        - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
-        Do not invent UI labels. Return at most 8 pages. Brief:\n{brief}"
+        - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\
+        Do not invent non-existent UI labels. Return at most 8 pages.\n\n\
+        {}\n\n\
+        Brief:\n{brief}",
+        app_context.prompt_summary
     );
 
     let schema = json!({
@@ -148,6 +155,10 @@ pub fn draft(root: &Path) -> Result<(), String> {
 
     // 自動で下書きサイトをビルド
     let _ = build(&templates, &generated, &output, true, Some(root));
+
+    // UI Map と Manual Dependency Graph を自動構築・保存
+    let _ = super::uimap::save_ui_map(root, &app_context.ui_map);
+    let _ = super::deps::build_manual_dependency_graph(root, &templates);
 
     Ok(())
 }

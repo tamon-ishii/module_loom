@@ -2,8 +2,11 @@ pub mod agent;
 pub mod author;
 pub mod builder;
 pub mod config;
+pub mod context;
+pub mod deps;
 pub mod preview;
 pub mod task;
+pub mod uimap;
 
 use std::fs;
 use std::path::Path;
@@ -30,6 +33,10 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "record-screenshot",
         "record-diagram",
         "build",
+        "ui-map",
+        "deps",
+        "impact",
+        "context",
     ];
     if !allowed.contains(&action) {
         return Err(format!("Unsupported manual action: {action}"));
@@ -55,6 +62,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut body_opt: Option<&str> = None;
     let mut project_opt: Option<&str> = None;
     let mut lang_opt: Option<&str> = None;
+    let mut ref_opt: Option<&str> = None;
 
     for (key, value) in options {
         match *key {
@@ -75,6 +83,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--body" => body_opt = Some(*value),
             "--project" => project_opt = Some(*value),
             "--lang" => lang_opt = Some(*value),
+            "--git-ref" | "--ref" => ref_opt = Some(*value),
             _ => return Err(format!("Unsupported manual option: {key}")),
         }
     }
@@ -203,6 +212,23 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "build" => {
             builder::build(&templates_path, &generated_path, &output_path, draft_flag, Some(root))
         }
+        "ui-map" => {
+            let map = uimap::extract_ui_map(root);
+            let _ = uimap::save_ui_map(root, &map);
+            serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
+        }
+        "deps" => {
+            let graph = deps::build_manual_dependency_graph(root, &templates_path);
+            serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())
+        }
+        "impact" => {
+            let report = deps::analyze_git_impact(root, ref_opt)?;
+            serde_json::to_string_pretty(&report).map_err(|e| e.to_string())
+        }
+        "context" => {
+            let ctx = context::build_application_context(root);
+            serde_json::to_string_pretty(&ctx).map_err(|e| e.to_string())
+        }
         _ => unreachable!(),
     }
 }
@@ -299,4 +325,105 @@ mod tests {
         assert!(!updated.contains("実際の PyCharm"));
         assert!(!updated.contains("図の生成元"));
     }
+
+    #[test]
+    fn test_uimap_extraction() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let html_content = r#"
+            <div id="main-view">
+                <button id="btn-start" title="Start analysis">開始</button>
+                <input id="query-input" placeholder="Search..." />
+            </div>
+        "#;
+        fs::write(root.join("index.html"), html_content).unwrap();
+
+        let src_dir = root.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let ts_content = r#"
+            const panel = document.getElementById("results-panel");
+        "#;
+        fs::write(src_dir.join("main.ts"), ts_content).unwrap();
+
+        let map = uimap::extract_ui_map(root);
+        assert!(!map.views.is_empty());
+        let all_elements: Vec<_> = map.views.iter().flat_map(|v| &v.elements).collect();
+        assert!(all_elements.iter().any(|e| e.id == "btn-start"));
+        assert!(all_elements.iter().any(|e| e.id == "query-input"));
+        assert!(all_elements.iter().any(|e| e.id == "results-panel"));
+    }
+
+    #[test]
+    fn test_context_building() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        fs::write(
+            root.join("pyproject.toml"),
+            "[project]\nname = \"sample_app\"\ndescription = \"Test app\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("README.md"),
+            "# Sample App\nThis is a sample project for testing.\n",
+        )
+        .unwrap();
+
+        let pkg = root.join("sample_app");
+        fs::create_dir_all(&pkg).unwrap();
+        fs::write(pkg.join("__init__.py"), "").unwrap();
+        fs::write(
+            pkg.join("service.py"),
+            "class AppService:\n    def run(self):\n        pass\n",
+        )
+        .unwrap();
+
+        let ctx = context::build_application_context(root);
+        assert_eq!(ctx.name, "sample_app");
+        assert!(ctx.readme_summary.contains("Sample App"));
+        assert!(ctx.key_modules.iter().any(|m| m.contains("service")));
+        assert!(ctx.prompt_summary.contains("sample_app"));
+    }
+
+    #[test]
+    fn test_dependency_graph_building() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+
+        let pkg = root.join("myapp");
+        fs::create_dir_all(&pkg).unwrap();
+        fs::write(
+            pkg.join("engine.py"),
+            "class Engine:\n    def start(self):\n        pass\n",
+        )
+        .unwrap();
+
+        fs::write(
+            root.join("index.html"),
+            r#"<button id="btn-engine">Start Engine</button>"#,
+        )
+        .unwrap();
+
+        let page = docs.join("guide.md");
+        fs::write(
+            &page,
+            "# User Guide\n\nRefer to `myapp.engine` and click #btn-engine.\n\n<!-- ai:task id=shot-engine kind=screenshot\n#btn-engine の操作画面\n-->\n",
+        )
+        .unwrap();
+
+        let graph = deps::build_manual_dependency_graph(root, &docs);
+        assert!(graph.pages.contains_key("guide.md"));
+
+        let page_dep = graph.pages.get("guide.md").unwrap();
+        assert_eq!(page_dep.title, "User Guide");
+        assert!(page_dep.symbols.contains(&"myapp.engine".to_string()));
+        assert!(page_dep.ui_elements.iter().any(|u| u.contains("btn-engine")));
+        assert!(page_dep.tasks.contains(&"shot-engine".to_string()));
+
+        assert!(graph.symbol_to_pages.contains_key("myapp.engine"));
+        assert!(graph.task_dependencies.contains_key("shot-engine"));
+    }
 }
+

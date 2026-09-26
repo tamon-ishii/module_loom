@@ -1339,6 +1339,106 @@ async function runGenerateApi(): Promise<void> {
 btnManualGenerateApi?.addEventListener("click", () => void runGenerateApi());
 btnManualApiRun?.addEventListener("click", () => void runGenerateApi());
 
+interface ImpactReport {
+  git_ref: string;
+  changed_files: string[];
+  affected_symbols: string[];
+  affected_ui_elements: string[];
+  impacted_pages: {
+    path: string;
+    reasons: string[];
+    impacted_tasks: string[];
+    requires_rebuild: boolean;
+  }[];
+  total_impacted_pages: number;
+  total_impacted_tasks: number;
+}
+
+let lastImpactReport: ImpactReport | null = null;
+
+async function runCheckImpact(): Promise<void> {
+  const btn = document.getElementById("btn-manual-impact") as HTMLButtonElement | null;
+  const banner = document.getElementById("manual-impact-banner");
+  const textEl = document.getElementById("manual-impact-text");
+  if (!btn) return;
+
+  btn.disabled = true;
+  manualStatus.textContent = "Git差分からマニュアル影響分析を実行中…";
+  try {
+    const raw = await callManual("impact");
+    const report = JSON.parse(raw) as ImpactReport;
+    lastImpactReport = report;
+
+    if (banner && textEl) {
+      if (report.total_impacted_pages > 0) {
+        banner.classList.remove("hidden");
+        textEl.textContent = `⚡ コード/UIの変更により ${report.total_impacted_pages} 件のページ（${report.impacted_pages.map((p) => p.path).join(", ")}）が影響を受けています`;
+        manualStatus.textContent = `影響分析完了: ${report.total_impacted_pages} 件のページに影響があります`;
+      } else {
+        banner.classList.add("hidden");
+        manualStatus.textContent = "影響分析完了: 直近のコード変更によるマニュアルへの影響はありません";
+      }
+    }
+  } catch (e) {
+    manualStatus.textContent = `影響分析失敗: ${String(e)}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("btn-manual-impact")?.addEventListener("click", () => void runCheckImpact());
+
+const manualImpactModal = document.getElementById("manual-impact-modal");
+const manualImpactModalBody = document.getElementById("manual-impact-modal-body");
+
+function openImpactModal() {
+  if (!manualImpactModal || !manualImpactModalBody || !lastImpactReport) return;
+  let html = `<p style="margin-top:0;"><strong>比較対象:</strong> <code>${escapeHtml(lastImpactReport.git_ref)}</code></p>`;
+  if (lastImpactReport.changed_files.length > 0) {
+    html += `<p style="margin-bottom:6px;"><strong>変更ファイル (${lastImpactReport.changed_files.length} 件):</strong></p>`;
+    html += `<ul style="margin-top:0; padding-left: 20px; color: var(--text-muted); font-size: 0.82rem;">`;
+    for (const f of lastImpactReport.changed_files.slice(0, 10)) {
+      html += `<li><code>${escapeHtml(f)}</code></li>`;
+    }
+    if (lastImpactReport.changed_files.length > 10) {
+      html += `<li>他 ${lastImpactReport.changed_files.length - 10} 件...</li>`;
+    }
+    html += `</ul>`;
+  }
+
+  html += `<h4 style="margin: 14px 0 8px 0; color: #f5a97f;">影響を受けるマニュアルページ (${lastImpactReport.total_impacted_pages} 件)</h4>`;
+  if (lastImpactReport.impacted_pages.length === 0) {
+    html += `<p style="color: var(--text-muted);">影響を受けるページはありません。</p>`;
+  } else {
+    for (const page of lastImpactReport.impacted_pages) {
+      html += `<div style="background: rgba(30, 30, 46, 0.6); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">`;
+      html += `<div style="font-weight: bold; color: var(--text-color); margin-bottom: 4px;">📄 ${escapeHtml(page.path)}</div>`;
+      html += `<ul style="margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--text-muted);">`;
+      for (const r of page.reasons) {
+        html += `<li>${escapeHtml(r)}</li>`;
+      }
+      html += `</ul>`;
+      html += `</div>`;
+    }
+  }
+
+  manualImpactModalBody.innerHTML = html;
+  manualImpactModal.classList.remove("hidden");
+}
+
+document.getElementById("btn-manual-impact-details")?.addEventListener("click", openImpactModal);
+document.getElementById("btn-close-manual-impact")?.addEventListener("click", () => {
+  manualImpactModal?.classList.add("hidden");
+});
+document.getElementById("btn-close-manual-impact-footer")?.addEventListener("click", () => {
+  manualImpactModal?.classList.add("hidden");
+});
+manualImpactModal?.addEventListener("click", (e) => {
+  if (e.target === manualImpactModal) {
+    manualImpactModal.classList.add("hidden");
+  }
+});
+
 manualTasks.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     const fbInput = (event.target as HTMLElement).closest<HTMLInputElement>(".manual-feedback-input");

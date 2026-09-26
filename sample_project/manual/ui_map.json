@@ -1,0 +1,347 @@
+{
+  "project_name": "sample_project",
+  "views": [
+    {
+      "id": "complexity-dashboard",
+      "name": "コード診断",
+      "description": null,
+      "elements": [
+        {
+          "id": "btn-quality",
+          "selector": "#btn-quality",
+          "name": "診断実行",
+          "role": "button",
+          "title": "現在のコードを診断して結果を更新",
+          "parent_view": "complexity-dashboard"
+        },
+        {
+          "id": "btn-install-skill",
+          "selector": "#btn-install-skill",
+          "name": "コード診断スキルをインストール",
+          "role": "button",
+          "title": "検出したコーディングエージェントにコード診断スキルをインストール",
+          "parent_view": "complexity-dashboard"
+        },
+        {
+          "id": "issues-search-filter",
+          "selector": "#issues-search-filter",
+          "name": "issues-search-filter",
+          "role": "input",
+          "title": null,
+          "parent_view": "complexity-dashboard"
+        }
+      ]
+    },
+    {
+      "id": "manual-view",
+      "name": "ドキュメント生成",
+      "description": null,
+      "elements": [
+        {
+          "id": "btn-manual-capture-all",
+          "selector": "#btn-manual-capture-all",
+          "name": "📸 全スクショ一括撮影",
+          "role": "button",
+          "title": "すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-diagram-all",
+          "selector": "#btn-manual-diagram-all",
+          "name": "📊 全ダイアグラム更新",
+          "role": "button",
+          "title": "プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-generate-api",
+          "selector": "#btn-manual-generate-api",
+          "name": "📖 APIドキュメント生成",
+          "role": "button",
+          "title": "DocstringからPythonモジュールのAPIリファレンス（docs/modules/）を自動生成します",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-open-settings",
+          "selector": "#btn-manual-open-settings",
+          "name": "⚙️ 設定",
+          "role": "button",
+          "title": "HTML出力先、Markdown原稿パス、AI設定を開きます",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "manual-build-draft",
+          "selector": "#manual-build-draft",
+          "name": "下書きビルド",
+          "role": "button",
+          "title": "未完成タスクをプレースホルダーとして残したまま下書きサイトをビルドします",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "manual-build",
+          "selector": "#manual-build",
+          "name": "🚀 完成版ビルド",
+          "role": "button",
+          "title": "全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-api-run",
+          "selector": "#btn-manual-api-run",
+          "name": "今すぐ生成",
+          "role": "button",
+          "title": null,
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-back",
+          "selector": "#btn-manual-back",
+          "name": "◀ 戻る",
+          "role": "button",
+          "title": "前のページに戻る",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-manual-forward",
+          "selector": "#btn-manual-forward",
+          "name": "進む ▶",
+          "role": "button",
+          "title": "次のページに進む",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-preview-mode-html",
+          "selector": "#btn-preview-mode-html",
+          "name": "HTML",
+          "role": "button",
+          "title": "MkDocsでビルドされたHTMLサイトを表示",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "btn-preview-mode-md",
+          "selector": "#btn-preview-mode-md",
+          "name": "Markdown",
+          "role": "button",
+          "title": "Markdownの簡易プレビューを表示",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "manual-refresh",
+          "selector": "#manual-refresh",
+          "name": "🔄 プレビュー更新",
+          "role": "button",
+          "title": "ドキュメント状態とプレビューを最新に更新",
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "manual-api-lang",
+          "selector": "#manual-api-lang",
+          "name": "manual-api-lang",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-view"
+        },
+        {
+          "id": "manual-page",
+          "selector": "#manual-page",
+          "name": "manual-page",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-view"
+        }
+      ]
+    },
+    {
+      "id": "callgraph-modal",
+      "name": "callgraph-modal",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-callgraph",
+          "selector": "#btn-close-callgraph",
+          "name": "&times;",
+          "role": "button",
+          "title": "閉じる",
+          "parent_view": "callgraph-modal"
+        }
+      ]
+    },
+    {
+      "id": "callgraph-cy-container",
+      "name": "callgraph-cy-container",
+      "description": "ダイアログ/モーダル",
+      "elements": []
+    },
+    {
+      "id": "ruff-fix-modal",
+      "name": "ruff-fix-modal",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-ruff-fix",
+          "selector": "#btn-close-ruff-fix",
+          "name": "&times;",
+          "role": "button",
+          "title": null,
+          "parent_view": "ruff-fix-modal"
+        },
+        {
+          "id": "btn-apply-ruff-fix",
+          "selector": "#btn-apply-ruff-fix",
+          "name": "差分を適用",
+          "role": "button",
+          "title": null,
+          "parent_view": "ruff-fix-modal"
+        }
+      ]
+    },
+    {
+      "id": "cycle-guide-modal",
+      "name": "循環インポートの解消アシスタント",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-cycle-guide",
+          "selector": "#btn-close-cycle-guide",
+          "name": "&times;",
+          "role": "button",
+          "title": "閉じる",
+          "parent_view": "cycle-guide-modal"
+        }
+      ]
+    },
+    {
+      "id": "analysis-history-modal",
+      "name": "analysis-history-modal",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-analysis-history",
+          "selector": "#btn-close-analysis-history",
+          "name": "&times;",
+          "role": "button",
+          "title": null,
+          "parent_view": "analysis-history-modal"
+        },
+        {
+          "id": "analysis-history-base",
+          "selector": "#analysis-history-base",
+          "name": "analysis-history-base",
+          "role": "input",
+          "title": null,
+          "parent_view": "analysis-history-modal"
+        },
+        {
+          "id": "analysis-history-head",
+          "selector": "#analysis-history-head",
+          "name": "analysis-history-head",
+          "role": "input",
+          "title": null,
+          "parent_view": "analysis-history-modal"
+        }
+      ]
+    },
+    {
+      "id": "git-history-modal",
+      "name": "git-history-modal",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-git-history",
+          "selector": "#btn-close-git-history",
+          "name": "&times;",
+          "role": "button",
+          "title": "閉じる",
+          "parent_view": "git-history-modal"
+        },
+        {
+          "id": "btn-cancel-git-history",
+          "selector": "#btn-cancel-git-history",
+          "name": "キャンセル",
+          "role": "button",
+          "title": null,
+          "parent_view": "git-history-modal"
+        },
+        {
+          "id": "btn-submit-git-history",
+          "selector": "#btn-submit-git-history",
+          "name": "変更ファイルを強調",
+          "role": "button",
+          "title": null,
+          "parent_view": "git-history-modal"
+        },
+        {
+          "id": "git-history-base",
+          "selector": "#git-history-base",
+          "name": "git-history-base",
+          "role": "input",
+          "title": null,
+          "parent_view": "git-history-modal"
+        },
+        {
+          "id": "git-history-head",
+          "selector": "#git-history-head",
+          "name": "git-history-head",
+          "role": "input",
+          "title": null,
+          "parent_view": "git-history-modal"
+        }
+      ]
+    },
+    {
+      "id": "manual-progress-modal",
+      "name": "AI アセット生成中",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-manual-progress",
+          "selector": "#btn-close-manual-progress",
+          "name": "&times;",
+          "role": "button",
+          "title": "閉じる",
+          "parent_view": "manual-progress-modal"
+        }
+      ]
+    },
+    {
+      "id": "manual-settings-modal",
+      "name": "ドキュメント生成・出力設定",
+      "description": "ダイアログ/モーダル",
+      "elements": [
+        {
+          "id": "btn-close-manual-settings",
+          "selector": "#btn-close-manual-settings",
+          "name": "&times;",
+          "role": "button",
+          "title": "閉じる",
+          "parent_view": "manual-settings-modal"
+        },
+        {
+          "id": "manual-root",
+          "selector": "#manual-root",
+          "name": "manual-root",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-settings-modal"
+        },
+        {
+          "id": "manual-docs",
+          "selector": "#manual-docs",
+          "name": "manual-docs",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-settings-modal"
+        },
+        {
+          "id": "manual-output",
+          "selector": "#manual-output",
+          "name": "manual-output",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-settings-modal"
+        }
+      ]
+    }
+  ],
+  "total_elements": 34
+}
