@@ -66,17 +66,30 @@ fn apply_cycle_fix(
 }
 
 #[tauri::command]
-fn analyze_project(
+async fn analyze_project(
     path: String,
     changed_files: Option<Vec<PathBuf>>,
     quality: Option<bool>,
     app: AppHandle,
-    state: State<'_, WatchState>,
+) -> Result<AnalysisResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        analyze_project_blocking(path, changed_files, quality, app)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn analyze_project_blocking(
+    path: String,
+    changed_files: Option<Vec<PathBuf>>,
+    quality: Option<bool>,
+    app: AppHandle,
 ) -> Result<AnalysisResult, String> {
     let p = PathBuf::from(path);
     if !p.exists() {
         return Err("Path does not exist".to_string());
     }
+    let state = app.state::<WatchState>();
     let mut cached = state
         .cached_result
         .lock()

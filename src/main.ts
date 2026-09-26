@@ -2488,8 +2488,8 @@ async function runAnalysis(quality = false) {
   statusBar.innerText = `${quality ? "コード診断中" : "解析中"}: ${path}...`;
   try {
     const result = await invokeCommand<AnalysisResult>("analyze_project", { path, quality });
-    const toolError = await refreshFixTools(path);
     updateGraph(result);
+    const toolError = await refreshFixTools(path);
     const pendingFilePath = (window as any).__MODULELOOM_PENDING_FILE__;
     if (pendingFilePath) {
       delete (window as any).__MODULELOOM_PENDING_FILE__;
