@@ -9,7 +9,7 @@
 - **依存グラフ領域**: 中央に Cytoscape による依存関係図が表示されます。
 - **モジュール詳細**: 右側パネルに選択中ノードのパス、LOC、依存・被依存モジュール一覧、行番号等が表示されます。
 
-<!-- ai:generated id=graph-view-screenshot kind=screenshot created-at=2026-09-26T12:44:41Z source-sha256=bc7f8c1beaf10b41c59e3ac29976cd8d293b31e6fdb25b0c6bf1c2c03c20a024 approved-at=2026-09-26T12:52:29Z -->
+<!-- ai:generated id=graph-view-screenshot kind=screenshot created-at=2026-09-26T22:55:41Z source-sha256=bc7f8c1beaf10b41c59e3ac29976cd8d293b31e6fdb25b0c6bf1c2c03c20a024 -->
 ![graph-view-screenshot](assets/graph-view-screenshot.png)
 <!-- /ai:generated -->
 

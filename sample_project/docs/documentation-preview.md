@@ -11,7 +11,7 @@ ModuleLoom の「ドキュメント生成」は、手書きマニュアル内の
 
 「ドキュメント生成」画面は、上部のアクションバー、左側の **アセット管理・生成パネル**、および右側の **リアルタイムプレビューパネル** で構成されています。
 
-<!-- ai:generated id=manual-tab-screenshot kind=screenshot created-at=2026-09-26T12:44:44Z source-sha256=7574b42f657600b132c686eb0754078f900c330f17b6c33ef5dcbef7a9bf687a approved-at=2026-09-26T12:44:59Z -->
+<!-- ai:generated id=manual-tab-screenshot kind=screenshot created-at=2026-09-26T22:53:27Z source-sha256=7574b42f657600b132c686eb0754078f900c330f17b6c33ef5dcbef7a9bf687a -->
 ![manual-tab-screenshot](assets/manual-tab-screenshot.png)
 <!-- /ai:generated -->
 
@@ -92,20 +92,22 @@ UI デザインの変更や機能追加が行われた場合：
 ### 1. タスク指示タグの基本構文 (`ai:task`)
 
 ```markdown
-&lt;!-- ai:task id=&lt;一意のID&gt; kind=&lt;screenshot|diagram|text&gt;
-&lt;指示文 / プロンプト&gt;
---&gt;
+<!-- ai:task id=<一意のID> kind=<screenshot|diagram|text>
+<指示文 / プロンプト>
+-->
 ```
 
-* **`id` の命名規則**:
-  * 小文字英字で始まり、小文字英数字とハイフンのみ使用可能（正規表現: `^[a-z][a-z0-9-]*$`）。
+* **`id` の自動付与（省略可能）**:
+  * `id` は手書きしやすいように省略可能です（例: `<!-- ai:task kind=screenshot`）。
+  * `id` を省略した場合、解釈時に `{kind}-{ファイル名}-{ハッシュ}` の形式で衝突のない一意な ID が自動付与されます。
+  * 手動で `id` を明示指定する場合は、小文字英字で始まり、小文字英数字とハイフンのみ使用可能（正規表現: `^[a-z][a-z0-9-]*$`）。
   * マニュアル全体（`docs/` 内の全 `.md` ファイル中）で**完全に一意（重複不可）**である必要があります。
   * 良い例: `overview-screenshot`, `module-architecture-diagram`, `setup-guide`
   * 悪い例: `1_screen`（数字始まり）, `main_UI`（大文字・アンダースコア）
 * **`kind` の種別（3 種類のみ）**:
   * `screenshot`: 実画面のキャプチャ画像専用
   * `diagram`: Mermaid によるモジュール依存図専用
-  * `text`: 文章、解説、手順、注釈専用
+  * `text`: 文章、解説、手順、注釈専用（省略時はデフォルトで `text` と解釈されます）
 * **改行・フォーマットの厳格ルール**:
   * `<!-- ai:task ...` の直後は必ず改行して指示文を開始してください。
   * 指示文を記述した後、必ず改行して `-->` で閉じてください。
@@ -125,17 +127,17 @@ UI デザインの変更や機能追加が行われた場合：
 ```markdown
 ### 画面操作手順
 
-&lt;!-- ai:task id=step-operation-text kind=text
+<!-- ai:task id=step-operation-text kind=text
 ツールウィンドウを開き、再解析ボタンをクリックする手順を説明してください
---&gt;
+-->
 
-&lt;!-- ai:task id=btn-analyze-screenshot kind=screenshot
+<!-- ai:task id=btn-analyze-screenshot kind=screenshot
 #btn-analyze を赤枠で囲んだ操作画面を撮影
---&gt;
+-->
 
-&lt;!-- ai:task id=screenshot-caption-text kind=text
+<!-- ai:task id=screenshot-caption-text kind=text
 上のスクリーンショットに関する注意点（ショートカットキーなど）を簡潔に補足
---&gt;
+-->
 ```
 
 ### 3. MarkIts セマンティック・アノテーションエンジン（`crates/markits`）
@@ -177,17 +179,17 @@ UI デザインの変更や機能追加が行われた場合：
 
 * **活用例 1: 操作手順マニュアルで重要ボタンを角丸赤枠・矢印・吹き出しで案内**
   ```markdown
-  &lt;!-- ai:task id=step-batch-capture kind=screenshot
+  <!-- ai:task id=step-batch-capture kind=screenshot
   #btn-manual-capture-all を赤枠で囲み、矢印を付けて「1. ここをクリックして全スクショを一括更新」と説明
-  --&gt;
+  -->
   ```
   ![全スクショ撮影ボタンの角丸赤枠・矢印・吹き出しアノテーション実例](assets/annotation-rect-example.png)
 
 * **活用例 2: 設定アイコンを赤丸と矢印で注目させる**
   ```markdown
-  &lt;!-- ai:task id=settings-guidance kind=screenshot
+  <!-- ai:task id=settings-guidance kind=screenshot
   設定ボタンを赤丸と矢印で指して「出力先やAIモデルを変更」と説明
-  --&gt;
+  -->
   ```
   ![設定ボタンの赤丸・矢印・吹き出しアノテーション実例](assets/annotation-circle-example.png)
 
@@ -202,9 +204,9 @@ UI デザインの変更や機能追加が行われた場合：
 タスクが実行されると、原稿内の `ai:task` が自動的に `ai:generated` タグで置き換わります：
 
 ```markdown
-&lt;!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:00Z source-sha256=a1b2c3... approved-at=2026-09-27T00:05:00Z --&gt;
+<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:00Z source-sha256=a1b2c3... approved-at=2026-09-27T00:05:00Z -->
 ![overview-screenshot](assets/overview-screenshot.png)
-&lt;!-- /ai:generated --&gt;
+<!-- /ai:generated -->
 ```
 
 * **`source-sha256` による追跡**:

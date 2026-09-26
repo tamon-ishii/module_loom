@@ -1685,7 +1685,7 @@
 <hr />
 <h2 id="1-3">1. 画面構成と 3 大アセット生成ツール</h2>
 <p>「ドキュメント生成」画面は、上部のアクションバー、左側の <strong>アセット管理・生成パネル</strong>、および右側の <strong>リアルタイムプレビューパネル</strong> で構成されています。</p>
-<!-- ai:generated id=manual-tab-screenshot kind=screenshot created-at=2026-09-26T12:44:44Z source-sha256=7574b42f657600b132c686eb0754078f900c330f17b6c33ef5dcbef7a9bf687a approved-at=2026-09-26T12:44:59Z -->
+<!-- ai:generated id=manual-tab-screenshot kind=screenshot created-at=2026-09-26T22:53:27Z source-sha256=7574b42f657600b132c686eb0754078f900c330f17b6c33ef5dcbef7a9bf687a -->
 <p><img alt="manual-tab-screenshot" src="assets/manual-tab-screenshot.png" /></p>
 <!-- /ai:generated -->
 
@@ -1784,20 +1784,22 @@
 <h2 id="5-ai">5. AI タグの書き方とルール仕様</h2>
 <p>原稿 Markdown 内に埋め込む <code>&lt;!-- ai:task --&gt;</code> および生成される <code>&lt;!-- ai:generated --&gt;</code> タグの厳格な構文と運用ルールです。コーディングエージェントや人間が手書きでマニュアル原稿を作成する際は、必ず以下のルールに従ってください。</p>
 <h3 id="1-aitask">1. タスク指示タグの基本構文 (<code>ai:task</code>)</h3>
-<div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=&amp;lt;一意のID&amp;gt; kind=&amp;lt;screenshot|diagram|text&amp;gt;
-&amp;lt;指示文 / プロンプト&amp;gt;
---&amp;gt;
+<div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=&lt;一意のID&gt; kind=&lt;screenshot|diagram|text&gt;
+&lt;指示文 / プロンプト&gt;
+--&gt;
 </code></pre></div>
 <ul>
-<li><strong><code>id</code> の命名規則</strong>:</li>
-<li>小文字英字で始まり、小文字英数字とハイフンのみ使用可能（正規表現: <code>^[a-z][a-z0-9-]*$</code>）。</li>
+<li><strong><code>id</code> の自動付与（省略可能）</strong>:</li>
+<li><code>id</code> は手書きしやすいように省略可能です（例: <code>&lt;!-- ai:task kind=screenshot</code>）。</li>
+<li><code>id</code> を省略した場合、解釈時に <code>{kind}-{ファイル名}-{ハッシュ}</code> の形式で衝突のない一意な ID が自動付与されます。</li>
+<li>手動で <code>id</code> を明示指定する場合は、小文字英字で始まり、小文字英数字とハイフンのみ使用可能（正規表現: <code>^[a-z][a-z0-9-]*$</code>）。</li>
 <li>マニュアル全体（<code>docs/</code> 内の全 <code>.md</code> ファイル中）で<strong>完全に一意（重複不可）</strong>である必要があります。</li>
 <li>良い例: <code>overview-screenshot</code>, <code>module-architecture-diagram</code>, <code>setup-guide</code></li>
 <li>悪い例: <code>1_screen</code>（数字始まり）, <code>main_UI</code>（大文字・アンダースコア）</li>
 <li><strong><code>kind</code> の種別（3 種類のみ）</strong>:</li>
 <li><code>screenshot</code>: 実画面のキャプチャ画像専用</li>
 <li><code>diagram</code>: Mermaid によるモジュール依存図専用</li>
-<li><code>text</code>: 文章、解説、手順、注釈専用</li>
+<li><code>text</code>: 文章、解説、手順、注釈専用（省略時はデフォルトで <code>text</code> と解釈されます）</li>
 <li><strong>改行・フォーマットの厳格ルール</strong>:</li>
 <li><code>&lt;!-- ai:task ...</code> の直後は必ず改行して指示文を開始してください。</li>
 <li>指示文を記述した後、必ず改行して <code>--&gt;</code> で閉じてください。</li>
@@ -1834,17 +1836,17 @@
 <h4 id="_3">配置例（単一責任を守った構成）</h4>
 <div class="highlight"><pre><span></span><code><span class="gu">### 画面操作手順</span>
 
-&amp;lt;!-- ai:task id=step-operation-text kind=text
+&lt;!-- ai:task id=step-operation-text kind=text
 ツールウィンドウを開き、再解析ボタンをクリックする手順を説明してください
---&amp;gt;
+--&gt;
 
-&amp;lt;!-- ai:task id=btn-analyze-screenshot kind=screenshot
+&lt;!-- ai:task id=btn-analyze-screenshot kind=screenshot
 <span class="gh">#btn-analyze を赤枠で囲んだ操作画面を撮影</span>
---&amp;gt;
+--&gt;
 
-&amp;lt;!-- ai:task id=screenshot-caption-text kind=text
+&lt;!-- ai:task id=screenshot-caption-text kind=text
 上のスクリーンショットに関する注意点（ショートカットキーなど）を簡潔に補足
---&amp;gt;
+--&gt;
 </code></pre></div>
 <h3 id="3-markits-cratesmarkits">3. MarkIts セマンティック・アノテーションエンジン（<code>crates/markits</code>）</h3>
 <p>スクリーンショット加工の統一感を保ち、スムーズに高品質なマニュアルを構築するため、ModuleLoom は専用サブモジュール <strong>MarkIts</strong>（<code>crates/markits</code>）を統合しています。</p>
@@ -1948,17 +1950,17 @@
 <ul>
 <li>
 <p><strong>活用例 1: 操作手順マニュアルで重要ボタンを角丸赤枠・矢印・吹き出しで案内</strong>
-  <div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=step-batch-capture kind=screenshot
+  <div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=step-batch-capture kind=screenshot
 <span class="gh">#btn-manual-capture-all を赤枠で囲み、矢印を付けて「1. ここをクリックして全スクショを一括更新」と説明</span>
---&amp;gt;
+--&gt;
 </code></pre></div>
   <img alt="全スクショ撮影ボタンの角丸赤枠・矢印・吹き出しアノテーション実例" src="assets/annotation-rect-example.png" /></p>
 </li>
 <li>
 <p><strong>活用例 2: 設定アイコンを赤丸と矢印で注目させる</strong>
-  <div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=settings-guidance kind=screenshot
+  <div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=settings-guidance kind=screenshot
 設定ボタンを赤丸と矢印で指して「出力先やAIモデルを変更」と説明
---&amp;gt;
+--&gt;
 </code></pre></div>
   <img alt="設定ボタンの赤丸・矢印・吹き出しアノテーション実例" src="assets/annotation-circle-example.png" /></p>
 </li>
@@ -1971,9 +1973,9 @@
 </ul>
 <h3 id="4-aigenerated">4. 生成後タグ (<code>ai:generated</code>) とライフサイクル</h3>
 <p>タスクが実行されると、原稿内の <code>ai:task</code> が自動的に <code>ai:generated</code> タグで置き換わります：</p>
-<div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:00Z source-sha256=a1b2c3... approved-at=2026-09-27T00:05:00Z --&amp;gt;
+<div class="highlight"><pre><span></span><code>&lt;!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:00Z source-sha256=a1b2c3... approved-at=2026-09-27T00:05:00Z --&gt;
 ![<span class="nt">overview-screenshot</span>](<span class="na">assets/overview-screenshot.png</span>)
-&amp;lt;!-- /ai:generated --&amp;gt;
+&lt;!-- /ai:generated --&gt;
 </code></pre></div>
 <ul>
 <li><strong><code>source-sha256</code> による追跡</strong>:</li>

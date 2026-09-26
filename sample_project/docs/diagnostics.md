@@ -9,7 +9,7 @@ ModuleLoom の「コード診断」タブでは、プロジェクト全体の複
 2. 「診断実行」ボタンをクリックします。
 3. プロジェクト全体のスコアおよび検出された問題（肥大化モジュール、重複箇所、循環インポート等）が一覧表示されます。
 
-<!-- ai:generated id=diagnostics-screenshot kind=screenshot created-at=2026-09-26T12:44:43Z source-sha256=49d7cddec740b5965cbb752f9be57d8b4cba6104e6d0dac1d3e1deef5c98ea3a approved-at=2026-09-26T12:44:56Z -->
+<!-- ai:generated id=diagnostics-screenshot kind=screenshot created-at=2026-09-26T22:53:25Z source-sha256=49d7cddec740b5965cbb752f9be57d8b4cba6104e6d0dac1d3e1deef5c98ea3a -->
 ![diagnostics-screenshot](assets/diagnostics-screenshot.png)
 <!-- /ai:generated -->
 

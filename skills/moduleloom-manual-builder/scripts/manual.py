@@ -22,16 +22,11 @@ DEFAULT_BRIEF = "# マニュアル作成の指示\n\n## 対象読者\n\n## 目�
 
 
 TASK = re.compile(
-    r"<!-- ai:task id=(?P<id>[a-z][a-z0-9-]*) kind=(?P<kind>text|screenshot|diagram)\n"
-    r"(?P<prompt>.*?)\n-->",
+    r"<!--\s*ai:task(?P<attrs>[^\r\n]*)\r?\n(?P<prompt>.*?)\r?\n-->",
     re.DOTALL,
 )
 GENERATED = re.compile(
-    r"<!-- ai:generated id=(?P<id>[a-z][a-z0-9-]*) kind=(?P<kind>text|screenshot|diagram)"
-    r"(?: created-at=(?P<created>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z))?"
-    r"(?: source-sha256=(?P<hash>[a-f0-9]{64}))?"
-    r"(?: approved-at=(?P<approved>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z))? -->\n"
-    r"(?P<body>.*?)\n<!-- /ai:generated -->",
+    r"<!--\s*ai:generated(?P<attrs>[^>]*)-->\r?\n(?P<body>.*?)\r?\n<!--\s*/ai:generated\s*-->",
     re.DOTALL,
 )
 ANSWER = re.compile(
@@ -42,6 +37,67 @@ ANSWER = re.compile(
     r"(?P<body>.*)\Z",
     re.DOTALL,
 )
+
+
+def get_code_block_ranges(content: str) -> list[tuple[int, int]]:
+    ranges: list[tuple[int, int]] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    fence_start = 0
+
+    offset = 0
+    for line in content.splitlines(keepends=True):
+        line_len = len(line)
+        line_end = offset + line_len
+        trimmed = line.lstrip()
+        indent = len(line) - len(trimmed)
+
+        if indent <= 3:
+            if not in_fence:
+                if trimmed.startswith("```") or trimmed.startswith("~~~"):
+                    ch = trimmed[0]
+                    length = len(trimmed) - len(trimmed.lstrip(ch))
+                    in_fence = True
+                    fence_char = ch
+                    fence_len = length
+                    fence_start = offset
+            else:
+                ch = fence_char
+                count = len(trimmed) - len(trimmed.lstrip(ch))
+                rest = trimmed[count:]
+                if count >= fence_len and not rest.strip():
+                    ranges.append((fence_start, line_end))
+                    in_fence = False
+        offset = line_end
+
+    if in_fence:
+        ranges.append((fence_start, len(content)))
+    return ranges
+
+
+def is_inside_ranges(start: int, end: int, ranges: list[tuple[int, int]]) -> bool:
+    return any((start >= r_start and end <= r_end) or (start < r_end and end > r_start) for r_start, r_end in ranges)
+
+
+def generate_auto_id(kind: str, page_rel: str, prompt: str, existing_ids: set[str]) -> str:
+    stem_raw = Path(page_rel).stem.lower()
+    clean_stem = re.sub(r"[^a-z0-9]+", "-", stem_raw).strip("-")
+    stem = clean_stem if clean_stem else "task"
+
+    digest = source_hash(kind, prompt)
+    short_hash = digest[:6] if len(digest) >= 6 else digest
+
+    base = f"{kind}-{stem}-{short_hash}"
+    if base not in existing_ids:
+        return base
+
+    counter = 1
+    while True:
+        candidate = f"{base}-{counter}"
+        if candidate not in existing_ids:
+            return candidate
+        counter += 1
 
 
 def utc_now() -> str:
@@ -57,42 +113,104 @@ def tasks(templates: Path) -> list[dict[str, object]]:
         raise ValueError(f"Template directory is missing: {templates}")
     found: list[dict[str, object]] = []
     ids: set[str] = set()
+
+    id_pattern = re.compile(r"""(?:^|\s)id=["']?([a-zA-Z0-9_-]+)["']?(?:\s|$)""")
+    kind_pattern = re.compile(r"""(?:^|\s)kind=["']?([a-zA-Z0-9_-]+)["']?(?:\s|$)""")
+    valid_id_pattern = re.compile(r"^[a-z][a-z0-9-]*$")
+    created_pattern = re.compile(r"\bcreated-at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)")
+    hash_pattern = re.compile(r"\bsource-sha256=([a-f0-9]{64})")
+    approved_pattern = re.compile(r"\bapproved-at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)")
+
     for page in sorted(templates.rglob("*.md")):
         content = page.read_text(encoding="utf-8")
-        # 1. 未生成の指示タグ (ai:task)
+        page_rel = page.relative_to(templates).as_posix()
+        code_blocks = get_code_block_ranges(content)
+
+        raw_tasks: list[tuple[tuple[int, int], str, str]] = []
         for match in TASK.finditer(content):
-            task_id = match.group("id")
-            if task_id in ids:
-                raise ValueError(f"Duplicate task ID: {task_id}")
-            ids.add(task_id)
+            if is_inside_ranges(match.start(), match.end(), code_blocks):
+                continue
+            attrs = match.group("attrs") or ""
             prompt = match.group("prompt").strip()
             if not prompt:
-                raise ValueError(f"Empty instruction: {task_id}")
-            kind = match.group("kind")
+                raise ValueError(f"Empty instruction in page: {page_rel}")
+            raw_tasks.append(((match.start(), match.end()), attrs, prompt))
+
+        raw_gens: list[tuple[tuple[int, int], str, str]] = []
+        for match in GENERATED.finditer(content):
+            if is_inside_ranges(match.start(), match.end(), code_blocks):
+                continue
+            attrs = match.group("attrs") or ""
+            body = match.group("body")
+            raw_gens.append(((match.start(), match.end()), attrs, body))
+
+        # Pass 1: Explicit IDs
+        for _, attrs, _ in raw_tasks:
+            i_m = id_pattern.search(attrs)
+            if i_m:
+                id_str = i_m.group(1)
+                if not valid_id_pattern.match(id_str):
+                    raise ValueError(f"Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)")
+                if id_str in ids:
+                    raise ValueError(f"Duplicate task ID: {id_str}")
+                ids.add(id_str)
+
+        for _, attrs, _ in raw_gens:
+            i_m = id_pattern.search(attrs)
+            if i_m:
+                id_str = i_m.group(1)
+                if not valid_id_pattern.match(id_str):
+                    raise ValueError(f"Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)")
+                if id_str in ids:
+                    raise ValueError(f"Duplicate task ID: {id_str}")
+                ids.add(id_str)
+            else:
+                raise ValueError(f"Missing id in ai:generated in page: {page_rel}")
+
+        # Pass 2: Tasks
+        for (start, end), attrs, prompt in raw_tasks:
+            k_m = kind_pattern.search(attrs)
+            kind = k_m.group(1) if k_m else "text"
+            if kind not in ("text", "screenshot", "diagram"):
+                raise ValueError(f"Invalid task kind: '{kind}' (must be text, screenshot, or diagram)")
+            i_m = id_pattern.search(attrs)
+            if i_m:
+                task_id = i_m.group(1)
+            else:
+                task_id = generate_auto_id(kind, page_rel, prompt, ids)
+                ids.add(task_id)
+
             found.append({
                 "id": task_id,
                 "kind": kind,
-                "page": page.relative_to(templates).as_posix(),
+                "page": page_rel,
                 "prompt": prompt,
                 "source_sha256": source_hash(kind, prompt),
                 "status": "missing",
+                "range": (start, end),
             })
-        # 2. AI生成済みのタグ (ai:generated)
-        for match in GENERATED.finditer(content):
-            task_id = match.group("id")
-            if task_id in ids:
-                raise ValueError(f"Duplicate task ID: {task_id}")
-            ids.add(task_id)
-            kind = match.group("kind")
-            approved = match.group("approved")
+
+        # Pass 3: Generated
+        for (start, end), attrs, body in raw_gens:
+            i_m = id_pattern.search(attrs)
+            assert i_m is not None
+            task_id = i_m.group(1)
+            k_m = kind_pattern.search(attrs)
+            kind = k_m.group(1) if k_m else "text"
+            approved = approved_pattern.search(attrs) is not None
+            h_m = hash_pattern.search(attrs)
+            hash_val = h_m.group(1) if h_m else ""
+
             found.append({
                 "id": task_id,
                 "kind": kind,
-                "page": page.relative_to(templates).as_posix(),
+                "page": page_rel,
                 "prompt": f"AI生成コンテンツ ({kind})",
-                "source_sha256": match.group("hash") or "",
+                "source_sha256": hash_val,
                 "status": "approved" if approved else "current",
+                "range": (start, end),
             })
+
     return found
 
 
@@ -207,21 +325,32 @@ def render_page_markdown(templates: Path, generated: Path, page_rel: Path, draft
             pass
 
     built_at = utc_now()
+    page_posix = page_rel.as_posix()
+    page_tasks = [t for t in entries if t["page"] == page_posix and t.get("range") and t.get("status") in ("missing", "stale")]
+    page_tasks.sort(key=lambda t: t["range"][0])
 
-    def replace(match: re.Match[str]) -> str:
-        task_id = match.group("id")
-        if task_id not in answers:
-            return f"> **作成待ち:** `{task_id}` ({match.group('kind')})"
-        created, body, approved = answers[task_id]
-        digest = source_hash(match.group("kind"), match.group("prompt").strip())
-        return (
-            f"<!-- ai:generated id={task_id} kind={match.group('kind')} "
-            f"created-at={created} source-sha256={digest}"
-            f"{f' approved-at={approved}' if approved else ''} -->\n"
-            f"{body}\n<!-- /ai:generated -->"
-        )
+    rendered = []
+    last_idx = 0
+    for t in page_tasks:
+        start, end = t["range"]
+        rendered.append(content[last_idx:start])
+        task_id = str(t["id"])
+        kind = str(t["kind"])
+        prompt = str(t["prompt"])
+        if task_id in answers:
+            created, body, approved = answers[task_id]
+            digest = source_hash(kind, prompt)
+            app_attr = f" approved-at={approved}" if approved else ""
+            rendered.append(
+                f"<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{app_attr} -->\n"
+                f"{body}\n<!-- /ai:generated -->"
+            )
+        else:
+            rendered.append(f"> **作成待ち:** `{task_id}` ({kind})")
+        last_idx = end
+    rendered.append(content[last_idx:])
 
-    return TASK.sub(replace, content).replace("{{BUILD_TIMESTAMP}}", built_at)
+    return "".join(rendered).replace("{{BUILD_TIMESTAMP}}", built_at)
 
 
 def inline_html_assets(output: Path, html_text: str) -> str:
@@ -614,21 +743,11 @@ def update_task_in_docs(templates: Path, task: dict[str, object], body: str, app
         f"{body.strip()}\n<!-- /ai:generated -->"
     )
 
-    task_pattern = re.compile(
-        rf"<!-- ai:task id={re.escape(task_id)} kind={kind}\n.*?\n-->",
-        re.DOTALL,
-    )
-    if task_pattern.search(content):
-        new_content = task_pattern.sub(replacement, content, count=1)
-        page_path.write_text(new_content, encoding="utf-8")
-        return
-
-    gen_pattern = re.compile(
-        rf"<!-- ai:generated id={re.escape(task_id)} kind={kind}.*?-->\n.*?\n<!-- /ai:generated -->",
-        re.DOTALL,
-    )
-    if gen_pattern.search(content):
-        new_content = gen_pattern.sub(replacement, content, count=1)
+    all_tasks = tasks(templates)
+    target = next((t for t in all_tasks if t["page"] == page_rel.as_posix() and t["id"] == task_id and "range" in t), None)
+    if target:
+        start, end = target["range"]
+        new_content = content[:start] + replacement + content[end:]
         page_path.write_text(new_content, encoding="utf-8")
         return
 

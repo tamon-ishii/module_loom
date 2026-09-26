@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use super::agent::which_binary;
 use super::config::read_config;
 use super::task::{
-    collect_markdown_files, read_answer, source_hash, task_regex, tasks, utc_now,
+    collect_markdown_files, parse_page_tags, read_answer, source_hash, tasks, utc_now, PageTag,
 };
 
 pub fn build(
@@ -50,34 +50,41 @@ pub fn build(
     fs::create_dir_all(&temp_docs).map_err(|e| e.to_string())?;
 
     let built_at = utc_now();
-    let t_re = task_regex();
 
     for page in collect_markdown_files(templates) {
         let content = fs::read_to_string(&page).map_err(|e| e.to_string())?;
+        let page_rel = page
+            .strip_prefix(templates)
+            .unwrap_or(&page)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut ids = std::collections::HashSet::new();
+        let tags = parse_page_tags(&page_rel, &content, &mut ids)?;
+
         let mut rendered = String::new();
         let mut last_idx = 0;
 
-        for cap in t_re.captures_iter(&content) {
-            let m = cap.get(0).unwrap();
-            rendered.push_str(&content[last_idx..m.start()]);
+        for tag in tags {
+            if let PageTag::Task { range, task } = tag {
+                rendered.push_str(&content[last_idx..range.start]);
+                let task_id = &task.id;
+                let kind = &task.kind;
+                let prompt = &task.prompt;
 
-            let task_id = cap.name("id").unwrap().as_str();
-            let kind = cap.name("kind").unwrap().as_str();
-            let prompt = cap.name("prompt").unwrap().as_str().trim();
-
-            if let Some((created, body, approved)) = answers.get(task_id) {
-                let digest = source_hash(kind, prompt);
-                let approved_attr = approved
-                    .as_ref()
-                    .map(|a| format!(" approved-at={a}"))
-                    .unwrap_or_default();
-                rendered.push_str(&format!(
-                    "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
-                ));
-            } else {
-                rendered.push_str(&format!("> **作成待ち:** `{task_id}` ({kind})"));
+                if let Some((created, body, approved)) = answers.get(task_id) {
+                    let digest = source_hash(kind, prompt);
+                    let approved_attr = approved
+                        .as_ref()
+                        .map(|a| format!(" approved-at={a}"))
+                        .unwrap_or_default();
+                    rendered.push_str(&format!(
+                        "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
+                    ));
+                } else {
+                    rendered.push_str(&format!("> **作成待ち:** `{task_id}` ({kind})"));
+                }
+                last_idx = range.end;
             }
-            last_idx = m.end();
         }
         rendered.push_str(&content[last_idx..]);
         let final_page = rendered.replace("{{BUILD_TIMESTAMP}}", &built_at);

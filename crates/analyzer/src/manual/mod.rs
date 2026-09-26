@@ -466,5 +466,81 @@ mod tests {
         assert!(res.contains("<svg"));
         assert!(res.contains("保存ボタン"));
     }
+
+    #[test]
+    fn test_optional_id_auto_assignment() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        let gen = root.join("manual").join("ai");
+        fs::create_dir_all(&docs).unwrap();
+        fs::create_dir_all(&gen).unwrap();
+
+        let page1 = docs.join("guide.md");
+        fs::write(
+            &page1,
+            "# ガイド\n\n<!-- ai:task kind=screenshot\nメイン画面を撮影\n-->\n\n<!-- ai:task kind=diagram id=explicit-diag\n依存図\n-->\n",
+        )
+        .unwrap();
+
+        let t = task::tasks(&docs).unwrap();
+        assert_eq!(t.len(), 2);
+
+        // 1つ目はid省略のため自動付与されている
+        let auto_task = t.iter().find(|task| task.kind == "screenshot").unwrap();
+        assert!(auto_task.id.starts_with("screenshot-guide-"));
+        let valid_id_re = regex::Regex::new(r"^[a-z][a-z0-9-]*$").unwrap();
+        assert!(valid_id_re.is_match(&auto_task.id));
+
+        // 2つ目は明示指定ID
+        let explicit_task = t.iter().find(|task| task.kind == "diagram").unwrap();
+        assert_eq!(explicit_task.id, "explicit-diag");
+
+        // 自動付与されたタスクに対して更新を実行
+        let answer_body = "![guide-screenshot](assets/guide.png)";
+        task::save_answer(&gen, auto_task, answer_body).unwrap();
+        task::update_task_in_docs(&docs, auto_task, answer_body, None).unwrap();
+
+        let updated_content = fs::read_to_string(&page1).unwrap();
+        assert!(updated_content.contains(&format!("<!-- ai:generated id={}", auto_task.id)));
+        assert!(updated_content.contains("![guide-screenshot](assets/guide.png)"));
+        assert!(!updated_content.contains("<!-- ai:task kind=screenshot"));
+
+        // 再スキャンしてもステータスが維持される
+        let scanned = task::scan_entries(&docs, &gen);
+        let found = scanned.iter().find(|s| s.id == auto_task.id).unwrap();
+        assert_eq!(found.status, "current");
+    }
+
+    #[test]
+    fn test_code_block_examples_ignored() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+
+        let page = docs.join("preview.md");
+        let content = r#"# ドキュメント記法
+
+以下はマニュアル内で AI タスクを書く書き方の例です：
+
+```markdown
+<!-- ai:task id=<一意のID> kind=<screenshot|diagram|text>
+<指示文 / プロンプト>
+-->
+```
+
+本物のタスクはここだけです：
+
+<!-- ai:task id=real-task kind=text
+本物の指示文です
+-->
+"#;
+        fs::write(&page, content).unwrap();
+
+        let t = task::tasks(&docs).unwrap();
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].id, "real-task");
+    }
 }
 

@@ -34,7 +34,7 @@ PyCharm で ModuleLoom のツールウィンドウを開くには、以下のい
 2. 「プロジェクトパス」に対象の Python プロジェクトのディレクトリを指定するか、「参照…」ボタンから選択します（対象プロジェクトがドロップダウンにある場合は「解析対象」から選択することも可能です）。
 3. 「解析実行」ボタンをクリックすると、プロジェクトの解析が実行され、モジュール一覧および依存図が表示されます。
 
-<!-- ai:generated id=tool-window-settings-screenshot kind=screenshot created-at=2026-09-26T12:44:46Z source-sha256=3f26a35a25f8a44822a305bc7615d82ad0ea3dc35fe076a7ec70906de3964c70 approved-at=2026-09-26T12:45:05Z -->
+<!-- ai:generated id=tool-window-settings-screenshot kind=screenshot created-at=2026-09-26T22:56:36Z source-sha256=3f26a35a25f8a44822a305bc7615d82ad0ea3dc35fe076a7ec70906de3964c70 -->
 ![tool-window-settings-screenshot](assets/tool-window-settings-screenshot.png)
 <!-- /ai:generated -->
 <!-- /ai:draft -->

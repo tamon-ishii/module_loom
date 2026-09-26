@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::config::{project_path, read_config};
-use super::task::{collect_markdown_files, task_regex, utc_now};
+use super::task::{collect_markdown_files, parse_page_tags, utc_now, PageTag};
 use super::uimap::extract_ui_map;
 use crate::analyze_directory;
 
@@ -107,7 +107,6 @@ pub fn build_manual_dependency_graph(root: &Path, docs_path: &Path) -> ManualDep
         }
     }
 
-    let t_re = task_regex();
     let title_re = Regex::new(r#"(?m)^#\s+(.+)$"#).unwrap();
     let asset_re = Regex::new(r#"!\[[^\]]*\]\(([^)]+)\)"#).unwrap();
     let selector_re = Regex::new(r#"#([a-zA-Z0-9_-]+)"#).unwrap();
@@ -166,51 +165,43 @@ pub fn build_manual_dependency_graph(root: &Path, docs_path: &Path) -> ManualDep
         }
 
         // Check tasks
-        for cap in t_re.captures_iter(&content) {
-            let tag = cap.get(0).unwrap().as_str();
-            let mut id = String::new();
-            let mut kind = String::new();
+        let mut ids = HashSet::new();
+        if let Ok(tags) = parse_page_tags(&rel_path, &content, &mut ids) {
+            for tag in tags {
+                let (task_id, kind, prompt) = match tag {
+                    PageTag::Task { task, .. } => (task.id, task.kind, task.prompt),
+                    PageTag::Generated { task, .. } => (task.id, task.kind, task.prompt),
+                };
 
-            for part in tag.split_whitespace() {
-                if let Some(rest) = part.strip_prefix("id=") {
-                    id = rest.trim_matches('"').trim_matches('\'').to_string();
-                } else if let Some(rest) = part.strip_prefix("kind=") {
-                    kind = rest.trim_matches('"').trim_matches('\'').to_string();
+                page_tasks.push(task_id.clone());
+
+                let mut task_symbols = Vec::new();
+                let mut task_ui = Vec::new();
+
+                for cap_sel in selector_re.captures_iter(&prompt) {
+                    let sel = format!("#{}", &cap_sel[1]);
+                    task_ui.push(sel.clone());
+                    page_ui.insert(sel);
                 }
-            }
 
-            if id.is_empty() {
-                continue;
-            }
-
-            page_tasks.push(id.clone());
-
-            let mut task_symbols = Vec::new();
-            let mut task_ui = Vec::new();
-
-            for cap_sel in selector_re.captures_iter(tag) {
-                let sel = format!("#{}", &cap_sel[1]);
-                task_ui.push(sel.clone());
-                page_ui.insert(sel);
-            }
-
-            for mod_id in &known_modules {
-                if tag.contains(mod_id) {
-                    task_symbols.push(mod_id.clone());
-                    page_symbols.insert(mod_id.clone());
+                for mod_id in &known_modules {
+                    if prompt.contains(mod_id) {
+                        task_symbols.push(mod_id.clone());
+                        page_symbols.insert(mod_id.clone());
+                    }
                 }
-            }
 
-            task_dependencies.insert(
-                id.clone(),
-                TaskDependencies {
-                    id,
-                    page: rel_path.clone(),
-                    kind,
-                    symbols: task_symbols,
-                    ui_elements: task_ui,
-                },
-            );
+                task_dependencies.insert(
+                    task_id.clone(),
+                    TaskDependencies {
+                        id: task_id,
+                        page: rel_path.clone(),
+                        kind,
+                        symbols: task_symbols,
+                        ui_elements: task_ui,
+                    },
+                );
+            }
         }
 
         // Configs

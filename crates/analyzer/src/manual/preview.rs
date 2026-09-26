@@ -11,7 +11,7 @@ use super::agent::get_agents;
 use super::builder::build;
 use super::config::{project_path, read_config, DEFAULT_BRIEF};
 use super::task::{
-    collect_markdown_files, read_answer, scan_entries, source_hash, task_regex, tasks, utc_now,
+    collect_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks, utc_now, PageTag,
 };
 
 pub fn render_page_markdown(
@@ -37,32 +37,34 @@ pub fn render_page_markdown(
     }
 
     let built_at = utc_now();
-    let t_re = task_regex();
+    let page_rel_str = page_rel.to_string_lossy().replace('\\', "/");
+    let mut ids = std::collections::HashSet::new();
+    let tags = parse_page_tags(&page_rel_str, &content, &mut ids)?;
 
     let mut result = String::new();
     let mut last_idx = 0;
 
-    for cap in t_re.captures_iter(&content) {
-        let m = cap.get(0).unwrap();
-        result.push_str(&content[last_idx..m.start()]);
+    for tag in tags {
+        if let PageTag::Task { range, task } = tag {
+            result.push_str(&content[last_idx..range.start]);
+            let task_id = &task.id;
+            let kind = &task.kind;
+            let prompt = &task.prompt;
 
-        let task_id = cap.name("id").unwrap().as_str();
-        let kind = cap.name("kind").unwrap().as_str();
-        let prompt = cap.name("prompt").unwrap().as_str().trim();
-
-        if let Some((created, body, approved)) = answers.get(task_id) {
-            let digest = source_hash(kind, prompt);
-            let approved_attr = approved
-                .as_ref()
-                .map(|a| format!(" approved-at={a}"))
-                .unwrap_or_default();
-            result.push_str(&format!(
-                "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
-            ));
-        } else {
-            result.push_str(&format!("> **作成待ち:** `{task_id}` ({kind})"));
+            if let Some((created, body, approved)) = answers.get(task_id) {
+                let digest = source_hash(kind, prompt);
+                let approved_attr = approved
+                    .as_ref()
+                    .map(|a| format!(" approved-at={a}"))
+                    .unwrap_or_default();
+                result.push_str(&format!(
+                    "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
+                ));
+            } else {
+                result.push_str(&format!("> **作成待ち:** `{task_id}` ({kind})"));
+            }
+            last_idx = range.end;
         }
-        last_idx = m.end();
     }
     result.push_str(&content[last_idx..]);
 
