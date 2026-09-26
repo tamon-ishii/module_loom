@@ -33,4 +33,5 @@ src-tauri/icons/StoreLogo.png
 .env.*
 !.env.example
 /docs/
-/sample_project/
+sample_project/.moduleloom/
+

@@ -1,0 +1,1702 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="diagnostics.html">
+      
+      
+        <link rel="next" href="index.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>documentation-preview - ModuleLoom マニュアル</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href="index.html" title="ModuleLoom マニュアル" class="md-header__button md-logo" aria-label="ModuleLoom マニュアル" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ModuleLoom マニュアル
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              documentation-preview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="ModuleLoom マニュアル" class="md-nav__button md-logo" aria-label="ModuleLoom マニュアル" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ModuleLoom マニュアル
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    api
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="dependency-graph.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    dependency-graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="diagnostics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    documentation-preview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="documentation-preview.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    documentation-preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 画面構成と 3 大アセット生成ツール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 画面構成と 3 大アセット生成ツール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アクションバー（上部ヘッダー）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 3 大アセットの自動同期機能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 3 大アセットの自動同期機能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. スクリーンショット一覧プレビュー &amp; リテイク
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 最新 Mermaid モジュール依存図の自動更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-docstring-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Docstring からの API リファレンス自動生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ドキュメント運用の基本フロー
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. UI 改修時の一括更新
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. AI タグの書き方とルール仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. AI タグの書き方とルール仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-aitask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. タスク指示タグの基本構文 (ai:task)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-strict-separation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 単一責任の原則（Strict Separation）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 単一責任の原則（Strict Separation）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置例（単一責任を守った構成）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アノテーション指示の構文キーワード
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        実践的な活用例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-aigenerated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 生成後タグ (ai:generated) とライフサイクル
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. ビルドモードによる検証ルールの違い
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0000.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0000
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0001.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0001
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0002.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0002
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0003.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0003
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0004.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0004
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0005.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0005
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0006.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0006
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0007.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0007
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0008.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0008
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0009.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0009
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0010.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0010
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0011.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0011
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0012.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0012
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0013.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0013
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0014.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0014
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0015.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0015
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0016.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0016
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0017.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0017
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="modules/0018.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0018
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="open-tool-window.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    open-tool-window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 画面構成と 3 大アセット生成ツール
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 画面構成と 3 大アセット生成ツール">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アクションバー（上部ヘッダー）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 3 大アセットの自動同期機能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 3 大アセットの自動同期機能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. スクリーンショット一覧プレビュー &amp; リテイク
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 最新 Mermaid モジュール依存図の自動更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-docstring-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Docstring からの API リファレンス自動生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ドキュメント運用の基本フロー
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. UI 改修時の一括更新
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. AI タグの書き方とルール仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. AI タグの書き方とルール仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-aitask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. タスク指示タグの基本構文 (ai:task)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-strict-separation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 単一責任の原則（Strict Separation）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 単一責任の原則（Strict Separation）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配置例（単一責任を守った構成）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アノテーション指示の構文キーワード
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        実践的な活用例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-aigenerated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 生成後タグ (ai:generated) とライフサイクル
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. ビルドモードによる検証ルールの違い
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<!-- ai:draft created-at=2026-09-27T00:55:00Z agent=agy -->
+<h1 id="_1">ドキュメント生成とプレビュー</h1>
+<p>ModuleLoom の「ドキュメント生成」は、手書きマニュアル内の <strong>スクリーンショット・モジュール依存図（Mermaid）・API リファレンス</strong> という、手作業での更新が最も負担となる <strong>3 大アセットの自動同期・一括生成</strong> に特化したハブ機能です。</p>
+<p>文章や章立てなどの原稿 Markdown は、普段使いのコーディングエージェント（Agy, Claude, Cursor 等）や人間が自由に作成し、画像やダイアグラムの同期ポイントに <code>&lt;!-- ai:task --&gt;</code> を配置します。ModuleLoom が実画面の自動巡回撮影、AST 解析からの最新ダイアグラム生成、および Docstring からの API リファレンス出力をボタン 1 発で自動実行します。</p>
+<hr />
+<h2 id="1-3">1. 画面構成と 3 大アセット生成ツール</h2>
+<p>「ドキュメント生成」画面は、上部のアクションバー、左側の <strong>アセット管理・生成パネル</strong>、および右側の <strong>リアルタイムプレビューパネル</strong> で構成されています。</p>
+<!-- ai:generated id=manual-tab-screenshot kind=screenshot created-at=2026-09-26T12:44:44Z source-sha256=7574b42f657600b132c686eb0754078f900c330f17b6c33ef5dcbef7a9bf687a approved-at=2026-09-26T12:44:59Z -->
+<p><img alt="manual-tab-screenshot" src="assets/manual-tab-screenshot.png" /></p>
+<!-- /ai:generated -->
+
+<h3 id="_2">アクションバー（上部ヘッダー）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ボタン</th>
+<th style="text-align: left;">機能と役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>📸 全スクショ一括撮影</strong></td>
+<td style="text-align: left;">全タブ（モジュール一覧・コード診断・マニュアル等）を自動巡回し、原稿内の全スクリーンショットを最新の実画面から一括再撮影・差し替えます。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>📊 全ダイアグラム更新</strong></td>
+<td style="text-align: left;">プロジェクトの最新 Python コード構造（AST）を解析し、原稿内の Mermaid モジュール依存図を一括自動再生成します。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>📖 APIドキュメント生成</strong></td>
+<td style="text-align: left;">全 Python モジュールの Docstring・クラス・関数・型ヒントから、<code>docs/modules/*.md</code> および <code>docs/api.md</code> を一瞬で自動生成します。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>⚙️ 設定</strong></td>
+<td style="text-align: left;">HTML出力先（<code>manual/</code>）、Markdown原稿元（<code>docs/</code>）、AI CLI、MkDocsテーマなどを設定するポップアップを開きます。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>下書きビルド</strong></td>
+<td style="text-align: left;">未撮影・未生成の箇所をプレースホルダーとして残したまま、最新の原稿から MkDocs 下書きサイトを高速ビルドします。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>🚀 完成版ビルド</strong></td>
+<td style="text-align: left;">アセットが揃っていることを検証し、公開・配布用の完全な静的 Web サイト（<code>manual/</code>）を出力します。</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-3">2. 3 大アセットの自動同期機能</h2>
+<h3 id="1">1. スクリーンショット一覧プレビュー &amp; リテイク</h3>
+<ul>
+<li><strong>サムネイル一覧表示</strong>:</li>
+<li>同期アセット一覧内の各スクショカードには、実際に撮影された最新画面のサムネイルが並びます。画像をクリックすると画面全体で拡大プレビューが可能です。</li>
+<li><strong>面倒な承認ポチポチの撤廃</strong>:</li>
+<li>画像が存在していれば、個別の承認ボタンを押さなくてもそのまま完成版ビルドの対象になります。</li>
+<li>プレビューを見て「撮り直したい」画像だけ、<strong>「📸 画面を自動撮影」</strong> や <strong>「💬 修正指示」</strong> を実行できます。</li>
+<li><strong>「このボタンに丸を囲んで」赤枠・赤丸ハイライト（アノテーション）</strong>:</li>
+<li>修正指示欄に <code>#btn-manual-capture</code> や「全スクショ」「保存」などのボタン名・キーワードを入力して再撮影すると、対象要素の周囲に自動で<strong>赤丸や角丸赤枠のハイライト</strong>を合成してキャプチャします。</li>
+</ul>
+<h3 id="2-mermaid">2. 最新 Mermaid モジュール依存図の自動更新</h3>
+<ul>
+<li>原稿内に <code>&lt;!-- ai:task kind=diagram --&gt;</code> を配置しておくだけで、<strong>「📊 全ダイアグラム更新」</strong> をクリックするたびに、コードベースの最新の依存関係を反映した Mermaid グラフへと一括置換されます。</li>
+</ul>
+<h3 id="3-docstring-api">3. Docstring からの API リファレンス自動生成</h3>
+<ul>
+<li><strong>「📖 APIドキュメント生成」</strong> を実行すると、プロジェクト内の全モジュールを走査し：</li>
+<li>モジュールごとの詳細ページ（<code>docs/modules/0000.md</code>〜）: クラス、メソッド、関数、引数型、Docstring、個別 Mermaid 依存図</li>
+<li>全体 API カタログ（<code>docs/api.md</code>）: 全シンボルの目次と説明一覧
+  を原稿ディレクトリ内に自動出力します。手書きのマニュアルページから自由にリンクして活用できます。</li>
+</ul>
+<hr />
+<h2 id="3">3. ドキュメント運用の基本フロー</h2>
+<div class="highlight"><pre><span></span><code>flowchart TD
+    Step1["1. 原稿 Markdown を docs/ に作成&lt;br&gt;（必要な箇所に &lt;!-- ai:task --&gt; を配置）"] --&gt; Step2["2. 「📖 APIドキュメント生成」を実行&lt;br&gt;docs/modules/ と api.md を自動生成"]
+    Step2 --&gt; Step3["3. 「📸 全スクショ一括撮影」を実行&lt;br&gt;全画面を自動巡回して最新 UI をキャプチャ"]
+    Step3 --&gt; Step4["4. 「📊 全ダイアグラム更新」を実行&lt;br&gt;最新 AST から Mermaid 依存図を一括更新"]
+    Step4 --&gt; Step5["5. プレビューで確認&lt;br&gt;気になった画像のみ「💬 修正指示（赤枠等）」でリテイク"]
+    Step5 --&gt; Step6["6. 「🚀 完成版ビルド」を実行&lt;br&gt;manual/ に公開用 Web サイトを出力"]
+</code></pre></div>
+<ol>
+<li><strong>原稿の用意</strong>:</li>
+<li>コーディングエージェントやテキストエディタで <code>docs/index.md</code> や各操作ガイドを作成します。画面写真を入れたい場所に <code>&lt;!-- ai:task id=main-ui kind=screenshot \nメイン画面\n--&gt;</code>、依存図を入れたい場所に <code>&lt;!-- ai:task id=mod-dep kind=diagram\nモジュール依存図\n--&gt;</code> を置きます。</li>
+<li><strong>API ドキュメントの生成</strong>:</li>
+<li><strong>「📖 APIドキュメント生成」</strong> をクリックすると、最新コードの Docstring から API リファレンスが一瞬で生成されます。</li>
+<li><strong>アセットの一括撮影・生成</strong>:</li>
+<li><strong>「📸 全スクショ一括撮影」</strong> と <strong>「📊 全ダイアグラム更新」</strong> をクリックします。実画面のキャプチャと Mermaid 図が自動で差し込まれます。</li>
+<li><strong>プレビューと微調整</strong>:</li>
+<li>右側ペインのプレビューやサムネイルを確認します。特定のボタンを強調したい場合は、カードの「💬 修正指示」に <code>#btn-id を赤枠で囲んで</code> と入力してリテイク実行します。</li>
+<li><strong>完成版ビルド</strong>:</li>
+<li><strong>「🚀 完成版ビルド」</strong> を押せば、公開可能な MkDocs HTML サイトが <code>manual/</code> に出力されます。</li>
+</ol>
+<hr />
+<h2 id="4-ui">4. UI 改修時の一括更新</h2>
+<p>UI デザインの変更や機能追加が行われた場合：</p>
+<ol>
+<li>最新のアプリを起動した状態で、<strong>「📸 全スクショ一括撮影」</strong> をクリックします。</li>
+<li>ツールが全画面を自動巡回して全画像を最新状態に置き換えます。</li>
+<li>撮影完了と同時に下書きプレビューが自動更新されるため、確認後 <strong>「🚀 完成版ビルド」</strong> を押すだけでドキュメント更新が完了します。</li>
+</ol>
+<hr />
+<h2 id="5-ai">5. AI タグの書き方とルール仕様</h2>
+<p>原稿 Markdown 内に埋め込む <code>&lt;!-- ai:task --&gt;</code> および生成される <code>&lt;!-- ai:generated --&gt;</code> タグの厳格な構文と運用ルールです。コーディングエージェントや人間が手書きでマニュアル原稿を作成する際は、必ず以下のルールに従ってください。</p>
+<h3 id="1-aitask">1. タスク指示タグの基本構文 (<code>ai:task</code>)</h3>
+<div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=&amp;lt;一意のID&amp;gt; kind=&amp;lt;screenshot|diagram|text&amp;gt;
+&amp;lt;指示文 / プロンプト&amp;gt;
+--&amp;gt;
+</code></pre></div>
+<ul>
+<li><strong><code>id</code> の命名規則</strong>:</li>
+<li>小文字英字で始まり、小文字英数字とハイフンのみ使用可能（正規表現: <code>^[a-z][a-z0-9-]*$</code>）。</li>
+<li>マニュアル全体（<code>docs/</code> 内の全 <code>.md</code> ファイル中）で<strong>完全に一意（重複不可）</strong>である必要があります。</li>
+<li>良い例: <code>overview-screenshot</code>, <code>module-architecture-diagram</code>, <code>setup-guide</code></li>
+<li>悪い例: <code>1_screen</code>（数字始まり）, <code>main_UI</code>（大文字・アンダースコア）</li>
+<li><strong><code>kind</code> の種別（3 種類のみ）</strong>:</li>
+<li><code>screenshot</code>: 実画面のキャプチャ画像専用</li>
+<li><code>diagram</code>: Mermaid によるモジュール依存図専用</li>
+<li><code>text</code>: 文章、解説、手順、注釈専用</li>
+<li><strong>改行・フォーマットの厳格ルール</strong>:</li>
+<li><code>&lt;!-- ai:task ...</code> の直後は必ず改行して指示文を開始してください。</li>
+<li>指示文を記述した後、必ず改行して <code>--&gt;</code> で閉じてください。</li>
+<li>指示文が空（空白のみ）のタグは構文エラーになります。</li>
+</ul>
+<h3 id="2-strict-separation">2. 単一責任の原則（Strict Separation）</h3>
+<p>各 <code>kind</code> の生成物は、その目的以外の不要な要素（注釈や出典、説明文）を含めてはなりません。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">種別</th>
+<th style="text-align: left;">生成・保持される内容</th>
+<th style="text-align: left;">禁止事項・ルール</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong><code>kind=screenshot</code></strong></td>
+<td style="text-align: left;"><strong>純粋な画像 Markdown タグのみ</strong><br><code>![&lt;id&gt;](assets/&lt;ファイル名&gt;.png)</code></td>
+<td style="text-align: left;">画像タグの前後に説明文、注釈、キャプション、出典を含めることは禁止です。補足説明が必要な場合は、直前または直下に独立した <code>kind=text</code> タスクを配置してください。<br>※指示文に <code>#btn-id</code> などのセレクタや「全スクショ」等のボタン名を含めると、撮影時に自動で赤丸・赤枠ハイライトが合成されます。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>kind=diagram</code></strong></td>
+<td style="text-align: left;"><strong>純粋な Mermaid コードブロックのみ</strong><br><code>mermaid\n...\n</code></td>
+<td style="text-align: left;">コードブロックの前後にタイトル、注記、出典フッターを含めることは禁止です。解説が必要な場合は独立した <code>kind=text</code> タスクを併置してください。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>kind=text</code></strong></td>
+<td style="text-align: left;"><strong>純粋な Markdown 文章・手順・注釈専用</strong></td>
+<td style="text-align: left;">画像タグや Mermaid コードブロックを混在させず、純粋な説明文のみを記述・生成させます。</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_3">配置例（単一責任を守った構成）</h4>
+<div class="highlight"><pre><span></span><code><span class="gu">### 画面操作手順</span>
+
+&amp;lt;!-- ai:task id=step-operation-text kind=text
+ツールウィンドウを開き、再解析ボタンをクリックする手順を説明してください
+--&amp;gt;
+
+&amp;lt;!-- ai:task id=btn-analyze-screenshot kind=screenshot
+<span class="gh">#btn-analyze を赤枠で囲んだ操作画面を撮影</span>
+--&amp;gt;
+
+&amp;lt;!-- ai:task id=screenshot-caption-text kind=text
+上のスクリーンショットに関する注意点（ショートカットキーなど）を簡潔に補足
+--&amp;gt;
+</code></pre></div>
+<h3 id="3_1">3. スクリーンショットのアノテーション指示仕様（赤丸・角丸赤枠・矢印・説明文ラベル）</h3>
+<p>スクリーンショットタスクの指示文（プロンプト）または GUI の「💬 修正指示」に要素名やキーワード、アノテーション指示を含めることで、撮影時に自動で <strong>赤丸・角丸赤枠</strong>、<strong>指示矢印</strong>、および <strong>吹き出し説明文ラベル</strong> を合成できます。</p>
+<div class="highlight"><pre><span></span><code>       ┌─────────────────────────────────────┐
+       │ 💬 1. ここをクリックして全スクショ更新 │  ← 吹き出し説明文ラベル（半透明ダーク背景・赤枠）
+       └──────────────────┬──────────────────┘
+                          ▼                         ← 指示矢印（赤色ハイライト）
+                   ╭─────────────╮
+                   │ 📸 全スクショ │                  ← 赤丸 または 角丸赤枠ハイライト
+                   ╰─────────────╯
+</code></pre></div>
+<h4 id="_4">アノテーション指示の構文キーワード</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指定項目</th>
+<th style="text-align: left;">指示方法</th>
+<th style="text-align: left;">動作仕様</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>対象要素</strong></td>
+<td style="text-align: left;"><code>#btn-id</code>, <code>.class</code> またはボタン名<br>（例: <code>全スクショ</code>, <code>ダイアグラム</code>, <code>API</code>, <code>ビルド</code>, <code>保存</code>, <code>解析</code>, <code>診断</code>, <code>設定</code> 等）</td>
+<td style="text-align: left;">指定された ID/クラス、または自然言語のボタン名に一致する UI 要素を自動検出します。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>ハイライト形状</strong></td>
+<td style="text-align: left;"><code>丸</code>, <code>円</code>, <code>circle</code> を含む</td>
+<td style="text-align: left;"><strong>円形（赤丸）</strong> で要素を包み込むようにハイライトします（指定がない場合はフィットする <strong>角丸四角の赤枠</strong>）。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>指示矢印</strong></td>
+<td style="text-align: left;"><code>矢印</code> または <code>arrow</code> を含む</td>
+<td style="text-align: left;">要素の直上（またはスペースに応じて直下）に <strong>赤い指示矢印（<code>⬇</code> / <code>⬆</code>）</strong> を合成します。</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>説明文ラベル</strong></td>
+<td style="text-align: left;"><code>「...」</code>, <code>『...』</code>, <code>"..."</code>, <code>'...'</code>, または <code>説明: ...</code></td>
+<td style="text-align: left;">赤枠・矢印と合わせて、ダーク半透明背景に赤枠の <strong>吹き出し説明文ラベル</strong> を自動配置します。</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_5">実践的な活用例</h4>
+<ul>
+<li>
+<p><strong>活用例 1: 操作手順マニュアルで重要ボタンを赤枠・矢印・吹き出しで案内</strong>
+  <div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=step-batch-capture kind=screenshot
+<span class="gh">#btn-manual-batch-capture を赤枠で囲み、矢印を付けて「1. ここをクリックして全スクショを一括更新」と説明</span>
+--&amp;gt;
+</code></pre></div>
+  <em>効果</em>: ボタンが角丸赤枠で強調され、その真上に矢印と「1. ここをクリックして全スクショを一括更新」のラベルが付いた画像がワンクリックで撮影・保存されます。</p>
+</li>
+<li>
+<p><strong>活用例 2: 設定アイコンを赤丸と矢印で注目させる</strong>
+  <div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:task id=settings-guidance kind=screenshot
+設定ボタンを赤丸と矢印で指して「出力先やAIモデルを変更」と説明
+--&amp;gt;
+</code></pre></div>
+  <em>効果</em>: 設定アイコンが綺麗な赤丸でマークされ、矢印と説明ラベルが付加されるため、読者が一目で操作場所を理解できます。</p>
+</li>
+<li>
+<p><strong>活用例 3: GUIの「💬 修正指示」からの即座リテイク</strong></p>
+</li>
+<li>ドキュメント生成カード内の「💬 修正指示」モーダルで：
+    &gt; 「保存ボタンを赤丸で囲み、矢印をつけて『変更をプロジェクトに保存』と説明文を入れて」</li>
+<li>と入力して送信するだけで、指示通りのアノテーションが合成された新しい画像に即座に差し替わります。</li>
+</ul>
+<h3 id="4-aigenerated">4. 生成後タグ (<code>ai:generated</code>) とライフサイクル</h3>
+<p>タスクが実行されると、原稿内の <code>ai:task</code> が自動的に <code>ai:generated</code> タグで置き換わります：</p>
+<div class="highlight"><pre><span></span><code>&amp;lt;!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:00Z source-sha256=a1b2c3... approved-at=2026-09-27T00:05:00Z --&amp;gt;
+![<span class="nt">overview-screenshot</span>](<span class="na">assets/overview-screenshot.png</span>)
+&amp;lt;!-- /ai:generated --&amp;gt;
+</code></pre></div>
+<ul>
+<li><strong><code>source-sha256</code> による追跡</strong>:</li>
+<li>指示文（<code>kind</code> + 改行 + <code>prompt</code>）から算出された SHA-256 ハッシュ値が記録されます。</li>
+<li>原稿側の指示文が後から書き換えられた場合、ハッシュの不一致により自動的に「指示変更あり（stale）」と検知され、リテイクや再生成が促されます。</li>
+<li><strong><code>approved-at</code>（承認日時）</strong>:</li>
+<li>内容を確認して「承認」を行うと、承認日時がタグ内に記録され、全体再生成の際にも意図しない上書きから保護されます。</li>
+<li>ただし、Mermaid ダイアグラム（<code>kind=diagram</code>）はコードの最新状態を優先するため、承認済みであっても「📊 全ダイアグラム更新」によって最新コード構造に同期されます。</li>
+</ul>
+<h3 id="5">5. ビルドモードによる検証ルールの違い</h3>
+<ul>
+<li><strong>下書きビルド（<code>--draft</code>）</strong>:</li>
+<li>未撮影・未生成の <code>ai:task</code> が原稿に残っていてもエラーになりません。</li>
+<li>生成待ちのブロックは、オレンジ色の「作成待ち（Pending）」プレースホルダーとして HTML 内に可視化され、全体の構成や進捗を確認できます。</li>
+<li><strong>完成版ビルド（厳格ビルド）</strong>:</li>
+<li>原稿内のすべての <code>ai:task</code> に対応する実アセット（画像ファイル、Mermaid 図、文章）が揃っていることが必須です。</li>
+<li>未解決のタスクや、指示文が変更されて stale 状態のブロックが 1 つでも残っている場合はビルドが中断され、問題箇所がエラーとして報告されます。</li>
+</ul>
+<!-- /ai:draft -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

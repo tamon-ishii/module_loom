@@ -615,8 +615,9 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
 
   if (!targetEl) targetEl = document.body;
 
-  // アノテーション（赤枠・赤丸囲み）の処理
+  // アノテーション（赤枠・赤丸囲み、矢印、説明文ラベル）の処理
   let highlightEl: HTMLDivElement | null = null;
+  let annotationLabelEl: HTMLDivElement | null = null;
   let prevPosition = "";
   if (annotationHint) {
     const hint = annotationHint.trim();
@@ -635,7 +636,7 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
 
     if (!foundEl) {
       const candidates = Array.from(document.querySelectorAll<HTMLElement>("button, .tab, label, select, input, h2, h3, a"));
-      const keywords = ["全スクショ", "ダイアグラム", "API", "ビルド", "保存", "解析", "診断", "マニュアル", "修正", "承認"];
+      const keywords = ["全スクショ", "ダイアグラム", "API", "ビルド", "保存", "解析", "診断", "マニュアル", "修正", "承認", "設定"];
       for (const kw of keywords) {
         if (hint.includes(kw)) {
           foundEl = candidates.find((c) => c.textContent?.includes(kw)) || null;
@@ -668,6 +669,51 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
         targetEl.style.position = "relative";
       }
       targetEl.appendChild(highlightEl);
+
+      // 矢印と説明文ラベル（吹き出し）の合成
+      const hasArrow = hint.includes("矢印") || hint.includes("arrow");
+      let labelText = "";
+      const quoteMatch = hint.match(/[「『"']([^「『"']+)["'」』]/);
+      if (quoteMatch) {
+        labelText = quoteMatch[1];
+      } else {
+        const descMatch = hint.match(/(?:説明|ラベル|注記|テキスト)[:：]\s*([^\s,、。]+)/);
+        if (descMatch) labelText = descMatch[1];
+      }
+
+      if (hasArrow || labelText) {
+        annotationLabelEl = document.createElement("div");
+        annotationLabelEl.className = "manual-screenshot-annotation-label";
+        annotationLabelEl.style.position = "absolute";
+        annotationLabelEl.style.pointerEvents = "none";
+        annotationLabelEl.style.zIndex = "999999";
+        annotationLabelEl.style.display = "flex";
+        annotationLabelEl.style.alignItems = "center";
+        annotationLabelEl.style.gap = "6px";
+        annotationLabelEl.style.fontFamily = "sans-serif";
+        annotationLabelEl.style.fontWeight = "bold";
+
+        const topSpace = elRect.top - targetRect.top;
+        const placeBelow = topSpace < 40;
+        const labelTop = placeBelow
+          ? elRect.top - targetRect.top + targetEl.scrollTop + elRect.height + 14
+          : elRect.top - targetRect.top + targetEl.scrollTop - 36;
+        const labelLeft = Math.max(10, elRect.left - targetRect.left + targetEl.scrollLeft);
+
+        annotationLabelEl.style.top = `${labelTop}px`;
+        annotationLabelEl.style.left = `${labelLeft}px`;
+
+        let html = "";
+        if (hasArrow) {
+          const arrowSymbol = placeBelow ? "⬆" : "⬇";
+          html += `<span style="color: #ff3344; font-size: 1.3rem; filter: drop-shadow(0 0 4px rgba(255,50,50,0.8)); line-height: 1;">${arrowSymbol}</span>`;
+        }
+        if (labelText) {
+          html += `<span style="background: rgba(20, 20, 30, 0.94); color: #ffffff; border: 1.5px solid #ff3344; border-radius: 4px; padding: 3px 8px; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(0,0,0,0.5); white-space: nowrap;">${escapeHtml(labelText)}</span>`;
+        }
+        annotationLabelEl.innerHTML = html;
+        targetEl.appendChild(annotationLabelEl);
+      }
     }
   }
 
@@ -687,6 +733,9 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
       if (targetEl && (!prevPosition || prevPosition === "static")) {
         targetEl.style.position = prevPosition;
       }
+    }
+    if (annotationLabelEl) {
+      annotationLabelEl.remove();
     }
   }
 }
