@@ -5,9 +5,41 @@
     <vendor url="https://github.com/tamon-ishii/module_loom">ModuleLoom</vendor>
     <idea-version since-build="253" />
     <description><![CDATA[
-    Interactive Python module dependency graph visualization inside PyCharm.
-    Detects circular imports, inspects oversized modules, and provides one-click navigation to editor files.
+    <h3>ModuleLoom - Python Architecture & Automated Documentation Engine</h3>
+    <p>
+      <b>ModuleLoom</b> brings real-time Python module dependency graph visualization, architectural diagnostics, 
+      and an automated manual documentation engine with local AI integration directly into your PyCharm environment.
+    </p>
+
+    <h4>🌟 Key Features</h4>
+    <ul>
+      <li><b>🔍 Real-time Dependency & Cycle Detection:</b> Visualize complex package structures, trace circular import paths, and navigate directly to source files with one click.</li>
+      <li><b>📖 3-Asset Automated Documentation Engine (Core Highlight):</b> 1-click sync for in-draft Screenshots (with automatic red-circle, bounding box, arrow, and label annotations), Mermaid architecture diagrams from AST, and Docstring API references into MkDocs static sites.</li>
+      <li><b>🚨 Code Quality & Architecture Diagnostics:</b> Multi-angle inspection of bloat, duplicate code (bundled jscpd v5), cyclomatic complexity (Lizard/AST), and missing type annotations. Automatically installs diagnostics skills to detected coding agents (Codex, Claude Code, Cursor).</li>
+      <li><b>🤖 Local AI Integration:</b> Connects to Codex, Claude Code, Grok, or Agy CLI using your local authentication without requiring extra API keys.</li>
+      <li><b>⚙️ Centralized Settings:</b> Easy configuration popup for HTML output destination, Markdown source directory, and AI CLI/model selection.</li>
+      <li><b>🌐 Dual Language:</b> Full support for English and Japanese (switchable in View &rarr; Language).</li>
+    </ul>
+
+    <h4>🇯🇵 日本語での特徴</h4>
+    <ul>
+      <li><b>🔍 依存関係 & 循環インポートのリアルタイム可視化:</b> 複雑なモジュール関係や循環インポート経路を可視化し、エディタと連携して即座に修正可能。</li>
+      <li><b>📖 3大アセット自動同期ドキュメント生成エンジン（目玉機能）:</b> 原稿内のスクリーンショット（赤丸・角丸赤枠・矢印・説明文吹き出し自動合成）、Mermaid依存図、DocstringからのAPIリファレンスをボタン1発で自動同期し、MkDocsサイトをビルド。</li>
+      <li><b>🚨 コード品質 & アーキテクチャ診断:</b> 肥大化、重複コード（jscpd同梱）、循環、型チェックを多角的に診断し、コーディングエージェントへ診断スキルを自動導入。</li>
+      <li><b>🤖 ローカル認証済み AI CLI 連携:</b> Codex、Claude Code、Grok、Agy とAPIキー不要で連携。</li>
+    </ul>
     ]]></description>
+
+    <change-notes><![CDATA[
+    <h4>v1.1.0</h4>
+    <ul>
+      <li><b>3-Asset Automated Documentation Engine:</b> Automatic batch screenshot capture with smart annotations (red circles, bounding boxes, arrows, and speech-bubble text labels), Mermaid dependency diagram extraction, and Docstring API reference generation.</li>
+      <li><b>Centralized Settings Popup:</b> Easy configuration for HTML export target, Markdown source directory, and AI CLI/model settings.</li>
+      <li><b>Unified Feature Parity:</b> 100% feature parity across Desktop app, PyCharm plugin, and VS Code extension.</li>
+      <li><b>Smart Annotations:</b> Natural language prompt support for circling elements, arrows, and descriptive labels on screenshot capture.</li>
+    </ul>
+    ]]></change-notes>
+
 
     <!-- Compatibility with all JetBrains IDEs (PyCharm, IntelliJ, etc.) -->
     <depends>com.intellij.modules.platform</depends>

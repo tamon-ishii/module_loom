@@ -1,7 +1,7 @@
 # ModuleLoom for VS Code
 
 Run **ModuleLoom: Open Module Graph** from the Command Palette in a Python workspace.
-The extension runs `analyze --json` and opens the shared ModuleLoom interface. It supports automatic reanalysis, Git change and commit comparison, JSON analysis export, MkDocs export, and Ruff cycle-fix previews and application.
+The extension runs `analyze --json` and opens the shared ModuleLoom interface. It supports automatic reanalysis, Git change and commit comparison, JSON analysis export, MkDocs export, Ruff cycle-fix previews and application, and the 3-asset automated documentation engine (batch screenshots with annotations, Mermaid dependency diagrams, Docstring API references).
 
 Release VSIX packages bundle the analyzer and jscpd v5 for supported platforms. The extension extracts both into the same cache directory so code diagnostics can use the bundled duplicate detector. Its license is included at `licenses/jscpd/LICENSE`.
 
@@ -15,7 +15,7 @@ To package and install from this repository, run:
 ```sh
 python3 scripts/build_vscode_extension.py
 python3 scripts/package_vscode_extension.py
-code --install-extension target/vscode-extension/moduleloom-1.0.6.vsix
+code --install-extension target/vscode-extension/moduleloom-1.1.0.vsix
 ```
 
 Reload VS Code after installation.
