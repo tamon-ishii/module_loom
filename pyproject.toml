@@ -1,6 +1,6 @@
 [project]
 name = "moduleloom"
-version = "1.0.6"
+version = "1.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "loguru>=0.7.3",
@@ -10,6 +10,10 @@ dependencies = [
 dev = [
     "jscpd>=5.3.2",
     "lizard>=1.24.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.7",
+    "pillow>=12.3.0",
     "pytest>=9.1.1",
     "ruff>=0.16.8",
+    "ty>=0.0.84",
 ]

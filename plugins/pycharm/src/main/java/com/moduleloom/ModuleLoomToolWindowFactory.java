@@ -35,6 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.event.AWTEventListener;
 import java.awt.event.MouseEvent;
@@ -322,7 +323,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         jsQuery.addHandler(query -> {
             return new JBCefJSQuery.Response(handleClientQuery(project, browser, query, targetCombo));
         });
-        Path webDir = prepareWebAssets(initialPath, jsQuery);
+        Path webDir = prepareWebAssets(initialPath, project.getBasePath(), jsQuery);
 
         targetCombo.addActionListener(e -> {
             String path = selectedAnalysisPath(project, targetCombo);
@@ -568,6 +569,10 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         String head = extractJsonField(request, "head");
         String toolId = extractJsonField(request, "toolId");
         switch (command == null ? "" : command) {
+            case "install_agent_skill": {
+                String result = runProcess(root, List.of(findAnalyzerBinary(project), "--install-skill"), null, false);
+                return jsonString(result.trim());
+            }
             case "analyze_project": {
                 List<String> analyzeArgs = new ArrayList<>(List.of(findAnalyzerBinary(project), "--json"));
                 if ("true".equals(extractJsonField(request, "quality"))) analyzeArgs.add("--quality");
@@ -665,6 +670,46 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 String binary = findAnalyzerBinary(project);
                 runProcess(root, List.of(binary, "--mkdocs", output, "--lang", lang == null ? "auto" : lang, root.toString()), null, false);
                 return jsonString(output);
+            }
+            case "manual_action": {
+                String action = extractJsonField(request, "action");
+                if (action == null) throw new IllegalArgumentException("マニュアル操作を指定してください");
+                List<String> args = new ArrayList<>(List.of(findAnalyzerBinary(project), "--manual", action, "--root", root.toString()));
+                for (String key : List.of("docs", "output", "brief", "agent", "model", "id", "page", "asset", "format", "feedback")) {
+                    String value = extractJsonField(request, key);
+                    if (value != null) args.addAll(List.of("--" + key, value));
+                }
+                String mkdocsSettings = extractJsonField(request, "mkdocs_settings");
+                if (mkdocsSettings != null) {
+                    args.addAll(List.of("--mkdocs-settings", mkdocsSettings));
+                }
+                if ("true".equals(extractJsonField(request, "draft"))) args.add("--draft");
+                if ("generate-task".equals(action)) args.addAll(List.of("--cli", findAnalyzerBinary(project)));
+                return jsonString(runProcess(root, args, null, false).trim());
+            }
+            case "manual_capture_screenshot": {
+                String taskId = extractJsonField(request, "id");
+                if (taskId == null || !taskId.matches("[a-z][a-z0-9-]*")) throw new IllegalArgumentException("スクリーンショットのタグIDが不正です");
+                Path assets = root.resolve("docs/assets");
+                Files.createDirectories(assets);
+                Path image = assets.resolve(taskId + ".png");
+
+                String dataUrl = extractJsonField(request, "data");
+                if (dataUrl != null && !dataUrl.isEmpty()) {
+                    String base64 = dataUrl.contains(",") ? dataUrl.substring(dataUrl.indexOf(",") + 1) : dataUrl;
+                    byte[] bytes = java.util.Base64.getDecoder().decode(base64.trim());
+                    Files.write(image, bytes);
+                } else {
+                    ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ModuleLoom");
+                    if (toolWindow == null || !toolWindow.isVisible()) throw new IllegalStateException("ModuleLoom ツールウィンドウを表示してください");
+                    Component component = toolWindow.getComponent();
+                    if (!component.isShowing()) throw new IllegalStateException("撮影する画面が表示されていません");
+                    Point location = component.getLocationOnScreen();
+                    Rectangle bounds = new Rectangle(location.x, location.y, component.getWidth(), component.getHeight());
+                    ImageIO.write(new Robot().createScreenCapture(bounds), "png", image.toFile());
+                }
+                runProcess(root, List.of(findAnalyzerBinary(project), "--manual", "record-screenshot", "--root", root.toString(), "--id", taskId, "--image", image.toString()), null, false);
+                return jsonString(image.toString());
             }
             case "export_report": {
                 String jsonData = extractJsonField(request, "json");
@@ -1110,7 +1155,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
         }
     }
 
-    private Path prepareWebAssets(String initialProjectPath, JBCefJSQuery jsQuery) {
+    private Path prepareWebAssets(String initialProjectPath, String workspacePath, JBCefJSQuery jsQuery) {
         try {
             Path targetDir = Path.of(System.getProperty("user.home"), ".cache", "moduleloom", "web");
             Files.createDirectories(targetDir);
@@ -1137,6 +1182,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 }
                 String bootstrap = "<style>#project-path-input,#btn-analyze,.editor-select-area,.watch-toggle-label{display:none !important;}</style>" +
                         "<script>window.__MODULELOOM_PROJECT_PATH__=" + jsonString(initialProjectPath == null ? "" : initialProjectPath) + ";" +
+                        "window.__MODULELOOM_WORKSPACE_PATH__=" + jsonString(workspacePath == null ? "" : workspacePath) + ";" +
                         "window.__MODULELOOM_EDITOR__='pycharm';" +
                         "window.cefQuery=function(arg){" + jsQuery.inject("arg.request", "arg.onSuccess", "arg.onFailure") + "};" +
                         "let moduleLoomRequestId=0;window.__MODULELOOM_INVOKE__=function(command,args){return new Promise((resolve,reject)=>{const requestId=++moduleLoomRequestId;window.cefQuery({request:JSON.stringify({type:'command',requestId,command,args}),onSuccess:function(raw){try{const result=JSON.parse(raw);if(result&&result.__moduleloom_error__)reject(new Error(result.__moduleloom_error__));else resolve(result);}catch(e){reject(e);}},onFailure:function(code,msg){reject(new Error(msg));}});});};</script>";

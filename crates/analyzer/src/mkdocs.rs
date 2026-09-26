@@ -244,6 +244,175 @@ pub fn generate_with_lang(
     Ok(())
 }
 
+pub fn generate_api_reference(
+    result: &AnalysisResult,
+    docs_dir: &Path,
+    lang: &str,
+) -> Result<usize, String> {
+    let lang = resolve_lang(lang)?;
+    let labels = labels_for_lang(&lang);
+
+    fs::create_dir_all(docs_dir.join("modules")).map_err(|error| error.to_string())?;
+    fs::create_dir_all(docs_dir.join("javascripts")).map_err(|error| error.to_string())?;
+
+    let mut modules: Vec<&ModuleInfo> = result.modules.iter().collect();
+    modules.sort_by(|a, b| a.id.cmp(&b.id).then(a.relative_path.cmp(&b.relative_path)));
+    let pages: BTreeMap<&str, String> = modules
+        .iter()
+        .enumerate()
+        .map(|(index, module)| (module.id.as_str(), format!("modules/{index:04}.md")))
+        .collect();
+
+    let marker_path = docs_dir.join("modules").join(MARKER);
+    let old_pages = fs::read_to_string(&marker_path).unwrap_or_default();
+    for old_page in old_pages.lines() {
+        if !old_page.starts_with("modules/")
+            || old_page.contains("..")
+            || !old_page.ends_with(".md")
+        {
+            continue;
+        }
+        if !pages.values().any(|page| page == old_page) {
+            let path = docs_dir.join(old_page);
+            if fs::read_to_string(&path).is_ok_and(|content| content.starts_with(GENERATED_HEADER))
+            {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+
+    let _ = write_bytes(
+        docs_dir.join("javascripts/mermaid.min.js"),
+        include_bytes!("../assets/mermaid.min.js"),
+    );
+    let _ = write_bytes(
+        docs_dir.join("javascripts/mermaid.LICENSE"),
+        include_bytes!("../assets/mermaid.LICENSE"),
+    );
+    let _ = write(
+        docs_dir.join("javascripts/mermaid.mjs"),
+        "import './mermaid.min.js';\nwindow.mermaid = globalThis.mermaid;\nwindow.mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });\n",
+    );
+
+    let mut api = format!("{GENERATED_HEADER}# {}\n\n", labels.api_catalog);
+    for module in &modules {
+        let page = &pages[module.id.as_str()];
+        api.push_str(&format!("## {} [{}]({page})\n\n", labels.module, module.id));
+        let module_summary = summary(module.docstring.as_deref(), labels);
+        api.push_str(&format!("{}\n\n", module_summary));
+        for class in &module.classes {
+            api.push_str(&format!(
+                "- **{}** [`{}{}`]({page}#api-class-{}) — {}\n",
+                labels.class,
+                class.name,
+                class.signature,
+                class.line,
+                summary(class.docstring.as_deref(), labels)
+            ));
+        }
+        for function in &module.functions {
+            let parent = function
+                .parent_class_line
+                .and_then(|line| module.classes.iter().find(|class| class.line == line));
+            let name = parent.map_or_else(
+                || function.name.clone(),
+                |class| format!("{}.{}", class.name, function.name),
+            );
+            api.push_str(&format!(
+                "- **{}** [`{}{}`]({page}#api-function-{}) — {}\n",
+                labels.callable,
+                name,
+                function.signature,
+                function.line,
+                summary(function.docstring.as_deref(), labels)
+            ));
+        }
+        api.push('\n');
+    }
+    if modules.is_empty() {
+        api.push_str(&format!("{}\n", labels.no_modules));
+    }
+    write(docs_dir.join("api.md"), &api)?;
+
+    for module in &modules {
+        let connected: BTreeSet<&str> = result
+            .edges
+            .iter()
+            .filter(|edge| edge.source == module.id || edge.target == module.id)
+            .flat_map(|edge| [edge.source.as_str(), edge.target.as_str()])
+            .chain(std::iter::once(module.id.as_str()))
+            .filter(|id| pages.contains_key(id))
+            .collect();
+        let mut page = format!("{GENERATED_HEADER}# {}\n\n", module.id);
+        page.push_str(&diagram(result, &connected, &pages, true, labels));
+        page.push_str(&format!("\n[← {}](../index.md)\n\n", labels.back_overview));
+        page.push_str(&format!("## {}\n\n", labels.description));
+        page.push_str(
+            &module
+                .docstring
+                .as_deref()
+                .filter(|text| !text.trim().is_empty())
+                .map(format_docstring)
+                .unwrap_or_else(|| labels.missing_module_description.clone()),
+        );
+        page.push_str("\n\n");
+
+        let mut documented = Vec::new();
+        for class in &module.classes {
+            let docstring = class
+                .docstring
+                .as_deref()
+                .filter(|text| !text.trim().is_empty());
+            documented.push((
+                class.line,
+                format!(
+                    "<a id=\"api-class-{}\"></a>\n### class `{}`\n\n{}\n\n",
+                    class.line,
+                    format!("{}{}", class.name, class.signature),
+                    docstring
+                        .map(format_docstring)
+                        .unwrap_or_else(|| labels.missing_description.clone())
+                ),
+            ));
+        }
+        for function in &module.functions {
+            let docstring = function
+                .docstring
+                .as_deref()
+                .filter(|text| !text.trim().is_empty());
+            let parent = function
+                .parent_class_line
+                .and_then(|line| module.classes.iter().find(|class| class.line == line));
+            let name = parent.map_or_else(
+                || function.name.clone(),
+                |class| format!("{}.{}", class.name, function.name),
+            );
+            documented.push((
+                function.line,
+                format!(
+                    "<a id=\"api-function-{}\"></a>\n### {}\n\n`{}{}`\n\n{}\n\n",
+                    function.line,
+                    name,
+                    name,
+                    function.signature,
+                    docstring
+                        .map(format_docstring)
+                        .unwrap_or_else(|| labels.missing_description.clone())
+                ),
+            ));
+        }
+        documented.sort_by_key(|(line, _)| *line);
+        for (_, section) in documented {
+            page.push_str(&section);
+        }
+        write(docs_dir.join(&pages[module.id.as_str()]), &page)?;
+    }
+
+    let manifest = pages.values().cloned().collect::<Vec<_>>().join("\n");
+    let _ = write(marker_path, &manifest);
+    Ok(modules.len())
+}
+
 fn write(path: PathBuf, content: &str) -> Result<(), String> {
     fs::write(&path, content).map_err(|error| format!("{}: {error}", path.display()))
 }
@@ -623,4 +792,39 @@ mod tests {
         generate(&updated, output.path()).unwrap();
         assert!(!output.path().join("docs/modules/0001.md").exists());
     }
+
+    #[test]
+    fn generates_api_reference_in_manual_docs() {
+        let project = tempdir().unwrap();
+        fs::write(
+            project.path().join("service.py"),
+            "\"\"\"Main service module.\"\"\"\n\nclass Worker:\n    \"\"\"Worker class.\"\"\"\n    def process(self):\n        \"\"\"Process item.\"\"\"\n        pass\n",
+        )
+        .unwrap();
+        let result = analyze_directory(project.path()).unwrap();
+
+        let manual_docs = tempdir().unwrap();
+        // 原稿の既存 index.md がある状態
+        fs::write(manual_docs.path().join("index.md"), "# Manual Overview\n").unwrap();
+
+        let count = super::generate_api_reference(&result, manual_docs.path(), "ja").unwrap();
+        assert_eq!(count, 1);
+
+        // 原稿の index.md が壊されていないこと
+        let index = fs::read_to_string(manual_docs.path().join("index.md")).unwrap();
+        assert_eq!(index, "# Manual Overview\n");
+
+        // api.md と modules/0000.md が生成されていること
+        assert!(manual_docs.path().join("api.md").exists());
+        let api = fs::read_to_string(manual_docs.path().join("api.md")).unwrap();
+        assert!(api.contains("service"));
+        assert!(api.contains("Main service module."));
+        assert!(api.contains("Worker"));
+
+        let mod_page = fs::read_to_string(manual_docs.path().join("modules/0000.md")).unwrap();
+        assert!(mod_page.contains("# service"));
+        assert!(mod_page.contains("Main service module."));
+        assert!(mod_page.contains("class `Worker`"));
+    }
 }
+

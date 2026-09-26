@@ -87,6 +87,10 @@ jobs:
       - run: npm ci
       - name: Stage jscpd v5 and its license
         run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
+      - name: Build and stage desktop analyzer CLI
+        run: |
+          cargo build --release -p moduleloom-analyzer --bin analyze ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          python scripts/stage_desktop_analyzer.py "${{ matrix.target }}"
       - uses: tauri-apps/tauri-action@v1
         with:
           args: --bundles ${{ matrix.bundles }}${{ matrix.target && format(' --target {0}', matrix.target) || '' }}

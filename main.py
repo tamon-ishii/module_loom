@@ -17,9 +17,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 def stage_local_jscpd() -> None:
     name = "jscpd.exe" if os.name == "nt" else "jscpd"
+    executable = shutil.which(name)
     candidates = [
         PROJECT_ROOT / ".venv" / ("Scripts" if os.name == "nt" else "bin") / name,
-        Path(shutil.which(name)) if shutil.which(name) else None,
+        Path(executable) if executable is not None else None,
     ]
     for source in candidates:
         if source is None or not source.is_file():

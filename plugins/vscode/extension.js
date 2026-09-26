@@ -92,6 +92,10 @@ async function handlePluginCommand(folder, webview, message) {
     ? { ...folder, uri: vscode.Uri.file(args.path) } : folder;
   const root = path.resolve(commandFolder.uri.fsPath);
   switch (message.command) {
+    case 'install_agent_skill': {
+      const { stdout } = await runFile(analyzerExecutable(commandFolder), ['--install-skill'], { cwd: root });
+      return stdout.trim();
+    }
     case 'analyze_project': return analyzeForCommand(commandFolder, args.changedFiles, args.quality === true);
     case 'list_fix_tools': return fixTools(root).map(({ id, label, kinds }) => ({ id, label, kinds }));
     case 'preview_cycle_fix': {
@@ -156,6 +160,40 @@ async function handlePluginCommand(folder, webview, message) {
     case 'stop_watching': clearTimeout(refreshTimer); pendingChangedFiles.clear(); fileWatchers.forEach(watcher => watcher.dispose()); fileWatchers = []; return {};
     case 'open_in_editor': await openFile(commandFolder, args.filePath, args.line); return {};
     case 'detect_editors': return ['code'];
+    case 'manual_action': {
+      if (!args.action) throw new Error('マニュアル操作を指定してください');
+      const cliArgs = ['--manual', args.action, '--root', root];
+      for (const key of ['docs', 'output', 'brief', 'agent', 'model', 'id', 'page', 'asset', 'format', 'feedback', 'lang', 'body']) {
+        if (args[key] !== undefined && args[key] !== null) {
+          cliArgs.push(`--${key}`, String(args[key]));
+        }
+      }
+      if (args.mkdocs_settings !== undefined && args.mkdocs_settings !== null) {
+        cliArgs.push('--mkdocs-settings', String(args.mkdocs_settings));
+      }
+      if (args.draft === true || args.draft === 'true') {
+        cliArgs.push('--draft');
+      }
+      if (args.action === 'generate-task') {
+        cliArgs.push('--cli', analyzerExecutable(commandFolder));
+      }
+      const { stdout } = await runFile(analyzerExecutable(commandFolder), cliArgs, { cwd: root });
+      return stdout.trim();
+    }
+    case 'manual_capture_screenshot': {
+      const taskId = args.id;
+      if (!taskId || !/^[a-z][a-z0-9-]*$/.test(taskId)) throw new Error('スクリーンショットのタグIDが不正です');
+      const assetsDir = path.join(root, 'docs', 'assets');
+      fs.mkdirSync(assetsDir, { recursive: true });
+      const imagePath = path.join(assetsDir, `${taskId}.png`);
+      const dataUrl = args.data;
+      if (!dataUrl) throw new Error('スクリーンショットデータが空です');
+      const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl;
+      fs.writeFileSync(imagePath, Buffer.from(base64.trim(), 'base64'));
+      const cliArgs = ['--manual', 'record-screenshot', '--root', root, '--id', taskId, '--image', imagePath];
+      const { stdout } = await runFile(analyzerExecutable(commandFolder), cliArgs, { cwd: root });
+      return stdout.trim();
+    }
     default: throw new Error(`Unsupported ModuleLoom command: ${message.command}`);
   }
 }

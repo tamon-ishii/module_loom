@@ -7,26 +7,28 @@ Enables running and interacting with the ModuleLoom module dependency graph dire
 
 ### Requirement: PyCharm Tool Window Registration
 The plugin SHALL register a Tool Window with ID `ModuleLoom` on the right sidebar of the IDE.
-- Anchor: `right` or `bottom`
-- Name: `ModuleLoom`
-- It SHALL display a toolbar with:
-  - "Analyze Active Project" button
-  - "Zoom Fit" button
-  - Status/Info label showing the number of modules and cycles
+
+#### Scenario: Register tool window
+- **WHEN** PyCharm launches with the ModuleLoom plugin installed
+- **THEN** it registers a tool window on the right sidebar displaying analysis and zoom controls.
 
 ### Requirement: JCEF Embedded Visualization
 The Tool Window SHALL embed a Chromium Embedded Framework (JCEF) browser (`JBCefBrowser`).
-- It SHALL load the interactive module dependency visualization.
-- It SHALL support zooming, panning, layout toggling, package grouping, and cycle highlighting.
+
+#### Scenario: Load visualization
+- **WHEN** the user opens the ModuleLoom tool window
+- **THEN** it loads the interactive module visualization supporting zoom, pan, and package groupings.
 
 ### Requirement: Bi-directional Communication & Editor Navigation
-- The web frontend SHALL use `JBCefJSQuery` to send events to PyCharm.
-- When an `open_file` message with `{ filePath, line }` is received from the web view:
-  - PyCharm SHALL locate the `VirtualFile` for the path.
-  - PyCharm SHALL open the file in the editor tab and place the caret on the specified line using `FileEditorManager` and `OpenFileDescriptor`.
+The web frontend SHALL communicate with the IDE to navigate source code.
+
+#### Scenario: Jump to editor position
+- **WHEN** an `open_file` message with file path and line number is emitted
+- **THEN** PyCharm locates the file, opens it in an editor tab, and moves the caret to the requested line.
 
 ### Requirement: Project Analysis Execution
-- When the user triggers "Analyze Active Project":
-  - The plugin SHALL identify the base directory of the currently open PyCharm project.
-  - The plugin SHALL execute the analyzer engine (`analyze --json <path>`).
-  - The resulting JSON SHALL be passed to the web view via `executeJavaScript("window.renderModuleGraph(...)")`.
+The plugin SHALL execute the analyzer engine and render results.
+
+#### Scenario: Analyze active project
+- **WHEN** the user triggers project analysis
+- **THEN** the plugin resolves the project base directory, executes the native analyzer binary, and updates the graph visualization.

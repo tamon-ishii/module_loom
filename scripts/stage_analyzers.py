@@ -14,6 +14,7 @@ TARGETS = {
     "macos-arm64": "analyze",
 }
 JSCPD_LICENSE = Path(__file__).resolve().parent.parent / "third_party/jscpd/LICENSE"
+SKILL = Path(__file__).resolve().parent.parent / "skills/moduleloom-diagnostics/SKILL.md"
 
 
 def stage(artifact_root: Path, project_root: Path) -> None:
@@ -57,6 +58,7 @@ def stage(artifact_root: Path, project_root: Path) -> None:
                 info.compress_type = ZIP_DEFLATED
                 archive.writestr(info, data)
             archive.writestr("licenses/jscpd/LICENSE", license_source.read_bytes())
+            archive.writestr("skills/moduleloom-diagnostics/SKILL.md", SKILL.read_bytes())
         print(f"Staged {platform}: {archive_path}")
 
     for destination in destinations:

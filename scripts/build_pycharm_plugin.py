@@ -25,7 +25,6 @@ def build():
     if not PYCHARM_HOME:
         raise RuntimeError("Set PYCHARM_HOME to an unpacked PyCharm installation")
     print("=== Building PyCharm Plugin for ModuleLoom ===")
-    shutil.rmtree(os.path.expanduser("~/.cache/moduleloom/web"), ignore_errors=True)
     subprocess.run(["npm", "run", "build"], cwd=PROJECT_ROOT, check=True)
     web_resources = os.path.join(SRC_RES, "web")
     shutil.rmtree(web_resources, ignore_errors=True)
@@ -194,10 +193,13 @@ def validate_jar(path):
                for name in jar.namelist()) and "licenses/jscpd/LICENSE" not in jar.namelist():
             raise RuntimeError("Bundled jscpd requires licenses/jscpd/LICENSE")
 
-def install():
+def install(profile=None):
     validate_jar(JAR_OUTPUT)
+    shutil.rmtree(os.path.expanduser("~/.cache/moduleloom/web"), ignore_errors=True)
     # Install into all existing PyCharm profiles, including newly created versions.
     target_plugin_roots = sorted(glob.glob(os.path.expanduser("~/.local/share/JetBrains/PyCharm*")))
+    if profile:
+        target_plugin_roots = [root for root in target_plugin_roots if os.path.basename(root) == profile]
 
     installed = 0
     for root_dir in target_plugin_roots:
@@ -228,10 +230,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build and install the local PyCharm plugin")
     parser.add_argument("--build-only", action="store_true", help="Build the JAR without installing")
     parser.add_argument("--install-only", action="store_true", help="Install an already built JAR")
+    parser.add_argument("--profile", help="Install only into this PyCharm profile directory name")
     args = parser.parse_args()
     if args.build_only and args.install_only:
         parser.error("--build-only and --install-only cannot be used together")
     if not args.install_only:
         build()
     if not args.build_only:
-        install()
+        install(args.profile)

@@ -23,6 +23,11 @@ fn initial_project_path() -> Option<String> {
 }
 
 #[tauri::command]
+fn install_agent_skill() -> Result<String, String> {
+    moduleloom_analyzer::skill::install_detected()
+}
+
+#[tauri::command]
 fn preview_cycle_fix(
     path: String,
     source: String,
@@ -136,6 +141,79 @@ fn generate_mkdocs(
         lang.as_deref().unwrap_or("auto"),
     )?;
     Ok(output)
+}
+
+#[tauri::command]
+async fn manual_action(
+    path: String,
+    action: String,
+    docs: Option<String>,
+    output: Option<String>,
+    brief: Option<String>,
+    agent: Option<String>,
+    model: Option<String>,
+    id: Option<String>,
+    page: Option<String>,
+    asset: Option<String>,
+    feedback: Option<String>,
+    draft: Option<bool>,
+    app: AppHandle,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = PathBuf::from(path);
+        let mut options = Vec::<(&str, &str)>::new();
+        if let Some(ref value) = docs { options.push(("--docs", value)); }
+        if let Some(ref value) = output { options.push(("--output", value)); }
+        if let Some(ref value) = brief { options.push(("--brief", value)); }
+        if let Some(ref value) = agent { options.push(("--agent", value)); }
+        if let Some(ref value) = model { options.push(("--model", value)); }
+        if let Some(ref value) = id { options.push(("--id", value)); }
+        if let Some(ref value) = page { options.push(("--page", value)); }
+        if let Some(ref value) = asset { options.push(("--asset", value)); }
+        if let Some(ref value) = feedback { options.push(("--feedback", value)); }
+        if draft.unwrap_or(false) { options.push(("--draft", "")); }
+        let binary_name = if cfg!(windows) { "analyze.exe" } else { "analyze" };
+        let bundled = app.path().resolve(format!("binaries/{binary_name}"), BaseDirectory::Resource).ok();
+        let local = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug").join(binary_name);
+        let binary = bundled.filter(|path| path.is_file()).or_else(|| local.is_file().then_some(local));
+        if action == "generate-task" {
+            if let Some(ref executable) = binary {
+                options.push(("--cli", executable.to_str().ok_or("Invalid analyzer path")?));
+            }
+        }
+        moduleloom_analyzer::manual::run(&root, &action, &options)
+    }).await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn manual_capture_screenshot(
+    path: String,
+    id: String,
+    data: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = PathBuf::from(&path);
+        let assets = root.join("docs/assets");
+        std::fs::create_dir_all(&assets).map_err(|e| e.to_string())?;
+        let image = assets.join(format!("{id}.png"));
+
+        let base64_str = if let Some(pos) = data.find(',') {
+            &data[pos + 1..]
+        } else {
+            &data
+        };
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(base64_str.trim())
+            .map_err(|e| format!("Base64 decode error: {e}"))?;
+        std::fs::write(&image, bytes).map_err(|e| e.to_string())?;
+
+        let options = vec![
+            ("--id", id.as_str()),
+            ("--image", image.to_str().unwrap_or("")),
+        ];
+        moduleloom_analyzer::manual::run(&root, "record-screenshot", &options)
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -361,8 +439,11 @@ fn main() {
         .manage(ruff_fix::FixState::default())
         .invoke_handler(tauri::generate_handler![
             initial_project_path,
+            install_agent_skill,
             analyze_project,
             generate_mkdocs,
+            manual_action,
+            manual_capture_screenshot,
             list_fix_tools,
             preview_cycle_fix,
             apply_cycle_fix,

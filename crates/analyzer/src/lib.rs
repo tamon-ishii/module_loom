@@ -6,11 +6,13 @@ pub mod dependencies;
 pub mod diagnostics;
 mod duplicate_filter;
 pub mod graph;
+pub mod manual;
 pub mod metrics;
 pub mod mkdocs;
 pub mod model;
 pub mod parser;
 pub mod quality;
+pub mod skill;
 pub mod suggestions;
 
 use model::{

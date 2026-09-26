@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-26
+goal: Let users draft, generate, review, approve, build, and preview manuals
+  through local AI CLIs.

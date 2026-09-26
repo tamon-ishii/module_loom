@@ -17,6 +17,56 @@ struct IncrementalInput {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    if args.get(1).is_some_and(|arg| arg == "--manual") {
+        let Some(action) = args.get(2) else {
+            eprintln!("Usage: moduleloom-analyze --manual ACTION --root PROJECT [OPTIONS]");
+            std::process::exit(2);
+        };
+        let mut root = ".".to_string();
+        let mut options = Vec::<(&str, &str)>::new();
+        let mut position = 3;
+        while position < args.len() {
+            let key = args[position].as_str();
+            if key == "--draft" {
+                options.push((key, ""));
+                position += 1;
+                continue;
+            }
+            if !key.starts_with("--") {
+                root = key.to_string();
+                position += 1;
+                continue;
+            }
+            let Some(value) = args.get(position + 1) else {
+                eprintln!("Missing value for {key}");
+                std::process::exit(2);
+            };
+            if key == "--root" {
+                root = value.clone();
+            } else {
+                options.push((key, value));
+            }
+            position += 2;
+        }
+        match moduleloom_analyzer::manual::run(Path::new(&root), action, &options) {
+            Ok(output) => println!("{output}"),
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+    if args.iter().skip(1).any(|arg| arg == "--install-skill") {
+        match moduleloom_analyzer::skill::install_detected() {
+            Ok(message) => println!("{message}"),
+            Err(message) => {
+                eprintln!("{message}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     let mut json_mode = false;
     let mut check_mode = false;
     let mut check_cycles = false;
@@ -40,6 +90,8 @@ fn main() {
         if arg == "--help" || arg == "-h" {
             println!("Usage: moduleloom-analyze [OPTIONS] [PROJECT_PATH]");
             println!("  --diagnostics      Run code diagnostics and print AI-ready JSON");
+            println!("  --install-skill    Install the bundled skill for detected coding agents");
+            println!("  --manual ACTION   Manage the MkDocs manual (state, save, draft, generate-task, build)");
             println!("  --quality-report   Alias of --diagnostics");
             println!("  --quality --json   Print the full analysis with diagnostics");
             println!("  --max-score N      Exit with status 1 if the score exceeds N");

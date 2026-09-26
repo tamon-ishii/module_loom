@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZipFile
 
-from stage_analyzers import JSCPD_LICENSE, TARGETS
+from stage_analyzers import JSCPD_LICENSE, SKILL, TARGETS
 
 
 def current_platform() -> str | None:
@@ -46,6 +46,15 @@ def smoke(analyzer: Path, jscpd: Path) -> None:
             raise RuntimeError(f"Bundled diagnostics did not use jscpd: {analyzer}")
         if not report["duplicate_candidates"]:
             raise RuntimeError(f"Bundled diagnostics missed duplicate example: {analyzer}")
+        codex_home = project / ".codex"
+        environment["HOME"] = str(project)
+        environment["USERPROFILE"] = str(project)
+        environment["CODEX_HOME"] = str(codex_home)
+        subprocess.run([str(analyzer.resolve()), "--install-skill"],
+                       capture_output=True, text=True, check=True, env=environment)
+        installed = codex_home / "skills/moduleloom-diagnostics/SKILL.md"
+        if installed.read_bytes() != SKILL.read_bytes():
+            raise RuntimeError(f"Bundled skill installation failed: {analyzer}")
 
 
 def check(release_dir: Path) -> None:
@@ -55,12 +64,15 @@ def check(release_dir: Path) -> None:
         cli_name = "moduleloom-analyze.exe" if target == "windows-x64" else "moduleloom-analyze"
         jscpd_name = "jscpd.exe" if target == "windows-x64" else "jscpd"
         license_name = "licenses/jscpd/LICENSE"
+        skill_name = "skills/moduleloom-diagnostics/SKILL.md"
         with ZipFile(archive_path) as archive:
-            expected = {cli_name, jscpd_name, license_name}
+            expected = {cli_name, jscpd_name, license_name, skill_name}
             if set(archive.namelist()) != expected:
                 raise RuntimeError(f"Unexpected files in {archive_path}: {archive.namelist()}")
             if archive.read(license_name) != JSCPD_LICENSE.read_bytes():
                 raise RuntimeError(f"jscpd license mismatch in {archive_path}")
+            if archive.read(skill_name) != SKILL.read_bytes():
+                raise RuntimeError(f"Skill mismatch in {archive_path}")
             for name in (cli_name, jscpd_name):
                 if not archive.read(name):
                     raise RuntimeError(f"Empty {name} in {archive_path}")

@@ -12,13 +12,34 @@
         <div class="controls-area">
           <input type="text" id="project-path-input" placeholder="Python プロジェクトのパス (/path/to/project)" />
           <button id="btn-analyze" class="btn-primary">解析実行</button>
+          <label class="global-language">言語 <select id="ui-language"><option value="ja">日本語</option><option value="en">English</option></select></label>
+          <input type="checkbox" id="chk-watch" checked hidden />
+          <input type="checkbox" id="chk-only-cycles" hidden />
+        </div>
+        <div class="editor-select-area" hidden>
+          <label for="editor-select">ジャンプ先:</label>
+          <select id="editor-select">
+            <option value="pycharm">PyCharm</option>
+            <option value="vscode">VS Code</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="workspace-tabs" role="tablist" aria-label="画面の切り替え">
+        <button id="tab-modules" class="workspace-tab active" type="button" role="tab" aria-controls="module-view" aria-selected="true">モジュール一覧</button>
+        <button id="tab-diagnostics" class="workspace-tab" type="button" role="tab" aria-controls="complexity-dashboard" aria-selected="false" tabindex="-1">コード診断</button>
+        <button id="tab-manual" class="workspace-tab" type="button" role="tab" aria-controls="manual-view" aria-selected="false" tabindex="-1">ドキュメント生成</button>
+      </div>
+
+      <div class="workspace-content">
+      <div id="module-view" class="main-container" role="tabpanel" aria-labelledby="tab-modules">
+        <div class="module-view-toolbar">
           <div class="primary-actions">
             <button id="btn-back" class="btn-secondary" title="前の表示に戻る">← 戻る</button>
             <button id="btn-show-overview" class="btn-secondary" title="プロジェクト全モジュールの全体図を表示">全体図</button>
           </div>
           <div class="search-box-header">
             <input type="text" id="search-input" placeholder="図内のモジュールを検索..." />
-            <button id="btn-search-issues" class="btn-secondary" title="問題・エラー一覧を表示">問題一覧</button>
           </div>
           <div class="toolbar-menus">
             <details class="toolbar-menu">
@@ -28,7 +49,6 @@
                   <button id="btn-toggle-tree" class="btn-secondary active" title="ソースツリーの表示/非表示">ソースツリー</button>
                   <button id="btn-toggle-inspector" class="btn-secondary active" title="モジュール詳細の表示/非表示">モジュール詳細</button>
                 </div>
-                <label>言語 <select id="ui-language"><option value="ja">日本語</option><option value="en">English</option></select></label>
                 <div class="filter-controls">
                   <label title="LOCや関数数が肥大化したモジュールのみ表示"><input type="checkbox" id="chk-only-bloat" /> 肥大化のみ</label>
                   <label title="選択モジュールの直接の依存・被依存のみ表示"><input type="checkbox" id="chk-direct-only" checked /> 直接依存のみ</label>
@@ -57,84 +77,161 @@
                 </div>
               </div>
             </details>
-            <details class="toolbar-menu">
-              <summary>出力</summary>
-              <div class="toolbar-menu-content">
-                <div class="menu-actions">
-                  <button id="btn-export-report" class="btn-secondary" title="現在の解析結果を JSON で保存">解析データを JSON で保存</button>
-                  <button id="btn-export-mkdocs" class="btn-secondary" title="全体図とモジュール別マニュアルを MkDocs 用に生成">MkDocs 出力</button>
-                </div>
-              </div>
-            </details>
+            <button id="btn-export-report" class="btn-secondary" title="現在の解析結果を JSON で保存">JSON 保存</button>
           </div>
-          <input type="checkbox" id="chk-watch" checked hidden />
-          <input type="checkbox" id="chk-only-cycles" hidden />
         </div>
-        <div class="editor-select-area" hidden>
-          <label for="editor-select">ジャンプ先:</label>
-          <select id="editor-select">
-            <option value="pycharm">PyCharm</option>
-            <option value="vscode">VS Code</option>
-          </select>
-        </div>
-      </header>
 
-      <div class="workspace-tabs" role="tablist" aria-label="画面の切り替え">
-        <button id="tab-modules" class="workspace-tab active" type="button" role="tab" aria-controls="module-view" aria-selected="true">モジュール一覧</button>
-        <button id="tab-diagnostics" class="workspace-tab" type="button" role="tab" aria-controls="complexity-dashboard" aria-selected="false" tabindex="-1">コード診断</button>
-      </div>
+        <div class="module-view-body">
+          <!-- Python Source Tree Panel -->
+          <aside id="tree-panel" class="tree-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <span class="panel-icon">📁</span>
+                <h3>ソースツリー (.py)</h3>
+              </div>
+            </div>
+            <div class="tree-search-area">
+              <input type="text" id="tree-search-input" placeholder="Python ファイル検索..." />
+            </div>
+            <div id="tree-content" class="tree-content">
+              <p class="placeholder-text">解析を実行すると Python ソースツリーが表示されます</p>
+            </div>
+          </aside>
 
-      <div class="workspace-content">
-      <div id="module-view" class="main-container" role="tabpanel" aria-labelledby="tab-modules">
-        <!-- Python Source Tree Panel -->
-        <aside id="tree-panel" class="tree-panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <span class="panel-icon">📁</span>
-              <h3>ソースツリー (.py)</h3>
+          <div id="tree-resizer" class="pane-resizer" role="separator" aria-label="ソースツリーの幅" aria-controls="tree-panel" aria-orientation="vertical" tabindex="0"></div>
+
+          <div class="graph-wrapper">
+            <div id="cy-container" class="graph-canvas"></div>
+            <div class="floating-zoom-controls">
+              <button id="btn-float-flow-direction" class="btn-float" title="フロー方向の切り替え (横 ↔ 縦)">↔</button>
+              <button id="btn-float-zoom-in" class="btn-float" title="拡大 (Zoom In)">&#43;</button>
+              <button id="btn-float-zoom-out" class="btn-float" title="縮小 (Zoom Out)">&minus;</button>
+              <button id="btn-float-zoom-reset" class="btn-float" title="等倍リセット (100%)">1:1</button>
+              <button id="btn-float-zoom-fit" class="btn-float" title="全体表示 (Fit)">&#x2922;</button>
             </div>
           </div>
-          <div class="tree-search-area">
-            <input type="text" id="tree-search-input" placeholder="Python ファイル検索..." />
-          </div>
-          <div id="tree-content" class="tree-content">
-            <p class="placeholder-text">解析を実行すると Python ソースツリーが表示されます</p>
-          </div>
-        </aside>
-
-        <div id="tree-resizer" class="pane-resizer" role="separator" aria-label="ソースツリーの幅" aria-controls="tree-panel" aria-orientation="vertical" tabindex="0"></div>
-
-        <div class="graph-wrapper">
-          <div id="cy-container" class="graph-canvas"></div>
-          <div class="floating-zoom-controls">
-            <button id="btn-float-flow-direction" class="btn-float" title="フロー方向の切り替え (横 ↔ 縦)">↔</button>
-            <button id="btn-float-zoom-in" class="btn-float" title="拡大 (Zoom In)">&#43;</button>
-            <button id="btn-float-zoom-out" class="btn-float" title="縮小 (Zoom Out)">&minus;</button>
-            <button id="btn-float-zoom-reset" class="btn-float" title="等倍リセット (100%)">1:1</button>
-            <button id="btn-float-zoom-fit" class="btn-float" title="全体表示 (Fit)">&#x2922;</button>
-          </div>
+          <div id="inspector-resizer" class="pane-resizer" role="separator" aria-label="モジュール詳細の幅" aria-controls="inspector-panel" aria-orientation="vertical" tabindex="0"></div>
+          <aside id="inspector-panel" class="inspector-panel">
+            <div class="panel-header">
+              <h3>モジュール詳細</h3>
+              <button id="btn-close-inspector" class="btn-icon">&times;</button>
+            </div>
+            <div id="inspector-content" class="panel-content">
+              <p class="placeholder-text">グラフ上のノードをクリックすると詳細が表示されます</p>
+            </div>
+          </aside>
         </div>
-        <div id="inspector-resizer" class="pane-resizer" role="separator" aria-label="モジュール詳細の幅" aria-controls="inspector-panel" aria-orientation="vertical" tabindex="0"></div>
-        <aside id="inspector-panel" class="inspector-panel">
-          <div class="panel-header">
-            <h3>モジュール詳細</h3>
-            <button id="btn-close-inspector" class="btn-icon">&times;</button>
-          </div>
-          <div id="inspector-content" class="panel-content">
-            <p class="placeholder-text">グラフ上のノードをクリックすると詳細が表示されます</p>
-          </div>
-        </aside>
       </div>
 
       <section id="complexity-dashboard" class="complexity-dashboard" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
-        <div class="complexity-dashboard-header"><h2 id="complexity-dashboard-title">コード診断</h2><span id="complexity-dashboard-score"></span><button id="btn-quality" class="btn-primary" type="button" title="現在のコードを診断して結果を更新">診断実行</button></div>
+        <div class="complexity-dashboard-header">
+          <h2 id="complexity-dashboard-title">コード診断</h2>
+          <span id="complexity-dashboard-score"></span>
+          <button id="btn-quality" class="btn-primary" type="button" title="現在のコードを診断して結果を更新">診断実行</button>
+          <button id="btn-install-skill" class="btn-secondary" type="button" title="検出したコーディングエージェントにコード診断スキルをインストール">コード診断スキルをインストール</button>
+        </div>
+        <p id="skill-install-status" class="skill-install-status" role="status" hidden></p>
+
+        <!-- 問題・エラー一覧セクション -->
+        <div class="issues-dashboard-section">
+          <div class="issues-filter-bar">
+            <input type="text" id="issues-search-filter" placeholder="キーワード絞り込み (モジュール名、メッセージ等)..." />
+            <div class="issues-category-tabs">
+              <button class="btn-filter-tab active" data-filter="all">すべて (<span id="count-all">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="cycles">🔄 循環 (<span id="count-cycles">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="architecture">🏛 アーキテクチャ (<span id="count-arch">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="dependencies">📦 依存宣言 (<span id="count-deps">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="unused">🧹 未使用シンボル (<span id="count-unused">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="bloat">⚡ 肥大化 (<span id="count-bloat">0</span>)</button>
+              <button class="btn-filter-tab" data-filter="diagnostics">🚨 診断エラー (<span id="count-diag">0</span>)</button>
+            </div>
+          </div>
+          <div id="issues-list-container" class="issues-list-panel">
+            <p class="placeholder-text">解析結果から問題を検索しています...</p>
+          </div>
+          <div class="issues-summary-bar">
+            <span id="issues-summary-text">0 件の問題</span>
+          </div>
+        </div>
+
         <div id="complexity-dashboard-content" class="complexity-dashboard-content"><p class="placeholder-text">解析結果を待っています</p></div>
+      </section>
+      <section id="manual-view" class="manual-view" role="tabpanel" aria-labelledby="tab-manual" hidden>
+        <div class="manual-header">
+          <div class="manual-header-title">
+            <h2>ドキュメント生成</h2>
+            <span class="manual-header-sub">スクショ・ダイアグラム・APIリファレンスを自動同期</span>
+          </div>
+          <div class="manual-header-actions">
+            <button id="btn-manual-capture-all" class="btn-secondary" type="button" title="すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます">📸 全スクショ一括撮影</button>
+            <button id="btn-manual-diagram-all" class="btn-secondary" type="button" title="プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します">📊 全ダイアグラム更新</button>
+            <button id="btn-manual-generate-api" class="btn-secondary" type="button" title="DocstringからPythonモジュールのAPIリファレンス（docs/modules/）を自動生成します">📖 APIドキュメント生成</button>
+            <button id="btn-manual-open-settings" class="btn-secondary" type="button" title="HTML出力先、Markdown原稿パス、AI設定を開きます">⚙️ 設定</button>
+            <button id="manual-build-draft" class="btn-secondary" type="button" title="未完成タスクをプレースホルダーとして残したまま下書きサイトをビルドします">下書きビルド</button>
+            <button id="manual-build" class="btn-primary" type="button" title="全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します">🚀 完成版ビルド</button>
+          </div>
+        </div>
+        <div class="manual-layout">
+          <div class="manual-editor">
+            <!-- 1. 自動同期アセット一覧（スクリーンショット & ダイアグラム） -->
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <h3>同期アセット一覧</h3>
+                <span id="manual-assets-summary" class="manual-assets-summary">0 件のアセット</span>
+              </div>
+              <p>Markdown 原稿内の <code>ai:task</code> に基づき、実画面画像や Mermaid 図を自動で同期・差し替えます。</p>
+              <div id="manual-tasks" class="manual-tasks"></div>
+            </div>
+
+            <!-- 2. API リファレンス自動生成 -->
+            <div class="manual-card">
+              <div class="manual-card-header">
+                <h3>API リファレンス生成</h3>
+                <button id="btn-manual-api-run" class="btn-secondary btn-sm" type="button">今すぐ生成</button>
+              </div>
+              <p>解析した全 Python モジュールの Docstring・クラス・関数・依存図から、MkDocs 用の API リファレンス（<code>docs/modules/*.md</code>）を自動生成します。</p>
+              <div class="form-row">
+                <label>出力言語
+                  <select id="manual-api-lang">
+                    <option value="auto">自動 (ロケール依存)</option>
+                    <option value="ja">日本語 (ja)</option>
+                    <option value="en">English (en)</option>
+                  </select>
+                </label>
+                <div style="font-size: 0.8rem; color: var(--text-muted); align-self: center; margin-top: 14px;">
+                  ※ Markdown 原稿内（<code>docs/modules/</code>）に自動出力されます
+                </div>
+              </div>
+            </div>
+
+            <p id="manual-status" role="status"></p>
+          </div>
+          <div class="manual-preview-panel">
+            <div class="manual-preview-header">
+              <h3>プレビュー</h3>
+              <div class="preview-nav-buttons">
+                <button type="button" id="btn-manual-back" class="btn-secondary btn-sm" title="前のページに戻る" disabled>◀ 戻る</button>
+                <button type="button" id="btn-manual-forward" class="btn-secondary btn-sm" title="次のページに進む" disabled>進む ▶</button>
+              </div>
+              <div class="preview-mode-toggle">
+                <button type="button" id="btn-preview-mode-html" class="btn-sm active" title="MkDocsでビルドされたHTMLサイトを表示">HTML</button>
+                <button type="button" id="btn-preview-mode-md" class="btn-sm" title="Markdownの簡易プレビューを表示">Markdown</button>
+              </div>
+              <select id="manual-page" aria-label="プレビューページ"><option value="index.md">index.md</option></select>
+              <button id="manual-refresh" class="btn-secondary btn-sm" type="button" title="ドキュメント状態とプレビューを最新に更新">🔄 プレビュー更新</button>
+            </div>
+            <div class="manual-preview-body">
+              <iframe id="manual-preview-iframe" class="manual-preview-iframe" title="MkDocs HTML プレビュー" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+              <div id="manual-preview" class="manual-preview" hidden><p>下書きをビルドするとプレビューを表示します。</p></div>
+            </div>
+          </div>
+        </div>
       </section>
       </div>
 
       <footer class="app-footer">
         <div id="status-bar">準備完了</div>
-        <div id="app-version">v1.0.6</div>
+        <div id="app-version">v1.1.0</div>
       </footer>
     </div>
 
@@ -231,39 +328,6 @@ def example_function():
       </div>
     </div>
 
-    <!-- 問題・エラー一覧 & モジュール検索 モーダル -->
-    <div id="issues-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="issues-modal-title">
-      <div class="modal-container" style="max-width: 820px; max-height: 85vh; display: flex; flex-direction: column;">
-        <div class="modal-header">
-          <div class="modal-title-area">
-            <span class="modal-icon">⚠️</span>
-            <strong id="issues-modal-title" class="modal-title">問題・エラー一覧 & モジュール検索</strong>
-          </div>
-          <button id="btn-close-issues-modal" class="btn-icon modal-close" title="閉じる">&times;</button>
-        </div>
-        <div class="modal-body" style="display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px;">
-          <div class="issues-filter-bar" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center;">
-            <input type="text" id="issues-search-filter" placeholder="キーワード絞り込み (モジュール名、メッセージ等)..." style="flex: 1; min-width: 180px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 0.82rem;" />
-            <div class="issues-category-tabs" style="display: flex; gap: 4px; flex-wrap: wrap;">
-              <button class="btn-filter-tab active" data-filter="all">すべて (<span id="count-all">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="cycles">🔄 循環 (<span id="count-cycles">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="architecture">🏛 アーキテクチャ (<span id="count-arch">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="dependencies">📦 依存宣言 (<span id="count-deps">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="unused">🧹 未使用シンボル (<span id="count-unused">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="bloat">⚡ 肥大化 (<span id="count-bloat">0</span>)</button>
-              <button class="btn-filter-tab" data-filter="diagnostics">🚨 診断エラー (<span id="count-diag">0</span>)</button>
-            </div>
-          </div>
-          <div id="issues-list-container" style="flex: 1; overflow-y: auto; max-height: 52vh; border: 1px solid var(--border-color); border-radius: 4px; background: #11111b; padding: 6px;">
-            <p class="placeholder-text" style="margin: 20px 0;">解析結果から問題を検索しています...</p>
-          </div>
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color);">
-          <span id="issues-summary-text" style="color: var(--text-muted); font-size: 0.82rem;">0 件の問題</span>
-          <button id="btn-close-issues-footer" class="btn-secondary btn-sm">閉じる</button>
-        </div>
-      </div>
-    </div>
 
     <div id="analysis-history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="analysis-history-title">
       <div class="modal-container" style="max-width: 760px; max-height: 80vh;">
@@ -310,29 +374,152 @@ def example_function():
       </div>
     </div>
 
-    <!-- MkDocs ドキュメント生成 モーダル -->
-    <div id="mkdocs-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mkdocs-title">
-      <div class="modal-container" style="max-width: 500px;">
+
+    <!-- AIマニュアル生成 進捗ダイアログ -->
+    <div id="manual-progress-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-progress-title">
+      <div class="modal-container" style="max-width: 520px; border: 1px solid var(--accent-color);">
         <div class="modal-header">
-          <strong id="mkdocs-title">MkDocs ドキュメント生成</strong>
-          <button id="btn-close-mkdocs" class="btn-icon modal-close" title="閉じる">&times;</button>
+          <div class="modal-title-area" style="display: flex; align-items: center; gap: 8px;">
+            <span class="modal-icon" style="font-size: 1.2rem;">🤖</span>
+            <strong id="manual-progress-title" class="modal-title">AI アセット生成中</strong>
+          </div>
+          <button id="btn-close-manual-progress" class="btn-icon modal-close" title="閉じる" disabled>&times;</button>
         </div>
-        <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-          <label style="font-size: 0.82rem;">出力先ディレクトリ:
-            <input type="text" id="mkdocs-output-path" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;" />
-          </label>
-          <label style="font-size: 0.82rem;">ドキュメント言語:
-            <select id="mkdocs-lang" style="width: 100%; margin-top: 4px; padding: 6px 8px; background: #11111b; border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px; box-sizing: border-box;">
-              <option value="auto">自動判定 (auto)</option>
-              <option value="ja">日本語 (ja)</option>
-              <option value="en">English (en)</option>
-            </select>
-          </label>
-          <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">全体図とモジュール別リファレンスマニュアルを静的サイト形式で出力します。</p>
+        <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <!-- 進行ステータス & タイマー -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="manual-progress-spinner" class="spinner-ring"></span>
+              <span id="manual-progress-badge" class="progress-badge badge-running">実行中</span>
+              <span id="manual-progress-phase" style="font-weight: 600; font-size: 0.88rem;">構成案を設計中...</span>
+            </div>
+            <span id="manual-progress-timer" style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">00:00</span>
+          </div>
+
+          <!-- プログレスバー -->
+          <div class="progress-track">
+            <div id="manual-progress-bar-fill" class="progress-bar-fill"></div>
+          </div>
+
+          <!-- ステップ一覧 -->
+          <div class="progress-steps-list">
+            <div id="step-manual-verify" class="step-item step-done">
+              <span class="step-indicator">✓</span>
+              <span class="step-label">設定と指示の検証 (docs, brief)</span>
+            </div>
+            <div id="step-manual-ai" class="step-item step-active">
+              <span class="step-indicator">●</span>
+              <span class="step-label">AI エージェント (<span id="progress-agent-name">Codex</span>) によるドキュメント生成</span>
+            </div>
+            <div id="step-manual-staged" class="step-item step-pending">
+              <span class="step-indicator">○</span>
+              <span class="step-label">Markdown 原稿ファイル（docs/）への展開</span>
+            </div>
+            <div id="step-manual-build" class="step-item step-pending">
+              <span class="step-indicator">○</span>
+              <span class="step-label">HTML 下書きプレビューの自動ビルド</span>
+            </div>
+          </div>
+
+          <!-- ログ / メッセージ表示 -->
+          <div id="manual-progress-log" class="progress-log-box">AI CLI を起動しています。通常 10〜30 秒ほどかかります...</div>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="btn-cancel-mkdocs" class="btn-secondary btn-sm">キャンセル</button>
-          <button id="btn-submit-mkdocs" class="btn-primary btn-sm">ドキュメントを生成</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border-color);">
+          <span id="manual-progress-footer-text" style="color: var(--text-muted); font-size: 0.78rem;">処理完了までこのままお待ちください</span>
+          <button id="btn-close-manual-progress-footer" class="btn-secondary btn-sm" disabled>閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AIマニュアル生成 設定モーダル -->
+    <div id="manual-settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-settings-title">
+      <div class="modal-container" style="max-width: 580px;">
+        <div class="modal-header">
+          <div class="modal-title-area" style="display: flex; align-items: center; gap: 8px;">
+            <span class="modal-icon" style="font-size: 1.2rem;">⚙️</span>
+            <strong id="manual-settings-title" class="modal-title">ドキュメント生成・出力設定</strong>
+          </div>
+          <button id="btn-close-manual-settings" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; max-height: 75vh;">
+          
+          <!-- パス設定セクション -->
+          <div class="settings-group" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: var(--accent-color); font-size: 0.88rem;">📁 パス設定（原稿と出力先）</div>
+            <div style="display: grid; gap: 10px;">
+              <label style="font-size: 0.82rem;">対象プロジェクト
+                <input id="manual-root" type="text" placeholder="Python プロジェクトのパス" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
+              <div class="form-row">
+                <label style="font-size: 0.82rem;" title="Markdown 原稿ファイル（.md）が配置されているフォルダ">
+                  📝 Markdown 原稿元 (MDファイル元)
+                  <input id="manual-docs" type="text" value="docs" placeholder="docs" style="margin-top: 4px;" />
+                </label>
+                <label style="font-size: 0.82rem;" title="完成した静的 HTML サイトが出力されるフォルダ">
+                  🌐 HTML 出力先
+                  <input id="manual-output" type="text" value="manual" placeholder="manual" style="margin-top: 4px;" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI CLI & モデル設定セクション -->
+          <div class="settings-group" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: var(--accent-color); font-size: 0.88rem;">🤖 AI 設定</div>
+            <div class="form-row">
+              <label style="font-size: 0.82rem;">使用 AI CLI
+                <select id="manual-agent" style="margin-top: 4px;">
+                  <option value="codex">codex</option>
+                  <option value="claude">claude</option>
+                  <option value="gemini">gemini</option>
+                  <option value="agy">agy</option>
+                </select>
+              </label>
+              <label style="font-size: 0.82rem;">モデル
+                <div style="display: flex; gap: 4px; margin-top: 4px;">
+                  <input id="manual-model" type="text" placeholder="例: gpt-4o, claude-3-5-sonnet" list="manual-model-options" style="flex: 1;" />
+                  <button id="manual-list-models" class="btn-secondary btn-sm" type="button" title="利用可能なモデル候補を取得">候補</button>
+                </div>
+                <datalist id="manual-model-options"></datalist>
+              </label>
+            </div>
+          </div>
+
+          <!-- MkDocs サイト設定セクション -->
+          <div class="settings-group" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: var(--accent-color); font-size: 0.88rem;">📑 サイト・ビルド設定 (MkDocs)</div>
+            <div class="form-row">
+              <label style="font-size: 0.82rem;">サイト名
+                <input id="manual-mkdocs-sitename" type="text" placeholder="ModuleLoom マニュアル" style="margin-top: 4px;" />
+              </label>
+              <label style="font-size: 0.82rem;">テーマ
+                <select id="manual-mkdocs-theme" style="margin-top: 4px;">
+                  <option value="material">material</option>
+                  <option value="mkdocs">mkdocs</option>
+                  <option value="readthedocs">readthedocs</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row">
+              <label style="font-size: 0.82rem;">言語
+                <select id="manual-mkdocs-language" style="margin-top: 4px;">
+                  <option value="ja">日本語 (ja)</option>
+                  <option value="en">English (en)</option>
+                </select>
+              </label>
+              <label class="checkbox-label" style="align-self: center; margin-top: 18px; font-size: 0.82rem;">
+                <input type="checkbox" id="manual-mkdocs-dir-urls" /> ディレクトリURL形式を使用
+              </label>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color);">
+          <span id="manual-settings-save-status" style="font-size: 0.8rem; color: var(--accent-color);"></span>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-cancel-manual-settings" class="btn-secondary btn-sm" type="button">キャンセル</button>
+            <button id="manual-save" class="btn-primary btn-sm" type="button">設定を保存</button>
+          </div>
         </div>
       </div>
     </div>

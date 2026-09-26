@@ -22,20 +22,22 @@ Node.js と Rust を用意して、このリポジトリで一度 `npm ci` を�
 | Linux デスクトップ | `ModuleLoom-Desktop-linux-x64-*.AppImage` または `.deb` | AppImage を実行、または deb をインストール |
 | macOS デスクトップ | `ModuleLoom-Desktop-macos-*-*.dmg` | CPU に合う `x64` または `arm64` の DMG を開く |
 
-PyCharm と VS Code の配布ファイルには、対応する OS の解析用実行ファイルを同梱しています。解析 CLI を単独で使う場合は `ModuleLoom-CLI-*.zip` を選んでください。展開すると `moduleloom-analyze`（Windows は `.exe`）、`jscpd`、ライセンスが入っています。同じディレクトリに置いたままCLIを実行すると、重複診断に同梱の jscpd を使います。現在の対象は Windows と Linux の x64、macOS の x64 と arm64 です。
+PyCharm と VS Code の配布ファイルには、対応する OS の解析用実行ファイルを同梱しています。解析 CLI を単独で使う場合は `ModuleLoom-CLI-*.zip` を選んでください。展開すると `moduleloom-analyze`（Windows は `.exe`）、`jscpd`、ライセンス、診断スキルの `SKILL.md` が入っています。同じディレクトリに置いたままCLIを実行すると、重複診断に同梱の jscpd を使います。現在の対象は Windows と Linux の x64、macOS の x64 と arm64 です。
 
 PyCharm・VS Code・デスクトップ版とCLIの配布ファイルには jscpd v5 を同梱し、コード診断の重複検出に使います。jscpd の MIT ライセンス全文と著作権表示は配布物内の `licenses/jscpd/LICENSE` に含まれます。Lizard、ty、Ruff は解析対象の環境または `PATH` にある場合に使い、Lizard がなければ関数複雑度は組み込みのAST推定値になります。元のライセンス文は [third_party/jscpd/LICENSE](third_party/jscpd/LICENSE) に保存しています。
+
+コード診断画面の「コード診断スキルをインストール」を押すと、この端末で検出した Codex、Claude Code、Cursor に [ModuleLoom 診断スキル](skills/moduleloom-diagnostics/SKILL.md) を導入します。CLI では `moduleloom-analyze --install-skill` で同じ操作ができます。各エージェントの設定ディレクトリまたは実行コマンドを検出し、スキルをユーザー用の `skills/moduleloom-diagnostics` に保存します。Codex は `CODEX_HOME` が設定されていればそこを使います。既存のスキルの内容が異なる場合は上書きせず、その保存先を表示します。スキルの認識にはエージェントの再起動が必要になる場合があります。
 
 ## リリースの作成
 
 `main` へのプッシュと手動実行では、ビルド結果を GitHub Actions の成果物として保存します。`v` で始まるタグをプッシュすると、3種類の配布ファイルと解析 CLI を GitHub Releases に公開します。
 
 ```sh
-git tag v1.0.6
-git push origin v1.0.6
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
-タグの版は `src-tauri/tauri.conf.json` と `plugins/vscode/package.json` の版に合わせてください。
+タグの版は `src-tauri/tauri.conf.json` と `plugins/vscode/package.json`、`package.json`、`pyproject.toml`、`crates/analyzer/Cargo.toml` の版に合わせてください。
 
 ## プロジェクトごとの解析設定
 
@@ -141,6 +143,76 @@ kinds = ["type_only", "runtime", "unknown"]
 「変更ファイルを強調」では、作業中の変更か指定した 2 つのコミット間の変更を選び、該当する Python ファイルを依存図上で強調します。修正したモジュールがどこにあり、周囲にどんな依存関係があるかを確認するときに使います。コードの行単位の差分や、変更による影響範囲を自動判定する機能ではありません。「問題一覧」には依存宣言の問題も含まれます。import 経路検索では、解析済みモジュールを出発点と到着点に選びます。
 
 ## MkDocs マニュアル生成
+
+「ドキュメント生成」タブは、マニュアル原稿内のスクリーンショット、Mermaid依存図、およびDocstringからのAPIリファレンスという3大アセットを自動同期・一括生成する作業画面です。デスクトップ版、PyCharm プラグイン、VS Code 拡張機能のいずれでも、原稿（`docs/`）内の `ai:task` に基づき、実画面の自動巡回撮影（赤枠・赤丸ハイライト対応）やダイアグラム生成、APIドキュメント出力をボタン1発で実行できます。各アセットはサムネイル一覧でプレビューでき、気になった画像のみリテイク・修正指示を出せます。承認ボタンの個別押しは不要で、画像や図が揃っていればそのまま完成版サイトに反映されます。「下書きをビルド」では未完成の箇所を作成待ちとして表示し、「完成版をビルド」では完成した静的HTMLサイトを出力します。生成結果には作成時刻と指示のハッシュが残ります。ビルド時の中間 Markdown は一時ファイルとして処理され、ビルド先（`manual/`）には生成された HTML サイトが出力されます。
+
+ヘッダーの **「⚙️ 設定」** ボタンから開くポップアップで、**🌐 HTML 出力先ディレクトリ**（既定: `manual`）と **📝 Markdown 原稿元ディレクトリ (MDファイル元)**（既定: `docs`）、AI CLI、MkDocs サイト設定（サイト名、テーマ、言語）を一元管理・変更できます。
+
+AIの選択肢は Codex、Claude Code、Grok Build、Agy です。端末にインストール済みのCLIだけを選べます。ModuleLoomは各CLIの既存のログイン状態を使い、APIキーは要求しません。モデルIDは任意で、空欄ならそのCLIの既定モデルを使います。「候補」ボタンは利用可能なCLIからモデル候補を読み込みます。原稿のスキャンやAI生成はネイティブのModuleLoomバイナリ単独で動作します。HTMLサイトのビルド時のみ、外部ツールとして端末の `mkdocs` コマンド（未インストールの場合はMarkdown原稿の作成まで可能）を呼び出します。画面レイアウトやUIが改修された際は、「📸 全スクショ一括撮影」ボタンを押すだけで、ツールが各タブ（モジュール一覧、コード診断、ドキュメント生成など）を自動巡回して全画面を連続キャプチャし、全画像をまとめて最新状態に更新・ビルドします。「📊 全ダイアグラム更新」でMermaid図を最新化し、「📖 APIドキュメント生成」でDocstringからモジュールリファレンスを自動出力できます。マニュアル作成の詳細は [スキル](skills/moduleloom-manual-builder/SKILL.md) にまとめています。
+
+### AI タグの書き方とルール仕様
+
+原稿 Markdown 内に埋め込む `<!-- ai:task -->` および生成される `<!-- ai:generated -->` タグの厳格な構文と運用ルールです。コーディングエージェントや人間がマニュアル原稿を作成する際は、以下のルールに従ってください。
+
+#### 1. タスク指示タグの基本構文 (`ai:task`)
+
+```markdown
+<!-- ai:task id=<一意のID> kind=<screenshot|diagram|text>
+<指示文 / プロンプト>
+-->
+```
+
+- **`id` の命名規則**: 小文字英字で始まり、小文字英数字とハイフンのみ使用可能（`^[a-z][a-z0-9-]*$`）。原稿全体で一意（重複不可）。
+- **`kind` の種別（3 種類のみ）**:
+  - `screenshot`: 実画面のキャプチャ画像専用（`![id](assets/画像.png)` を出力）。
+  - `diagram`: Mermaid によるモジュール依存図専用（```mermaid ... ``` を出力）。
+  - `text`: 文章、解説、手順、注釈専用。
+- **改行・フォーマットルール**: タグ開始直後に必ず改行して指示文を開始し、末尾も改行して `-->` で閉じます。空の指示文は構文エラーになります。
+
+#### 2. 単一責任の原則（Strict Separation）
+
+各 `kind` の生成物は、その目的以外の不要な要素（注釈や出典、説明文）を含めてはなりません。
+- **`screenshot`**: **純粋な画像タグのみ**（`![id](assets/画像.png)`）。画像タグの前後に説明文・注釈・出典を含めないでください。説明が必要な場合は、直前または直下に別の `kind=text` タスクを独立して配置します。
+- **`diagram`**: **純粋な Mermaid コードブロックのみ**。出典やフッター注記を含めないでください。
+- **`text`**: **文章・手順・注釈専用**。画像タグや Mermaid コードブロックを混在させず、純粋な説明文のみを生成させます。
+
+#### 3. スクリーンショットのアノテーション指示仕様（赤丸・赤枠ハイライト）
+
+指示文または GUI の「💬 修正指示」に要素セレクタやキーワードを含めることで、撮影対象要素に自動で赤丸・赤枠ハイライトを合成できます：
+- **セレクタ指定**: `#btn-manual-batch-capture を赤枠で囲む`, `#btn-analyze に注目`
+- **自然言語キーワード指定**: `全スクショ`, `ダイアグラム`, `API`, `ビルド`, `保存`, `解析`, `診断`, `マニュアル`, `修正`, `承認` などのラベルを自動検出。
+- **形状の指定**: 指示文に `丸`, `円`, `circle` が含まれる場合は **赤丸**、それ以外は **角丸赤枠** を自動描画します。
+
+#### 4. 生成後タグ (`ai:generated`) とライフサイクル
+
+- タスクが実行・撮影されると、原稿内の `ai:task` は自動的に `<!-- ai:generated id=... created-at=... source-sha256=... -->` に置き換わります。
+- **`source-sha256`**: 指示文の SHA-256 ハッシュ値を記録し、指示文が後から書き換えられた場合に自動的に「指示変更あり（stale）」と検知します。
+- **`approved-at`**: 内容を確認して「承認」を行うと承認日時が記録され、不用意な再生成から保護されます（Mermaid 図はコード最新状態を反映するため承認済みでも再生成可能）。
+- **下書きビルド（`--draft`） vs 完成版ビルド**: 下書きビルドでは未解決タスクをオレンジ色の「作成待ち」プレースホルダーとして可視化し、完成版ビルドでは全タスクの完了を厳格に検証します。
+
+### CLI によるマニュアル操作とピンポイント修正指示
+
+GUI だけでなく、ターミナルから `moduleloom-analyze --manual` を使って状況確認や自然言語での修正指示を行えます：
+
+```sh
+# 1. タスク一覧と状態の確認（JSON出力）
+moduleloom-analyze --manual scan --root ./my-project
+
+# 2. 自然言語によるピンポイント修正指示・再生成（タグIDを指定）
+moduleloom-analyze --manual generate-task --root ./my-project --id pycharm-open-tool-window --feedback "初心者向けにメニューの場所をより具体的に箇条書きで解説して"
+
+# 3. スクリーンショットの登録
+moduleloom-analyze --manual record-screenshot --root ./my-project --id overview-screenshot --image ./path/to/screenshot.png
+
+# 4. 下書きビルド（未完了箇所を「作成待ち」としてプレビュー生成）
+moduleloom-analyze --manual build --root ./my-project --draft
+
+# 5. 完成版ビルド（全タスク完了が必須）
+moduleloom-analyze --manual build --root ./my-project
+
+# 6. タスクの承認（変更ロック）
+moduleloom-analyze --manual approve --root ./my-project --id pycharm-open-tool-window
+```
 
 デスクトップ版または PyCharm プラグインの「MkDocs 出力」、あるいは CLI の `--mkdocs` で、全体依存図、モジュール別ページ、API 一覧ページを含む MkDocs プロジェクトを生成できます。各モジュールページにはモジュール・クラス・関数・メソッドの docstring と、クラスの基底クラス、呼び出し可能オブジェクトの引数・既定値・型注釈・戻り値注釈を掲載します。Google、NumPy、Sphinx 形式の docstring 見出しも Markdown に整えます。ソースコード本文は出力しません。PyCharm とデスクトップ版は生成先・モジュール数・言語を確認してから生成します。
 

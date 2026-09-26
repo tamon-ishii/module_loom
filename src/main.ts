@@ -2,6 +2,7 @@ import "./style.css";
 import cytoscape, { Core, EventObject } from "cytoscape";
 // @ts-ignore
 import dagre from "cytoscape-dagre";
+import html2canvas from "html2canvas";
 import { escapeHtml } from "./utils";
 import { currentUiLocale, initUiLocale, setUiLocale, translateUiText, type UiLocale } from "./i18n";
 import { cycleGuidance, cyclePath, cycleSuggestion } from "./cycle-insights";
@@ -36,8 +37,12 @@ const pathInput = document.getElementById("project-path-input") as HTMLInputElem
 const uiLanguage = document.getElementById("ui-language") as HTMLSelectElement;
 const btnAnalyze = document.getElementById("btn-analyze") as HTMLButtonElement;
 const btnQuality = document.getElementById("btn-quality") as HTMLButtonElement;
+const btnInstallSkill = document.getElementById("btn-install-skill") as HTMLButtonElement;
+const skillInstallStatus = document.getElementById("skill-install-status") as HTMLElement;
 const tabModules = document.getElementById("tab-modules") as HTMLButtonElement;
 const tabDiagnostics = document.getElementById("tab-diagnostics") as HTMLButtonElement;
+const tabManual = document.getElementById("tab-manual") as HTMLButtonElement;
+const manualView = document.getElementById("manual-view") as HTMLElement;
 const moduleView = document.getElementById("module-view") as HTMLElement;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const chkWatch = document.getElementById("chk-watch") as HTMLInputElement;
@@ -68,6 +73,7 @@ const btnShowOverview = document.getElementById("btn-show-overview") as HTMLButt
 let currentViewMode: "overview" | "file" = "file";
 const editorSelect = document.getElementById("editor-select") as HTMLSelectElement | null;
 const hostEditor = (window as any).__MODULELOOM_EDITOR__;
+if (hostEditor === "vscode") tabManual.hidden = true;
 if (hostEditor === "pycharm" || hostEditor === "vscode") {
   document.querySelector(".editor-select-area")?.remove();
   pathInput.hidden = true;
@@ -84,21 +90,27 @@ const complexityDashboard = document.getElementById("complexity-dashboard") as H
 const complexityDashboardTitle = document.getElementById("complexity-dashboard-title") as HTMLElement;
 const complexityDashboardScore = document.getElementById("complexity-dashboard-score") as HTMLElement;
 const complexityDashboardContent = document.getElementById("complexity-dashboard-content") as HTMLElement;
-let activeWorkspaceTab: "modules" | "diagnostics" = "modules";
+let activeWorkspaceTab: "modules" | "diagnostics" | "manual" = "modules";
 let graphNeedsFit = false;
-function selectWorkspaceTab(tab: "modules" | "diagnostics") {
+function selectWorkspaceTab(tab: "modules" | "diagnostics" | "manual") {
   if (activeWorkspaceTab === tab) return;
   activeWorkspaceTab = tab;
   const modules = tab === "modules";
   moduleView.hidden = !modules;
-  complexityDashboard.hidden = modules;
+  complexityDashboard.hidden = tab !== "diagnostics";
+  manualView.hidden = tab !== "manual";
   tabModules.classList.toggle("active", modules);
-  tabDiagnostics.classList.toggle("active", !modules);
+  tabDiagnostics.classList.toggle("active", tab === "diagnostics");
+  tabManual.classList.toggle("active", tab === "manual");
   tabModules.setAttribute("aria-selected", String(modules));
-  tabDiagnostics.setAttribute("aria-selected", String(!modules));
+  tabDiagnostics.setAttribute("aria-selected", String(tab === "diagnostics"));
+  tabManual.setAttribute("aria-selected", String(tab === "manual"));
   tabModules.tabIndex = modules ? 0 : -1;
-  tabDiagnostics.tabIndex = modules ? -1 : 0;
+  tabDiagnostics.tabIndex = tab === "diagnostics" ? 0 : -1;
+  tabManual.tabIndex = tab === "manual" ? 0 : -1;
   document.body.dataset.workspaceTab = tab;
+  if (tab === "diagnostics") renderIssuesList();
+  if (tab === "manual") void refreshManual();
   if (modules) requestAnimationFrame(() => {
     cy?.resize();
     if (graphNeedsFit && cy) {
@@ -108,14 +120,15 @@ function selectWorkspaceTab(tab: "modules" | "diagnostics") {
     }
   });
 }
-for (const [button, tab] of [[tabModules, "modules"], [tabDiagnostics, "diagnostics"]] as const) {
+for (const [button, tab] of [[tabModules, "modules"], [tabDiagnostics, "diagnostics"], [tabManual, "manual"]] as const) {
   button.addEventListener("click", () => selectWorkspaceTab(tab));
   button.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    const next = tab === "modules" ? tabDiagnostics : tabModules;
+    const order = [tabModules, tabDiagnostics, tabManual].filter((item) => !item.hidden);
+    const next = order[(order.indexOf(button) + (event.key === "ArrowRight" ? 1 : order.length - 1)) % order.length];
     next.focus();
-    selectWorkspaceTab(tab === "modules" ? "diagnostics" : "modules");
+    selectWorkspaceTab(next === tabModules ? "modules" : next === tabDiagnostics ? "diagnostics" : "manual");
   });
 }
 const btnResolveCycles = document.getElementById("btn-resolve-cycles") as HTMLButtonElement | null;
@@ -170,10 +183,8 @@ const treeSearchInput = document.getElementById("tree-search-input") as HTMLInpu
 const inspectorPanel = document.getElementById("inspector-panel") as HTMLElement;
 const inspectorResizer = document.getElementById("inspector-resizer") as HTMLElement;
 const btnToggleInspector = document.getElementById("btn-toggle-inspector") as HTMLButtonElement | null;
-const btnSearchIssues = document.getElementById("btn-search-issues") as HTMLButtonElement | null;
 
-// Issues Modal Elements
-const issuesModal = document.getElementById("issues-modal") as HTMLDivElement | null;
+// Issues Section Elements (Embedded in Complexity Dashboard)
 const issuesSearchFilter = document.getElementById("issues-search-filter") as HTMLInputElement | null;
 const issuesListContainer = document.getElementById("issues-list-container") as HTMLDivElement | null;
 const issuesSummaryText = document.getElementById("issues-summary-text") as HTMLElement | null;
@@ -188,11 +199,6 @@ const analysisHistoryBase = document.getElementById("analysis-history-base") as 
 const analysisHistoryHead = document.getElementById("analysis-history-head") as HTMLSelectElement | null;
 const analysisHistorySummary = document.getElementById("analysis-history-summary") as HTMLDivElement | null;
 const analysisHistoryComparison = document.getElementById("analysis-history-comparison") as HTMLDivElement | null;
-
-// MkDocs Modal Elements
-const mkdocsModal = document.getElementById("mkdocs-modal") as HTMLDivElement | null;
-const mkdocsOutputPath = document.getElementById("mkdocs-output-path") as HTMLInputElement | null;
-const mkdocsLang = document.getElementById("mkdocs-lang") as HTMLSelectElement | null;
 
 // Helper to invoke Tauri command with mock fallback for web preview
 async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
@@ -230,6 +236,12 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
   if (cmd === "generate_mkdocs") {
     throw new Error("MkDocs 出力はデスクトップ版で利用できます");
   }
+  if (cmd === "manual_action") {
+    throw new Error("マニュアル機能はデスクトップ版または PyCharm 版で利用できます");
+  }
+  if (cmd === "install_agent_skill") {
+    throw new Error("スキルのインストールにはアプリ版が必要です");
+  }
   if (cmd === "list_fix_tools") {
     return fixTools as T;
   }
@@ -238,6 +250,1060 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
   }
   throw new Error(`Unknown command: ${cmd}`);
 }
+
+interface ManualTask { id: string; kind: "text" | "diagram" | "screenshot"; page: string; prompt: string; status: "missing" | "current" | "approved" | "stale" }
+interface ManualState {
+  config: {
+    docs: string;
+    output: string;
+    format?: string;
+    agent: string;
+    model: string;
+    mkdocs?: {
+      site_name: string;
+      theme: string;
+      language: string;
+      use_directory_urls: boolean;
+    };
+  };
+  brief: string;
+  agents: { id: string; label: string; available: boolean }[];
+  tasks: ManualTask[];
+  pages: string[];
+  preview: string;
+  preview_html?: string;
+  has_html?: boolean;
+}
+const manualAgent = document.getElementById("manual-agent") as HTMLSelectElement | null;
+const manualFormat = document.getElementById("manual-format") as HTMLSelectElement | null;
+const manualRootInput = document.getElementById("manual-root") as HTMLInputElement;
+const manualModel = document.getElementById("manual-model") as HTMLInputElement | null;
+const manualModelOptions = document.getElementById("manual-model-options") as HTMLDataListElement | null;
+const manualDocs = document.getElementById("manual-docs") as HTMLInputElement;
+const manualOutput = document.getElementById("manual-output") as HTMLInputElement;
+const manualBrief = document.getElementById("manual-brief") as HTMLTextAreaElement | null;
+const manualMkdocsSiteName = document.getElementById("manual-mkdocs-sitename") as HTMLInputElement | null;
+const manualMkdocsTheme = document.getElementById("manual-mkdocs-theme") as HTMLSelectElement | null;
+const manualMkdocsLanguage = document.getElementById("manual-mkdocs-language") as HTMLSelectElement | null;
+const manualMkdocsDirUrls = document.getElementById("manual-mkdocs-dir-urls") as HTMLInputElement | null;
+const manualTasks = document.getElementById("manual-tasks") as HTMLElement;
+const btnManualCaptureAll = document.getElementById("btn-manual-capture-all") as HTMLButtonElement | null;
+const btnManualDiagramAll = document.getElementById("btn-manual-diagram-all") as HTMLButtonElement | null;
+const btnManualGenerateApi = document.getElementById("btn-manual-generate-api") as HTMLButtonElement | null;
+const btnManualApiRun = document.getElementById("btn-manual-api-run") as HTMLButtonElement | null;
+const manualApiLang = document.getElementById("manual-api-lang") as HTMLSelectElement | null;
+const manualStatus = document.getElementById("manual-status") as HTMLElement;
+const manualPage = document.getElementById("manual-page") as HTMLSelectElement;
+const manualPreview = document.getElementById("manual-preview") as HTMLElement;
+const manualPreviewIframe = document.getElementById("manual-preview-iframe") as HTMLIFrameElement;
+const btnPreviewModeHtml = document.getElementById("btn-preview-mode-html") as HTMLButtonElement;
+const btnPreviewModeMd = document.getElementById("btn-preview-mode-md") as HTMLButtonElement;
+const btnManualBack = document.getElementById("btn-manual-back") as HTMLButtonElement | null;
+const btnManualForward = document.getElementById("btn-manual-forward") as HTMLButtonElement | null;
+const btnManualOpenSettings = document.getElementById("btn-manual-open-settings") as HTMLButtonElement | null;
+const manualSettingsModal = document.getElementById("manual-settings-modal") as HTMLDivElement | null;
+const btnCloseManualSettings = document.getElementById("btn-close-manual-settings") as HTMLButtonElement | null;
+const btnCancelManualSettings = document.getElementById("btn-cancel-manual-settings") as HTMLButtonElement | null;
+const manualSettingsSaveStatus = document.getElementById("manual-settings-save-status") as HTMLElement | null;
+
+function openManualSettingsModal(): void {
+  if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "";
+  manualSettingsModal?.classList.remove("hidden");
+}
+
+function closeManualSettingsModal(): void {
+  manualSettingsModal?.classList.add("hidden");
+}
+
+const manualScreenshotCache: Record<string, string> = {};
+
+let manualPageHistory: string[] = ["index.md"];
+let manualHistoryIndex = 0;
+
+function updateManualNavButtons(): void {
+  if (btnManualBack) btnManualBack.disabled = manualHistoryIndex <= 0;
+  if (btnManualForward) btnManualForward.disabled = manualHistoryIndex >= manualPageHistory.length - 1;
+}
+
+function pushManualPageHistory(page: string): void {
+  if (!page) return;
+  if (manualPageHistory[manualHistoryIndex] === page) return;
+  manualPageHistory = manualPageHistory.slice(0, manualHistoryIndex + 1);
+  manualPageHistory.push(page);
+  manualHistoryIndex = manualPageHistory.length - 1;
+  updateManualNavButtons();
+}
+const manualProgressModal = document.getElementById("manual-progress-modal") as HTMLDivElement;
+const manualProgressTitle = document.getElementById("manual-progress-title") as HTMLElement;
+const manualProgressSpinner = document.getElementById("manual-progress-spinner") as HTMLElement;
+const manualProgressBadge = document.getElementById("manual-progress-badge") as HTMLElement;
+const manualProgressPhase = document.getElementById("manual-progress-phase") as HTMLElement;
+const manualProgressTimer = document.getElementById("manual-progress-timer") as HTMLElement;
+const manualProgressBarFill = document.getElementById("manual-progress-bar-fill") as HTMLElement;
+const manualProgressLog = document.getElementById("manual-progress-log") as HTMLElement;
+const manualProgressFooterText = document.getElementById("manual-progress-footer-text") as HTMLElement;
+const btnCloseManualProgress = document.getElementById("btn-close-manual-progress") as HTMLButtonElement;
+const btnCloseManualProgressFooter = document.getElementById("btn-close-manual-progress-footer") as HTMLButtonElement;
+const progressAgentName = document.getElementById("progress-agent-name") as HTMLElement;
+const stepManualVerify = document.getElementById("step-manual-verify") as HTMLElement;
+const stepManualAi = document.getElementById("step-manual-ai") as HTMLElement;
+const stepManualStaged = document.getElementById("step-manual-staged") as HTMLElement;
+const stepManualBuild = document.getElementById("step-manual-build") as HTMLElement;
+
+let manualBusy = false;
+let manualProject = "";
+let manualPreviewMode: "html" | "md" = "html";
+let manualProgressInterval: number | null = null;
+let manualProgressStartTime = 0;
+
+function setStepState(element: HTMLElement | null, state: "done" | "active" | "pending" | "error", iconText?: string) {
+  if (!element) return;
+  element.classList.remove("step-done", "step-active", "step-pending", "step-error");
+  element.classList.add(`step-${state}`);
+  const icon = element.querySelector(".step-indicator");
+  if (icon) {
+    icon.textContent = iconText || (state === "done" ? "✓" : state === "active" ? "●" : state === "error" ? "✕" : "○");
+  }
+}
+
+function openManualProgress(action: "draft" | "generate-task", taskOrAgentInfo: string, feedback?: string) {
+  if (!manualProgressModal) return;
+  manualProgressModal.classList.remove("hidden");
+  if (btnCloseManualProgress) btnCloseManualProgress.disabled = true;
+  if (btnCloseManualProgressFooter) btnCloseManualProgressFooter.disabled = true;
+  if (manualProgressSpinner) manualProgressSpinner.style.display = "inline-block";
+  if (manualProgressBadge) {
+    manualProgressBadge.className = "progress-badge badge-running";
+    manualProgressBadge.textContent = "実行中";
+  }
+
+  manualProgressStartTime = Date.now();
+  if (manualProgressInterval) clearInterval(manualProgressInterval);
+  if (manualProgressTimer) manualProgressTimer.textContent = "00:00";
+
+  if (action === "draft") {
+    if (manualProgressTitle) manualProgressTitle.textContent = "AI アセットを生成中";
+    if (progressAgentName) progressAgentName.textContent = taskOrAgentInfo || "AI";
+    setStepState(stepManualVerify, "done");
+    setStepState(stepManualAi, "active");
+    setStepState(stepManualStaged, "pending");
+    setStepState(stepManualBuild, "pending");
+    if (manualProgressPhase) manualProgressPhase.textContent = "AI エージェントで構成案を生成中...";
+    if (manualProgressBarFill) manualProgressBarFill.style.width = "20%";
+    if (manualProgressLog) {
+      manualProgressLog.textContent = `[00:00] プロジェクト構造と brief を検証しました\n[00:00] ${taskOrAgentInfo} エージェントを起動して章立てと ai:task を生成しています...`;
+    }
+  } else {
+    const isRevision = Boolean(feedback);
+    if (manualProgressTitle) manualProgressTitle.textContent = isRevision ? `AI タスクを修正中 (${taskOrAgentInfo})` : `AI タスクを作成中 (${taskOrAgentInfo})`;
+    setStepState(stepManualVerify, "done");
+    setStepState(stepManualAi, "active");
+    setStepState(stepManualStaged, "pending");
+    setStepState(stepManualBuild, "pending");
+    if (manualProgressPhase) manualProgressPhase.textContent = isRevision ? "修正指示を反映して再生成中..." : "指示内容に基づいてコンテンツを生成中...";
+    if (manualProgressBarFill) manualProgressBarFill.style.width = "25%";
+    if (manualProgressLog) {
+      const fbMsg = feedback ? `\n[00:00] ユーザーの修正指示: "${feedback}"` : "";
+      manualProgressLog.textContent = `[00:00] タスク [${taskOrAgentInfo}] の指示を検証しました${fbMsg}\n[00:00] AI エージェントを起動しています...`;
+    }
+  }
+
+  manualProgressInterval = window.setInterval(() => {
+    const elapsedSec = Math.floor((Date.now() - manualProgressStartTime) / 1000);
+    const m = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const s = String(elapsedSec % 60).padStart(2, "0");
+    if (manualProgressTimer) manualProgressTimer.textContent = `${m}:${s}`;
+
+    if (action === "draft") {
+      if (elapsedSec >= 3 && elapsedSec < 10) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "35%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "プロジェクト構造とコード規約を解析中...";
+      } else if (elapsedSec >= 10 && elapsedSec < 20) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "55%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "各ページの Markdown と ai:task を設計中...";
+      } else if (elapsedSec >= 20 && elapsedSec < 40) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "75%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "AI エージェントの生成結果をパース準備中...";
+      } else if (elapsedSec >= 40) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "85%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "生成結果の最終検証中...";
+      }
+    } else {
+      if (elapsedSec >= 3 && elapsedSec < 15) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "50%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "AI が文章・ダイアグラムを出力中...";
+      } else if (elapsedSec >= 15) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "75%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "生成内容の構文チェック中...";
+      }
+    }
+  }, 500);
+}
+
+function completeManualProgress(successMessage: string, logDetails?: string) {
+  if (manualProgressInterval) { clearInterval(manualProgressInterval); manualProgressInterval = null; }
+  if (manualProgressSpinner) manualProgressSpinner.style.display = "none";
+  if (manualProgressBadge) {
+    manualProgressBadge.className = "progress-badge badge-success";
+    manualProgressBadge.textContent = "完了";
+  }
+  if (manualProgressPhase) manualProgressPhase.textContent = "完了しました";
+  if (manualProgressBarFill) manualProgressBarFill.style.width = "100%";
+
+  setStepState(stepManualVerify, "done");
+  setStepState(stepManualAi, "done");
+  setStepState(stepManualStaged, "done");
+  setStepState(stepManualBuild, "done");
+
+  const elapsedSec = Math.floor((Date.now() - manualProgressStartTime) / 1000);
+  const m = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+  const s = String(elapsedSec % 60).padStart(2, "0");
+  if (manualProgressTimer) manualProgressTimer.textContent = `${m}:${s}`;
+
+  if (manualProgressLog) {
+    const currentLog = manualProgressLog.textContent || "";
+    manualProgressLog.textContent = `${currentLog}\n[${m}:${s}] ${successMessage}${logDetails ? `\n${logDetails}` : ""}`;
+    manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
+  }
+
+  if (manualProgressFooterText) manualProgressFooterText.textContent = "作成が正常に完了しました";
+  if (btnCloseManualProgress) btnCloseManualProgress.disabled = false;
+  if (btnCloseManualProgressFooter) {
+    btnCloseManualProgressFooter.disabled = false;
+    btnCloseManualProgressFooter.focus();
+  }
+}
+
+function failManualProgress(errorMessage: string) {
+  if (manualProgressInterval) { clearInterval(manualProgressInterval); manualProgressInterval = null; }
+  if (manualProgressSpinner) manualProgressSpinner.style.display = "none";
+  if (manualProgressBadge) {
+    manualProgressBadge.className = "progress-badge badge-error";
+    manualProgressBadge.textContent = "エラー";
+  }
+  if (manualProgressPhase) manualProgressPhase.textContent = "処理に失敗しました";
+
+  setStepState(stepManualAi, "error");
+
+  const elapsedSec = Math.floor((Date.now() - manualProgressStartTime) / 1000);
+  const m = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+  const s = String(elapsedSec % 60).padStart(2, "0");
+  if (manualProgressTimer) manualProgressTimer.textContent = `${m}:${s}`;
+
+  if (manualProgressLog) {
+    const currentLog = manualProgressLog.textContent || "";
+    manualProgressLog.textContent = `${currentLog}\n[${m}:${s}] エラー: ${errorMessage}`;
+    manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
+  }
+
+  if (manualProgressFooterText) manualProgressFooterText.textContent = "エラーが発生しました。設定やAPIキー等を確認してください";
+  if (btnCloseManualProgress) btnCloseManualProgress.disabled = false;
+  if (btnCloseManualProgressFooter) {
+    btnCloseManualProgressFooter.disabled = false;
+    btnCloseManualProgressFooter.focus();
+  }
+}
+
+function closeManualProgress() {
+  if (manualProgressInterval) { clearInterval(manualProgressInterval); manualProgressInterval = null; }
+  manualProgressModal?.classList.add("hidden");
+}
+
+btnCloseManualProgress?.addEventListener("click", closeManualProgress);
+btnCloseManualProgressFooter?.addEventListener("click", closeManualProgress);
+
+function manualRoot(): string {
+  return manualRootInput.value.trim() || (window as any).__MODULELOOM_WORKSPACE_PATH__ || currentResult?.root_path || pathInput.value.trim() || (window as any).__MODULELOOM_PROJECT_PATH__ || "";
+}
+
+async function callManual(action: string, extras: Record<string, unknown> = {}): Promise<string> {
+  const path = manualRoot();
+  if (!path) throw new Error("先に解析対象のプロジェクトを選択してください");
+  return invokeCommand<string>("manual_action", { path, action, ...extras });
+}
+
+function inlineManualMarkdown(value: string): string {
+  return escapeHtml(value).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+let manualDiagramGraphs: Core[] = [];
+function renderManualMarkdown(source: string): void {
+  manualDiagramGraphs.forEach((graph) => graph.destroy());
+  manualDiagramGraphs = [];
+  const lines = source.replace(/<!-- ai:(?:generated|draft)[^>]*-->/g, "").replace(/<!-- \/ai:(?:generated|draft) -->/g, "").split("\n");
+  let fenced = false;
+  let code: string[] = [];
+  let codeLanguage = "";
+  const diagrams: string[] = [];
+  const html: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (fenced) {
+        if (codeLanguage === "mermaid") {
+          const index = diagrams.push(code.join("\n")) - 1;
+          html.push(`<div class="manual-diagram" data-diagram-index="${index}"></div>`);
+        } else html.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+        code = [];
+      } else codeLanguage = line.slice(3).trim();
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) { code.push(line); continue; }
+    if (!line.trim()) continue;
+    const heading = /^(#{1,4})\s+(.+)$/.exec(line);
+    if (heading) { const level = heading[1].length; html.push(`<h${level}>${inlineManualMarkdown(heading[2])}</h${level}>`); continue; }
+    const image = /^!\[([^\]]*)\]\(([^)]+)\)/.exec(line);
+    if (image) { html.push(`<figure><img class="manual-preview-image" data-asset="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" /><figcaption>${escapeHtml(image[1])}</figcaption></figure>`); continue; }
+    if (line.startsWith("> ")) { html.push(`<blockquote>${inlineManualMarkdown(line.slice(2))}</blockquote>`); continue; }
+    if (/^[-*] /.test(line)) { html.push(`<p>• ${inlineManualMarkdown(line.slice(2))}</p>`); continue; }
+    html.push(`<p>${inlineManualMarkdown(line)}</p>`);
+  }
+  manualPreview.innerHTML = html.join("") || "<p>プレビューするページがありません。</p>";
+  manualPreview.querySelectorAll<HTMLElement>(".manual-diagram").forEach((container) => {
+    const source = diagrams[Number(container.dataset.diagramIndex)] || "";
+    const nodes = [...source.matchAll(/^\s*(\w+)\["([^"]+)"\]/gm)].map((match) => ({ data: { id: match[1], label: match[2] } }));
+    const edges = [...source.matchAll(/^\s*(\w+)\s*-->\s*(\w+)/gm)].map((match, index) => ({ data: { id: `edge-${index}`, source: match[1], target: match[2] } }));
+    if (!nodes.length) { container.textContent = source; return; }
+    const graph = cytoscape({ container, elements: [...nodes, ...edges], layout: { name: "dagre", rankDir: "LR" } as any,
+      style: [
+        { selector: "node", style: { label: "data(label)", "background-color": "#89b4fa", color: "#cdd6f4", "text-valign": "bottom", "text-margin-y": 6, "font-size": 12 } },
+        { selector: "edge", style: { width: 2, "line-color": "#a6adc8", "target-arrow-color": "#a6adc8", "target-arrow-shape": "triangle", "curve-style": "bezier" } },
+      ], userZoomingEnabled: false, userPanningEnabled: false });
+    manualDiagramGraphs.push(graph);
+  });
+  const currentPage = manualPage.value || "index.md";
+  manualPreview.querySelectorAll<HTMLImageElement>(".manual-preview-image").forEach((element) => {
+    const asset = element.dataset.asset;
+    if (!asset) return;
+    void callManual("preview-asset", { page: currentPage, asset }).then((value) => {
+      if (element.isConnected && value.startsWith("data:image/")) element.src = value;
+    }).catch(() => { if (element.isConnected) element.alt = `${element.alt}（画像を読み込めません）`; });
+  });
+}
+
+async function captureBackgroundScreenshot(taskId: string, annotationHint?: string): Promise<string> {
+  const isGraphTask = taskId.includes("graph") || taskId.includes("overview") || taskId.includes("module");
+  if (isGraphTask && cy && cy.nodes().length > 0 && !annotationHint) {
+    try {
+      cy.resize();
+      const visible = cy.elements().not(".hidden");
+      if (visible.length) cy.fit(visible, 30);
+      const dataUrl = cy.png({
+        full: false,
+        bg: "#1e1e2e",
+        scale: 1.5,
+      });
+      if (dataUrl && dataUrl.startsWith("data:image/png")) {
+        manualScreenshotCache[taskId] = dataUrl;
+        return dataUrl;
+      }
+    } catch {
+      // フォールバック
+    }
+  }
+
+  let targetEl: HTMLElement | null = null;
+  if (taskId.includes("diagnostic")) {
+    targetEl = document.getElementById("complexity-dashboard");
+  } else if (taskId.includes("setting") || taskId.includes("tool-window")) {
+    targetEl = document.getElementById("module-view");
+  } else if (taskId.includes("manual")) {
+    targetEl = document.getElementById("manual-view");
+  } else {
+    targetEl = document.getElementById("module-view") || document.body;
+  }
+
+  if (!targetEl) targetEl = document.body;
+
+  // アノテーション（赤枠・赤丸囲み）の処理
+  let highlightEl: HTMLDivElement | null = null;
+  let prevPosition = "";
+  if (annotationHint) {
+    const hint = annotationHint.trim();
+    let selector = "";
+    const idMatch = hint.match(/#([a-zA-Z0-9_-]+)/);
+    const classMatch = hint.match(/\.([a-zA-Z0-9_-]+)/);
+    if (idMatch) selector = idMatch[0];
+    else if (classMatch) selector = classMatch[0];
+
+    let foundEl: HTMLElement | null = null;
+    if (selector) {
+      try {
+        foundEl = document.querySelector<HTMLElement>(selector);
+      } catch {}
+    }
+
+    if (!foundEl) {
+      const candidates = Array.from(document.querySelectorAll<HTMLElement>("button, .tab, label, select, input, h2, h3, a"));
+      const keywords = ["全スクショ", "ダイアグラム", "API", "ビルド", "保存", "解析", "診断", "マニュアル", "修正", "承認"];
+      for (const kw of keywords) {
+        if (hint.includes(kw)) {
+          foundEl = candidates.find((c) => c.textContent?.includes(kw)) || null;
+          if (foundEl) break;
+        }
+      }
+    }
+
+    if (foundEl && targetEl.contains(foundEl)) {
+      const targetRect = targetEl.getBoundingClientRect();
+      const elRect = foundEl.getBoundingClientRect();
+      const isCircle = hint.includes("丸") || hint.includes("円") || hint.includes("circle");
+
+      highlightEl = document.createElement("div");
+      highlightEl.className = "manual-screenshot-highlight";
+      highlightEl.style.position = "absolute";
+      highlightEl.style.left = `${elRect.left - targetRect.left + targetEl.scrollLeft - 6}px`;
+      highlightEl.style.top = `${elRect.top - targetRect.top + targetEl.scrollTop - 6}px`;
+      highlightEl.style.width = `${elRect.width + 12}px`;
+      highlightEl.style.height = `${elRect.height + 12}px`;
+      highlightEl.style.border = "4px solid #ff3344";
+      highlightEl.style.borderRadius = isCircle ? "50%" : "8px";
+      highlightEl.style.boxShadow = "0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 16px rgba(255, 50, 50, 0.85)";
+      highlightEl.style.pointerEvents = "none";
+      highlightEl.style.zIndex = "999999";
+      highlightEl.style.boxSizing = "border-box";
+
+      prevPosition = targetEl.style.position;
+      if (!prevPosition || prevPosition === "static") {
+        targetEl.style.position = "relative";
+      }
+      targetEl.appendChild(highlightEl);
+    }
+  }
+
+  try {
+    const canvas = await html2canvas(targetEl, {
+      backgroundColor: "#1e1e2e",
+      scale: 1.5,
+      logging: false,
+      useCORS: true,
+    });
+    const dataUrl = canvas.toDataURL("image/png");
+    manualScreenshotCache[taskId] = dataUrl;
+    return dataUrl;
+  } finally {
+    if (highlightEl) {
+      highlightEl.remove();
+      if (targetEl && (!prevPosition || prevPosition === "static")) {
+        targetEl.style.position = prevPosition;
+      }
+    }
+  }
+}
+
+async function captureAllScreenshots(): Promise<void> {
+  const project = manualRoot();
+  if (!project) {
+    manualStatus.textContent = "先に解析対象のプロジェクトを選択してください";
+    return;
+  }
+  const state = JSON.parse(await callManual("state")) as ManualState;
+  const screenshotTasks = state.tasks.filter((t: ManualTask) => t.kind === "screenshot");
+  if (!screenshotTasks.length) {
+    manualStatus.textContent = "スクリーンショットのタスクはありません";
+    return;
+  }
+
+  if (btnManualCaptureAll) btnManualCaptureAll.disabled = true;
+  const prevTab = activeWorkspaceTab;
+  manualStatus.textContent = `全 ${screenshotTasks.length} 件のスクリーンショットを一括自動撮影中…`;
+
+  try {
+    for (let i = 0; i < screenshotTasks.length; i++) {
+      const task = screenshotTasks[i];
+      manualStatus.textContent = `自動撮影中 (${i + 1}/${screenshotTasks.length}): ${task.id}…`;
+
+      let targetTab: "modules" | "diagnostics" | "manual" = "modules";
+      if (task.id.includes("diagnostic")) {
+        targetTab = "diagnostics";
+      } else if (task.id.includes("manual")) {
+        targetTab = "manual";
+      }
+      selectWorkspaceTab(targetTab);
+
+      // DOM描画の安定待機
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const dataUrl = await captureBackgroundScreenshot(task.id, task.prompt);
+      await invokeCommand("manual_capture_screenshot", {
+        path: manualRoot(),
+        id: task.id,
+        data: dataUrl,
+      });
+    }
+
+    manualStatus.textContent = "全スクショの自動撮影完了。最新サイトをビルド中…";
+    await callManual("build", { draft: true });
+    manualStatus.textContent = `全 ${screenshotTasks.length} 件のスクリーンショットを自動更新し、プレビューを最新化しました！`;
+    await refreshManual();
+  } catch (error) {
+    manualStatus.textContent = `一括自動撮影エラー: ${String(error)}`;
+  } finally {
+    selectWorkspaceTab(prevTab);
+    if (btnManualCaptureAll) btnManualCaptureAll.disabled = false;
+  }
+}
+
+function renderManualTasks(tasks: ManualTask[]): void {
+  const summaryEl = document.getElementById("manual-assets-summary");
+  if (!tasks.length) {
+    manualTasks.innerHTML = "<p>同期対象のアセット指示タグ（<code>ai:task</code>）はまだありません。</p>";
+    if (summaryEl) summaryEl.textContent = "0 件のアセット";
+    return;
+  }
+
+  const sTasks = tasks.filter((t) => t.kind === "screenshot");
+  const dTasks = tasks.filter((t) => t.kind === "diagram");
+  const tTasks = tasks.filter((t) => t.kind === "text");
+  if (summaryEl) {
+    summaryEl.textContent = `📸 スクショ ${sTasks.length}件 · 📊 ダイアグラム ${dTasks.length}件${tTasks.length ? ` · 📝 テキスト ${tTasks.length}件` : ""}`;
+  }
+
+  manualTasks.innerHTML = tasks.map((task) => {
+    const isScreenshot = task.kind === "screenshot";
+    const isDiagram = task.kind === "diagram";
+    const typeLabel = isScreenshot ? "📸 スクショ" : isDiagram ? "📊 ダイアグラム" : "📝 テキスト";
+    const typeBadgeClass = isScreenshot ? "manual-task-badge-screenshot" : isDiagram ? "manual-task-badge-diagram" : "manual-task-badge-text";
+
+    const hasCachedImage = Boolean(manualScreenshotCache[task.id]);
+    const isReady = task.status === "approved" || task.status === "current" || hasCachedImage;
+    const statusBadge = isReady
+      ? `<span class="manual-task-badge manual-task-badge-status-ready">✅ 準備完了</span>`
+      : `<span class="manual-task-badge manual-task-badge-status-missing">📷 未撮影</span>`;
+
+    let thumbHtml = "";
+    if (isScreenshot) {
+      if (manualScreenshotCache[task.id]) {
+        thumbHtml = `
+          <div class="manual-task-thumb-container">
+            <img src="${manualScreenshotCache[task.id]}" class="manual-task-thumb" alt="${escapeHtml(task.id)}" title="クリックで拡大プレビュー" />
+          </div>`;
+      } else {
+        thumbHtml = `
+          <div class="manual-task-thumb-container" id="manual-thumb-wrap-${escapeHtml(task.id)}">
+            <div class="manual-task-placeholder-thumb">
+              📷 画像読込中…（未撮影の場合は「📸 画面を自動撮影」）
+            </div>
+          </div>`;
+      }
+    }
+
+    let actions = "";
+    if (isScreenshot) {
+      actions = `
+        <button type="button" data-manual-capture="${escapeHtml(task.id)}" class="btn-secondary" title="現在のUI画面を自動撮影します">📸 画面を自動撮影</button>
+        <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="赤枠・赤丸囲みや対象要素の指定など修正指示を出します">💬 修正指示</button>
+        <button type="button" data-manual-image-toggle="${escapeHtml(task.id)}" class="btn-secondary">📁 画像ファイルを指定</button>
+      `;
+    } else if (isDiagram) {
+      actions = `
+        <button type="button" data-manual-generate="${escapeHtml(task.id)}" class="btn-secondary" title="最新のコード解析結果からMermaid依存図を生成します">📊 最新図を生成</button>
+        <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="ダイアグラムの調整指示を出します">💬 修正指示</button>
+      `;
+    } else {
+      actions = `
+        <button type="button" data-manual-generate="${escapeHtml(task.id)}" class="btn-secondary">AIで作成</button>
+        <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="文章の修正指示を出します">💬 修正指示</button>
+      `;
+    }
+
+    return `<div class="manual-task" id="manual-task-card-${escapeHtml(task.id)}">
+      <div class="manual-task-header">
+        <div class="manual-task-meta">
+          <span class="manual-task-badge ${typeBadgeClass}">${typeLabel}</span>
+          <strong>${escapeHtml(task.id)}</strong>
+          <small>${escapeHtml(task.page)}</small>
+        </div>
+        ${statusBadge}
+      </div>
+      <p>${escapeHtml(task.prompt)}</p>
+      ${thumbHtml}
+      <div class="manual-actions">${actions}</div>
+      <div id="manual-feedback-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
+        <div class="manual-feedback-row">
+          <input type="text" id="manual-feedback-input-${escapeHtml(task.id)}" class="manual-feedback-input" placeholder="${isScreenshot ? '修正指示（例: #btn-manual-capture を赤枠で囲んで / 診断画面を撮影）' : '修正指示（例: 箇条書きで手順を追加して）'}" />
+          <button type="button" data-manual-feedback-submit="${escapeHtml(task.id)}" class="btn-primary">指示実行</button>
+        </div>
+      </div>
+      <div id="manual-image-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
+        <div class="manual-feedback-row">
+          <input type="text" id="manual-image-input-${escapeHtml(task.id)}" class="manual-feedback-input" placeholder="画像パス（例: docs/assets/screen.png）" />
+          <button type="button" data-manual-image-submit="${escapeHtml(task.id)}" class="btn-primary">登録実行</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  tasks.forEach((task) => {
+    if (task.kind === "screenshot" && !manualScreenshotCache[task.id]) {
+      void (async () => {
+        try {
+          const res = await callManual("preview-asset", { asset: `assets/${task.id}.png` });
+          if (res && res.startsWith("data:image/")) {
+            manualScreenshotCache[task.id] = res;
+            const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
+            if (wrap) {
+              wrap.innerHTML = `<img src="${res}" class="manual-task-thumb" alt="${escapeHtml(task.id)}" title="クリックで拡大プレビュー" />`;
+            }
+          } else {
+            const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
+            if (wrap) {
+              wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未撮影（「📸 画面を自動撮影」を押すと現在のUIを撮影します）</div>`;
+            }
+          }
+        } catch {
+          const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
+          if (wrap) {
+            wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未撮影（「📸 画面を自動撮影」を押すと現在のUIを撮影します）</div>`;
+          }
+        }
+      })();
+    }
+  });
+}
+
+async function renderManualPreview(state: ManualState): Promise<void> {
+  const currentPage = manualPage.value || "index.md";
+  if (manualPreviewMode === "html") {
+    try {
+      let htmlContent = "";
+      if (currentPage === "index.md" && state.preview_html) {
+        htmlContent = state.preview_html;
+      } else {
+        htmlContent = await callManual("preview-html", { page: currentPage });
+      }
+      if (htmlContent) {
+        manualPreviewIframe.hidden = false;
+        manualPreview.hidden = true;
+        manualPreviewIframe.srcdoc = htmlContent;
+        return;
+      }
+    } catch {
+      // HTML未生成時はMarkdown表示にフォールバック
+    }
+  }
+
+  // Markdown 表示
+  manualPreviewIframe.hidden = true;
+  manualPreview.hidden = false;
+  if (currentPage === "index.md") renderManualMarkdown(state.preview);
+  else {
+    try {
+      renderManualMarkdown(await callManual("preview-page", { page: currentPage }));
+    } catch (e) {
+      manualPreview.innerHTML = `<p>${escapeHtml(String(e))}</p>`;
+    }
+  }
+}
+
+async function refreshManual(): Promise<void> {
+  if (manualBusy) return;
+  try {
+    if (!manualRootInput.value.trim()) manualRootInput.value = (window as any).__MODULELOOM_WORKSPACE_PATH__ || currentResult?.root_path || pathInput.value.trim() || "";
+    const project = manualRoot();
+    if (!project) { manualStatus.textContent = "先に解析対象のプロジェクトを選択してください"; return; }
+    const state = JSON.parse(await callManual("state")) as ManualState;
+    if (manualProject !== project) {
+      manualDocs.value = state.config.docs || "docs";
+      manualOutput.value = state.config.output || "manual";
+      if (manualBrief) manualBrief.value = state.brief || "";
+      const savedAgent = state.config.agent || localStorage.getItem("moduleloom_manual_agent") || "codex";
+      if (manualAgent) manualAgent.value = savedAgent;
+      const savedModel = state.config.model || localStorage.getItem("moduleloom_manual_model") || "";
+      if (manualModel) manualModel.value = savedModel;
+      const savedFormat = state.config.format || localStorage.getItem("moduleloom_manual_format") || "mkdocs";
+      if (manualFormat) manualFormat.value = savedFormat;
+      if (state.config.mkdocs) {
+        if (manualMkdocsSiteName) manualMkdocsSiteName.value = state.config.mkdocs.site_name || "";
+        if (manualMkdocsTheme) manualMkdocsTheme.value = state.config.mkdocs.theme || "material";
+        if (manualMkdocsLanguage) manualMkdocsLanguage.value = state.config.mkdocs.language || "ja";
+        if (manualMkdocsDirUrls) manualMkdocsDirUrls.checked = Boolean(state.config.mkdocs.use_directory_urls);
+      }
+      manualProject = project;
+    }
+    if (manualAgent) {
+      for (const option of Array.from(manualAgent.options)) {
+        const agent = state.agents.find((item) => item.id === option.value);
+        option.disabled = !agent?.available;
+        option.textContent = `${agent?.label || option.value}${agent?.available ? "" : "（未検出）"}`;
+      }
+    }
+    const currentPage = manualPage.value;
+    manualPage.innerHTML = (state.pages.length ? state.pages : ["index.md"]).map((page) => `<option value="${escapeHtml(page)}">${escapeHtml(page)}</option>`).join("");
+    manualPage.value = state.pages.includes(currentPage) ? currentPage : "index.md";
+    renderManualTasks(state.tasks);
+    await renderManualPreview(state);
+    updateManualNavButtons();
+  } catch (error) {
+    manualStatus.textContent = String(error);
+  }
+}
+
+async function runManual(action: string, extras: Record<string, unknown> = {}): Promise<void> {
+  if (manualBusy) return;
+  manualBusy = true;
+  const isAiTask = action === "draft" || action === "generate-task";
+  manualStatus.textContent = isAiTask ? "AIを実行中…" : "処理中…";
+  manualView.setAttribute("aria-busy", "true");
+
+  if (isAiTask) {
+    const info = action === "draft" ? (manualAgent?.value || "Codex") : String(extras.id || "");
+    const feedback = typeof extras.feedback === "string" ? extras.feedback : undefined;
+    openManualProgress(action, info, feedback);
+  }
+
+  try {
+    const mkdocsSettings = {
+      site_name: manualMkdocsSiteName?.value.trim() || "ModuleLoom マニュアル",
+      theme: manualMkdocsTheme?.value || "material",
+      language: manualMkdocsLanguage?.value || "ja",
+      use_directory_urls: Boolean(manualMkdocsDirUrls?.checked),
+    };
+    const settings = {
+      docs: manualDocs.value.trim() || "docs",
+      output: manualOutput.value.trim() || "manual",
+      format: manualFormat?.value || "mkdocs",
+      brief: manualBrief?.value || "",
+      agent: manualAgent?.value || "codex",
+      model: manualModel?.value.trim() || "",
+      mkdocs_settings: JSON.stringify(mkdocsSettings),
+    };
+    localStorage.setItem("moduleloom_manual_agent", settings.agent);
+    localStorage.setItem("moduleloom_manual_model", settings.model);
+    localStorage.setItem("moduleloom_manual_format", settings.format);
+    let result = "";
+    if (action === "save") result = await callManual("save", settings);
+    else {
+      if (action !== "approve") await callManual("save", settings);
+      result = await callManual(action, extras);
+    }
+    if (action === "generate-task" || action === "approve") await callManual("build", { draft: true });
+    manualStatus.textContent = action === "save" ? "AI設定とドキュメント設定を保存しました" : action === "approve" ? "承認しました" : action === "build" ? result : "完了しました";
+
+    if (isAiTask) {
+      if (action === "draft") {
+        completeManualProgress("アセットの生成と下書き HTML ビルドが完了しました", "原稿ファイルを更新し、プレビューを最新化しました。");
+      } else {
+        const msg = extras.feedback ? "アセットの修正と下書き HTML ビルドが完了しました" : "アセットの生成と下書き HTML ビルドが完了しました";
+        completeManualProgress(msg, "プレビューを更新しました。");
+      }
+    }
+  } catch (error) {
+    manualStatus.textContent = `失敗: ${String(error)}`;
+    if (isAiTask) {
+      failManualProgress(String(error));
+    }
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+    await refreshManual();
+  }
+}
+
+btnPreviewModeHtml?.addEventListener("click", () => {
+  manualPreviewMode = "html";
+  btnPreviewModeHtml.classList.add("active");
+  btnPreviewModeMd.classList.remove("active");
+  void refreshManual();
+});
+btnPreviewModeMd?.addEventListener("click", () => {
+  manualPreviewMode = "md";
+  btnPreviewModeMd.classList.add("active");
+  btnPreviewModeHtml.classList.remove("active");
+  void refreshManual();
+});
+
+document.getElementById("manual-refresh")?.addEventListener("click", () => { void refreshManual(); });
+btnManualOpenSettings?.addEventListener("click", openManualSettingsModal);
+btnCloseManualSettings?.addEventListener("click", closeManualSettingsModal);
+btnCancelManualSettings?.addEventListener("click", closeManualSettingsModal);
+manualSettingsModal?.addEventListener("click", (e) => {
+  if (e.target === manualSettingsModal) closeManualSettingsModal();
+});
+manualRootInput.addEventListener("change", () => { void refreshManual(); });
+document.getElementById("manual-save")?.addEventListener("click", async () => {
+  if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "保存中…";
+  try {
+    await runManual("save");
+    if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "✓ 設定を保存しました";
+    setTimeout(() => {
+      closeManualSettingsModal();
+    }, 400);
+  } catch (err) {
+    if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = `保存失敗: ${String(err)}`;
+  }
+});
+document.getElementById("manual-list-models")?.addEventListener("click", async () => {
+  if (!manualAgent) return;
+  manualStatus.textContent = "モデル候補を取得中…";
+  try {
+    const result = JSON.parse(await callManual("models", { agent: manualAgent.value })) as { models: { id: string; label: string }[]; message: string };
+    if (manualModelOptions) {
+      manualModelOptions.innerHTML = result.models.map((model) => `<option value="${escapeHtml(model.id)}" label="${escapeHtml(model.label)}"></option>`).join("");
+    }
+    manualStatus.textContent = result.message || `${result.models.length} 件のモデル候補を取得しました。モデルID欄で選べます。`;
+  } catch (error) { manualStatus.textContent = `モデル候補を取得できません: ${String(error)}`; }
+});
+manualAgent?.addEventListener("change", () => {
+  if (manualModelOptions) manualModelOptions.innerHTML = "";
+  if (manualAgent) localStorage.setItem("moduleloom_manual_agent", manualAgent.value);
+  if (manualRoot()) void runManual("save");
+});
+manualModel?.addEventListener("change", () => {
+  if (manualModel) localStorage.setItem("moduleloom_manual_model", manualModel.value.trim());
+  if (manualRoot()) void runManual("save");
+});
+manualFormat?.addEventListener("change", () => {
+  if (manualFormat) localStorage.setItem("moduleloom_manual_format", manualFormat.value);
+  if (manualRoot()) void runManual("save");
+});
+document.getElementById("manual-draft")?.addEventListener("click", () => { void runManual("draft"); });
+document.getElementById("manual-build-draft")?.addEventListener("click", () => { void runManual("build", { draft: true }); });
+document.getElementById("manual-build")?.addEventListener("click", () => { void runManual("build"); });
+manualPage.addEventListener("change", () => {
+  pushManualPageHistory(manualPage.value);
+  void refreshManual();
+});
+
+btnManualBack?.addEventListener("click", () => {
+  if (manualHistoryIndex > 0) {
+    manualHistoryIndex--;
+    const target = manualPageHistory[manualHistoryIndex];
+    if (target) {
+      manualPage.value = target;
+      void refreshManual();
+      updateManualNavButtons();
+    }
+  }
+});
+
+btnManualForward?.addEventListener("click", () => {
+  if (manualHistoryIndex < manualPageHistory.length - 1) {
+    manualHistoryIndex++;
+    const target = manualPageHistory[manualHistoryIndex];
+    if (target) {
+      manualPage.value = target;
+      void refreshManual();
+      updateManualNavButtons();
+    }
+  }
+});
+
+window.addEventListener("message", (event: MessageEvent) => {
+  if (event.data?.type === "moduleloom_manual_navigate") {
+    let href = String(event.data.href || "").split("#")[0].split("?")[0];
+    if (!href) return;
+    if (href.endsWith(".html")) {
+      href = href.slice(0, -5) + ".md";
+    } else if (href.endsWith("/")) {
+      href = href.replace(/\/+$/, "") + "/index.md";
+    } else if (!href.endsWith(".md")) {
+      href = href + ".md";
+    }
+    href = href.replace(/^(\.\/|\.\.\/)+/, "");
+    if (href === ".md" || !href) href = "index.md";
+
+    const options = Array.from(manualPage.options).map((o) => o.value);
+    const target = options.find((opt) => opt === href || opt.endsWith("/" + href) || href.endsWith("/" + opt)) || (options.includes(href) ? href : "");
+    if (target) {
+      pushManualPageHistory(target);
+      manualPage.value = target;
+      void refreshManual();
+    }
+  }
+});
+manualTasks.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+
+  // サムネイル画像クリックでの拡大表示
+  const thumb = target.closest<HTMLImageElement>(".manual-task-thumb");
+  if (thumb && thumb.src) {
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.width = "100vw";
+    overlay.style.height = "100vh";
+    overlay.style.background = "rgba(0, 0, 0, 0.85)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.zIndex = "9999999";
+    overlay.style.cursor = "zoom-out";
+    const img = document.createElement("img");
+    img.src = thumb.src;
+    img.style.maxWidth = "92vw";
+    img.style.maxHeight = "92vh";
+    img.style.borderRadius = "6px";
+    img.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.6)";
+    overlay.appendChild(img);
+    overlay.addEventListener("click", () => overlay.remove());
+    document.body.appendChild(overlay);
+    return;
+  }
+
+  const button = target.closest<HTMLButtonElement>("button");
+  if (!button) return;
+  if (button.dataset.manualGenerate) void runManual("generate-task", { id: button.dataset.manualGenerate });
+  if (button.dataset.manualFeedbackToggle) {
+    const id = button.dataset.manualFeedbackToggle;
+    const box = document.getElementById(`manual-feedback-box-${id}`);
+    if (box) {
+      box.hidden = !box.hidden;
+      if (!box.hidden) {
+        const input = document.getElementById(`manual-feedback-input-${id}`) as HTMLInputElement | null;
+        input?.focus();
+      }
+    }
+  }
+  if (button.dataset.manualFeedbackSubmit) {
+    const id = button.dataset.manualFeedbackSubmit;
+    const input = document.getElementById(`manual-feedback-input-${id}`) as HTMLInputElement | null;
+    const feedback = input?.value.trim() || "";
+    if (!feedback) {
+      input?.focus();
+      return;
+    }
+
+    const isScreenshotTask = document.querySelector<HTMLElement>(`#manual-task-card-${id} .manual-task-badge-screenshot`) !== null;
+    if (isScreenshotTask) {
+      void (async () => {
+        manualStatus.textContent = `リテイク指示を反映して再撮影中: ${id}…`;
+        const prevTab = activeWorkspaceTab;
+        try {
+          let targetTab: "modules" | "diagnostics" | "manual" = "modules";
+          if (id.includes("diagnostic")) targetTab = "diagnostics";
+          else if (id.includes("manual")) targetTab = "manual";
+          selectWorkspaceTab(targetTab);
+          await new Promise((resolve) => setTimeout(resolve, 300));
+
+          const dataUrl = await captureBackgroundScreenshot(id, feedback);
+          await invokeCommand("manual_capture_screenshot", { path: manualRoot(), id, data: dataUrl });
+          await callManual("build", { draft: true });
+          manualStatus.textContent = "リテイク撮影・保存が完了しました（アノテーション反映）";
+          await refreshManual();
+        } catch (error) {
+          manualStatus.textContent = `リテイク撮影に失敗しました: ${String(error)}`;
+        } finally {
+          selectWorkspaceTab(prevTab);
+        }
+      })();
+    } else {
+      void runManual("generate-task", { id, feedback });
+    }
+  }
+  if (button.dataset.manualImageToggle) {
+    const id = button.dataset.manualImageToggle;
+    const box = document.getElementById(`manual-image-box-${id}`);
+    if (box) {
+      box.hidden = !box.hidden;
+      if (!box.hidden) {
+        const input = document.getElementById(`manual-image-input-${id}`) as HTMLInputElement | null;
+        input?.focus();
+      }
+    }
+  }
+  if (button.dataset.manualImageSubmit) {
+    const id = button.dataset.manualImageSubmit;
+    const input = document.getElementById(`manual-image-input-${id}`) as HTMLInputElement | null;
+    const imagePath = input?.value.trim() || "";
+    if (!imagePath) {
+      input?.focus();
+      return;
+    }
+    void (async () => {
+      try {
+        manualStatus.textContent = "画像を登録中…";
+        await callManual("record-screenshot", { id, image: imagePath });
+        await callManual("build", { draft: true });
+        manualStatus.textContent = "画像を登録しました";
+        await refreshManual();
+      } catch (err) {
+        manualStatus.textContent = `画像の登録に失敗しました: ${String(err)}`;
+      }
+    })();
+  }
+  if (button.dataset.manualApprove) void runManual("approve", { id: button.dataset.manualApprove });
+  if (button.dataset.manualCapture) void (async () => {
+    const id = button.dataset.manualCapture;
+    if (!id) return;
+    manualStatus.textContent = `画面を自動撮影中: ${id}…`;
+    const prevTab = activeWorkspaceTab;
+    try {
+      let targetTab: "modules" | "diagnostics" | "manual" = "modules";
+      if (id.includes("diagnostic")) targetTab = "diagnostics";
+      else if (id.includes("manual")) targetTab = "manual";
+      selectWorkspaceTab(targetTab);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const dataUrl = await captureBackgroundScreenshot(id);
+      await invokeCommand("manual_capture_screenshot", { path: manualRoot(), id, data: dataUrl });
+      await callManual("build", { draft: true });
+      manualStatus.textContent = "自動撮影・保存が完了しました";
+      await refreshManual();
+    } catch (error) {
+      manualStatus.textContent = `撮影に失敗しました: ${String(error)}`;
+    } finally {
+      selectWorkspaceTab(prevTab);
+    }
+  })();
+});
+
+btnManualCaptureAll?.addEventListener("click", () => void captureAllScreenshots());
+
+btnManualDiagramAll?.addEventListener("click", async () => {
+  if (manualBusy) return;
+  manualBusy = true;
+  manualStatus.textContent = "全ダイアグラムを最新コードから一括更新中…";
+  manualView.setAttribute("aria-busy", "true");
+  try {
+    const res = JSON.parse(await callManual("generate-diagram-all")) as { updated: number };
+    await callManual("build", { draft: true });
+    manualStatus.textContent = `${res.updated} 件のダイアグラム（Mermaid）を一括更新しました`;
+  } catch (e) {
+    manualStatus.textContent = `ダイアグラム更新失敗: ${String(e)}`;
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+    await refreshManual();
+  }
+});
+
+async function runGenerateApi(): Promise<void> {
+  if (manualBusy) return;
+  manualBusy = true;
+  manualStatus.textContent = "DocstringからAPIドキュメントを生成中…";
+  manualView.setAttribute("aria-busy", "true");
+  try {
+    const lang = manualApiLang?.value || "auto";
+    const res = JSON.parse(await callManual("generate-api", { lang })) as { count: number; api_page: string };
+    await callManual("build", { draft: true });
+    manualStatus.textContent = `${res.count} 件のモジュールから最新 API ドキュメント（docs/modules/, docs/api.md）を自動生成しました！`;
+  } catch (e) {
+    manualStatus.textContent = `APIドキュメント生成失敗: ${String(e)}`;
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+    await refreshManual();
+  }
+}
+btnManualGenerateApi?.addEventListener("click", () => void runGenerateApi());
+btnManualApiRun?.addEventListener("click", () => void runGenerateApi());
+
+manualTasks.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    const fbInput = (event.target as HTMLElement).closest<HTMLInputElement>(".manual-feedback-input");
+    if (fbInput) {
+      if (fbInput.id.startsWith("manual-feedback-input-")) {
+        const id = fbInput.id.replace("manual-feedback-input-", "");
+        document.querySelector<HTMLButtonElement>(`button[data-manual-feedback-submit="${id}"]`)?.click();
+      } else if (fbInput.id.startsWith("manual-image-input-")) {
+        const id = fbInput.id.replace("manual-image-input-", "");
+        document.querySelector<HTMLButtonElement>(`button[data-manual-image-submit="${id}"]`)?.click();
+      }
+    }
+  }
+});
 
 function initGraph() {
   const container = document.getElementById("cy-container");
@@ -2329,6 +3395,7 @@ complexityDashboard.addEventListener("click", (event) => {
 
 function updateSummary(result: AnalysisResult) {
   renderComplexityDashboard(result);
+  renderIssuesList();
   const cycleCount = result.cycles.length;
   const errorCount = result.analysis_errors?.length || 0;
 
@@ -2720,36 +3787,7 @@ async function exportAnalysisJson() {
   statusBar.innerText = "解析データを JSON で保存しました";
 }
 
-// --- MkDocs 出力 ---
-function openMkDocsModal() {
-  if (!currentResult) {
-    statusBar.innerText = "先に解析を実行してください";
-    return;
-  }
-  const root = currentResult.root_path.replace(/[\\/]$/, "");
-  const separator = root.includes("\\") ? "\\" : "/";
-  if (mkdocsOutputPath) mkdocsOutputPath.value = `${root}${separator}moduleloom-docs`;
-  mkdocsModal?.classList.remove("hidden");
-}
 
-function closeMkDocsModal() {
-  mkdocsModal?.classList.add("hidden");
-}
-
-async function submitMkDocs() {
-  if (!currentResult) return;
-  const output = mkdocsOutputPath?.value.trim();
-  if (!output) return;
-  const lang = mkdocsLang?.value.trim() || "auto";
-  closeMkDocsModal();
-  statusBar.innerText = "MkDocs ドキュメントを生成中...";
-  try {
-    await invokeCommand<string>("generate_mkdocs", { path: currentResult.root_path, output, lang });
-    statusBar.innerText = `MkDocs ドキュメントを生成しました: ${output}`;
-  } catch (error: any) {
-    statusBar.innerText = `MkDocs 出力エラー: ${error.toString()}`;
-  }
-}
 
 // --- 問題・エラー一覧 & モジュール検索 ---
 interface IssueItem {
@@ -2880,28 +3918,7 @@ function collectAllIssues(): IssueItem[] {
   return list;
 }
 
-function openIssuesModal(initialFilter = "all", initialQuery = "") {
-  if (!currentResult) {
-    statusBar.innerText = "先に解析を実行してください";
-    return;
-  }
-  currentIssuesFilterCategory = initialFilter;
-  if (issuesSearchFilter) {
-    issuesSearchFilter.value = initialQuery;
-  }
-  renderIssuesList();
-  issuesModal?.classList.remove("hidden");
-  if (issuesSearchFilter) {
-    issuesSearchFilter.focus();
-    if (initialQuery) {
-      issuesSearchFilter.select();
-    }
-  }
-}
 
-function closeIssuesModal() {
-  issuesModal?.classList.add("hidden");
-}
 
 function renderIssuesList() {
   if (!issuesListContainer || !currentResult) return;
@@ -2925,7 +3942,7 @@ function renderIssuesList() {
   if (countDiag) countDiag.innerText = String(allIssues.filter((i) => i.category === "diagnostics").length);
 
   // タブのアクティブ更新
-  issuesModal?.querySelectorAll(".btn-filter-tab").forEach((tab) => {
+  document.querySelectorAll(".issues-category-tabs .btn-filter-tab").forEach((tab) => {
     tab.classList.toggle("active", tab.getAttribute("data-filter") === currentIssuesFilterCategory);
   });
 
@@ -2973,7 +3990,6 @@ function renderIssuesList() {
       e.stopPropagation();
       const mId = btn.getAttribute("data-issue-mod");
       const matchedCycle = currentResult?.cycles.find((c) => c.modules.includes(mId || ""));
-      closeIssuesModal();
       void triggerCycleResolveWithRuff(matchedCycle);
     });
   });
@@ -2992,8 +4008,8 @@ function renderIssuesList() {
   issuesListContainer.querySelectorAll<HTMLElement>(".issue-card").forEach((card) => {
     card.addEventListener("click", () => {
       const mId = card.getAttribute("data-issue-mod");
-      closeIssuesModal();
       if (mId) {
+        selectWorkspaceTab("modules");
         selectModuleById(mId);
       }
     });
@@ -3458,31 +4474,26 @@ gitHistoryModal?.addEventListener("click", (e) => {
 });
 
 document.getElementById("btn-export-report")?.addEventListener("click", () => { void exportAnalysisJson(); });
-
-document.getElementById("btn-export-mkdocs")?.addEventListener("click", openMkDocsModal);
-document.getElementById("btn-close-mkdocs")?.addEventListener("click", closeMkDocsModal);
-document.getElementById("btn-cancel-mkdocs")?.addEventListener("click", closeMkDocsModal);
-document.getElementById("btn-submit-mkdocs")?.addEventListener("click", () => { void submitMkDocs(); });
-mkdocsModal?.addEventListener("click", (e) => {
-  if (e.target === mkdocsModal) closeMkDocsModal();
+btnInstallSkill.addEventListener("click", async () => {
+  btnInstallSkill.disabled = true;
+  skillInstallStatus.hidden = false;
+  skillInstallStatus.textContent = translateUiText("コード診断スキルをインストール中...");
+  try {
+    skillInstallStatus.textContent = await invokeCommand<string>("install_agent_skill");
+  } catch (error) {
+    skillInstallStatus.textContent = `${translateUiText("スキルのインストールに失敗しました")}: ${String(error)}`;
+  } finally {
+    btnInstallSkill.disabled = false;
+  }
 });
 
-// Issues Modal Listeners
-btnSearchIssues?.addEventListener("click", () => {
-  const initialSearch = searchInput.value.trim();
-  openIssuesModal("all", initialSearch);
-});
-document.getElementById("btn-close-issues-modal")?.addEventListener("click", closeIssuesModal);
-document.getElementById("btn-close-issues-footer")?.addEventListener("click", closeIssuesModal);
+// Issues Listeners (Embedded in Complexity Dashboard)
 issuesSearchFilter?.addEventListener("input", renderIssuesList);
-issuesModal?.querySelectorAll<HTMLElement>(".btn-filter-tab").forEach((tab) => {
+document.querySelectorAll<HTMLElement>(".issues-category-tabs .btn-filter-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     currentIssuesFilterCategory = tab.getAttribute("data-filter") || "all";
     renderIssuesList();
   });
-});
-issuesModal?.addEventListener("click", (e) => {
-  if (e.target === issuesModal) closeIssuesModal();
 });
 
 document.getElementById("btn-history")?.addEventListener("click", showAnalysisHistory);
@@ -3514,7 +4525,13 @@ searchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
     const initialSearch = searchInput.value.trim();
-    openIssuesModal("all", initialSearch);
+    if (initialSearch) {
+      selectWorkspaceTab("diagnostics");
+      if (issuesSearchFilter) {
+        issuesSearchFilter.value = initialSearch;
+      }
+      renderIssuesList();
+    }
   }
 });
 chkOnlyCycles.addEventListener("change", applyFilters);
@@ -3577,11 +4594,10 @@ callGraphModal?.addEventListener("click", (e) => {
 });
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (issuesModal && !issuesModal.classList.contains("hidden")) closeIssuesModal();
     if (analysisHistoryModal && !analysisHistoryModal.classList.contains("hidden")) closeAnalysisHistory();
     if (gitHistoryModal && !gitHistoryModal.classList.contains("hidden")) closeGitHistoryModal();
-    if (mkdocsModal && !mkdocsModal.classList.contains("hidden")) closeMkDocsModal();
     if (callGraphModal && !callGraphModal.classList.contains("hidden")) closeCallGraph();
+    if (manualSettingsModal && !manualSettingsModal.classList.contains("hidden")) closeManualSettingsModal();
   }
 });
 
