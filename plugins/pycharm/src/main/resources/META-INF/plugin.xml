@@ -31,12 +31,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <h4>v1.2.0</h4>
+    <ul>
+      <li><b>MarkIts Vector Annotation Engine:</b> Integrated MarkIts (v0.2.0) for professional vector SVG annotations (callouts, pins, badges, spotlights, step/bezier arrows).</li>
+      <li><b>Full AI Text Updates:</b> One-click batch updates for all AI text tasks ("✍️ 全AIテキスト更新") and granular card-level generation controls.</li>
+      <li><b>Asset Jump & Highlight:</b> Clicking an asset card automatically scrolls to its exact location in the preview with pulse animation in both HTML and Markdown modes.</li>
+      <li><b>Streamlined Documentation Flow:</b> Removed legacy API catalog to focus on seamless synchronization of Screenshots, Diagrams, and Explanations.</li>
+    </ul>
     <h4>v1.1.0</h4>
     <ul>
-      <li><b>3-Asset Automated Documentation Engine:</b> Automatic batch screenshot capture with smart annotations (red circles, bounding boxes, arrows, and speech-bubble text labels), Mermaid dependency diagram extraction, and Docstring API reference generation.</li>
+      <li><b>Automated Documentation Engine:</b> Automatic batch screenshot capture with smart annotations, Mermaid dependency diagram extraction.</li>
       <li><b>Centralized Settings Popup:</b> Easy configuration for HTML export target, Markdown source directory, and AI CLI/model settings.</li>
       <li><b>Unified Feature Parity:</b> 100% feature parity across Desktop app, PyCharm plugin, and VS Code extension.</li>
-      <li><b>Smart Annotations:</b> Natural language prompt support for circling elements, arrows, and descriptive labels on screenshot capture.</li>
     </ul>
     ]]></change-notes>
 
