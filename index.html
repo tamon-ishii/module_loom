@@ -182,18 +182,39 @@
             </p>
           </div>
 
-          <div style="max-width: 580px; margin: 0 auto 24px auto; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; text-align: left;">
-            <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
-            <div class="form-row" style="display: flex; gap: 12px;">
-              <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
-                <input id="starter-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
-              </label>
-              <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
-                <input id="starter-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
-              </label>
+          <div style="max-width: 620px; margin: 0 auto 24px auto; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; text-align: left; display: flex; flex-direction: column; gap: 12px;">
+            <!-- AI・LLM 設定 -->
+            <div>
+              <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">🤖 たたき台生成に使用する AI・LLM 設定</div>
+              <div class="form-row" style="display: flex; gap: 12px;">
+                <label style="flex: 1; font-size: 0.82rem;">使用 AI CLI (エージェント)
+                  <select id="starter-agent" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                    <option value="codex">codex</option>
+                    <option value="claude">claude</option>
+                    <option value="agy">agy</option>
+                    <option value="grok">grok</option>
+                  </select>
+                </label>
+                <label style="flex: 1; font-size: 0.82rem;">モデル (任意)
+                  <input id="starter-model" type="text" placeholder="例: gpt-4o, claude-3-7-sonnet" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+              </div>
             </div>
-            <div style="font-size: 0.78rem; color: var(--secondary-text); margin-top: 6px;">
-              ※ テンプレート生成時に、上記設定で <code>manual_setting.json</code> が作成されます。
+
+            <!-- ディレクトリ設定 -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.07); padding-top: 10px;">
+              <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
+              <div class="form-row" style="display: flex; gap: 12px;">
+                <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
+                  <input id="starter-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+                <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
+                  <input id="starter-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+              </div>
+              <div style="font-size: 0.78rem; color: var(--secondary-text); margin-top: 6px;">
+                ※ たたき台生成時に、上記設定で <code>manual_setting.json</code> が作成されます。
+              </div>
             </div>
           </div>
 
@@ -206,7 +227,7 @@
                   <strong style="font-size: 1.1rem; color: var(--accent-color);">マニュアル (利用・操作ガイド)</strong>
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 12px; line-height: 1.5;">
-                  <strong>機能面と操作方法</strong>をユーザー視点で解説します。実画面のスクリーンショット自動撮影（<code>ai:task kind=screenshot</code>）や、AI による操作手順文（<code>ai:task kind=text</code>）を活用する構成です。
+                  <strong>機能面と操作方法</strong>をユーザー視点で解説します。プロジェクトのコードとUIを解析し、実画面スクリーンショット自動撮影（<code>ai:task kind=screenshot</code>）やMarkIts注釈、操作手順文（<code>ai:task kind=text</code>）を含むたたき台をLLMが自動生成します。
                 </p>
                 <ul style="font-size: 0.8rem; color: var(--secondary-text); padding-left: 18px; margin-bottom: 16px; line-height: 1.5;">
                   <li><code>index.md</code>: 全体概要とメイン画面スクリーンショット</li>
@@ -216,7 +237,7 @@
                 </ul>
               </div>
               <button class="btn-primary btn-init-template-manual" type="button" style="width: 100%; padding: 10px; font-weight: bold;">
-                📘 マニュアルテンプレートを生成
+                🤖 AIで利用マニュアルたたき台を生成
               </button>
             </div>
 
@@ -228,7 +249,7 @@
                   <strong style="font-size: 1.1rem; color: var(--accent-color);">APIドキュメント (技術・構造仕様)</strong>
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 12px; line-height: 1.5;">
-                  <strong>ダイアグラム図と事実（Fact）</strong>を中心に構成します。コード解析から自動生成される Mermaid 依存図（<code>ai:task kind=diagram</code>）や、モジュール・クラス・関数の仕様を整理する構成です。
+                  <strong>ダイアグラム図と事実（Fact）</strong>を中心に構成します。コード解析から自動生成される Mermaid 依存図（<code>ai:task kind=diagram</code>）や、モジュール・クラス・関数の仕様を整理した技術ドキュメントのたたき台をLLMが自動生成します。
                 </p>
                 <ul style="font-size: 0.8rem; color: var(--secondary-text); padding-left: 18px; margin-bottom: 16px; line-height: 1.5;">
                   <li><code>index.md</code>: システム全体モジュール依存ダイアグラム</li>
@@ -237,7 +258,7 @@
                 </ul>
               </div>
               <button class="btn-primary btn-init-template-api" type="button" style="width: 100%; padding: 10px; font-weight: bold;">
-                📊 APIドキュメントテンプレートを生成
+                🤖 AIでAPIドキュメントたたき台を生成
               </button>
             </div>
           </div>
@@ -591,18 +612,39 @@ def example_function():
         </div>
         <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
           <p style="font-size: 0.88rem; color: var(--secondary-text); margin: 0; line-height: 1.5;">
-            プロジェクトに合わせた原稿雛形を生成します。原稿先フォルダ・出力先フォルダを確認し、テンプレートを選択してください。
+            プロジェクトのコードと構造を解析し、LLMでドキュメントのたたき台（Markdown原稿）を再生成します。AI設定と出力先フォルダを確認し、テンプレートを選択してください。
           </p>
 
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px;">
-            <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
-            <div class="form-row" style="display: flex; gap: 12px;">
-              <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
-                <input id="modal-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
-              </label>
-              <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
-                <input id="modal-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
-              </label>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px;">
+            <!-- AI・LLM 設定 -->
+            <div>
+              <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; color: var(--accent-color);">🤖 たたき台生成に使用する AI・LLM 設定</div>
+              <div class="form-row" style="display: flex; gap: 12px;">
+                <label style="flex: 1; font-size: 0.82rem;">使用 AI CLI (エージェント)
+                  <select id="modal-agent" style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                    <option value="codex">codex</option>
+                    <option value="claude">claude</option>
+                    <option value="agy">agy</option>
+                    <option value="grok">grok</option>
+                  </select>
+                </label>
+                <label style="flex: 1; font-size: 0.82rem;">モデル (任意)
+                  <input id="modal-model" type="text" placeholder="例: gpt-4o, claude-3-7-sonnet" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+              </div>
+            </div>
+
+            <!-- ディレクトリ設定 -->
+            <div style="border-top: 1px solid rgba(255,255,255,0.07); padding-top: 10px;">
+              <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
+              <div class="form-row" style="display: flex; gap: 12px;">
+                <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
+                  <input id="modal-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+                <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
+                  <input id="modal-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+                </label>
+              </div>
             </div>
           </div>
 
@@ -622,7 +664,7 @@ def example_function():
                 </div>
               </div>
               <button class="btn-primary btn-sm btn-init-template-manual" type="button" style="width: 100%; font-weight: bold;">
-                📘 このテンプレートで生成
+                🤖 AIで利用マニュアルたたき台を生成
               </button>
             </div>
             <!-- APIドキュメント -->
@@ -640,7 +682,7 @@ def example_function():
                 </div>
               </div>
               <button class="btn-primary btn-sm btn-init-template-api" type="button" style="width: 100%; font-weight: bold;">
-                📊 このテンプレートで生成
+                🤖 AIでAPIドキュメントたたき台を生成
               </button>
             </div>
           </div>

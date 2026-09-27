@@ -322,8 +322,12 @@ const btnAcceptManualConfirm = document.getElementById("btn-accept-manual-confir
 
 const starterDocsDir = document.getElementById("starter-docs-dir") as HTMLInputElement | null;
 const starterOutputDir = document.getElementById("starter-output-dir") as HTMLInputElement | null;
+const starterAgent = document.getElementById("starter-agent") as HTMLSelectElement | null;
+const starterModel = document.getElementById("starter-model") as HTMLInputElement | null;
 const modalDocsDir = document.getElementById("modal-docs-dir") as HTMLInputElement | null;
 const modalOutputDir = document.getElementById("modal-output-dir") as HTMLInputElement | null;
+const modalAgent = document.getElementById("modal-agent") as HTMLSelectElement | null;
+const modalModel = document.getElementById("modal-model") as HTMLInputElement | null;
 const confirmDocsFolderLabel = document.getElementById("confirm-docs-folder-label") as HTMLElement | null;
 const confirmBackupFolderLabel = document.getElementById("confirm-backup-folder-label") as HTMLElement | null;
 
@@ -344,6 +348,20 @@ function getSelectedTemplateOutputDir(): string {
   return starterOutputDir?.value.trim() || manualOutput?.value.trim() || "manual";
 }
 
+function getSelectedTemplateAgent(): string {
+  if (manualTemplateModal && !manualTemplateModal.classList.contains("hidden")) {
+    return modalAgent?.value || manualAgent?.value || "codex";
+  }
+  return starterAgent?.value || manualAgent?.value || "codex";
+}
+
+function getSelectedTemplateModel(): string {
+  if (manualTemplateModal && !manualTemplateModal.classList.contains("hidden")) {
+    return modalModel?.value?.trim() || manualModel?.value?.trim() || "";
+  }
+  return starterModel?.value?.trim() || manualModel?.value?.trim() || "";
+}
+
 function openManualSettingsModal(): void {
   if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "";
   manualSettingsModal?.classList.remove("hidden");
@@ -356,8 +374,12 @@ function closeManualSettingsModal(): void {
 function openManualTemplateModal(): void {
   const currentDocs = manualDocs?.value.trim() || starterDocsDir?.value.trim() || "docs";
   const currentOut = manualOutput?.value.trim() || starterOutputDir?.value.trim() || "manual";
+  const currentAgent = manualAgent?.value || starterAgent?.value || "codex";
+  const currentModel = manualModel?.value?.trim() || starterModel?.value?.trim() || "";
   if (modalDocsDir) modalDocsDir.value = currentDocs;
   if (modalOutputDir) modalOutputDir.value = currentOut;
+  if (modalAgent) modalAgent.value = currentAgent;
+  if (modalModel) modalModel.value = currentModel;
   manualTemplateModal?.classList.remove("hidden");
 }
 
@@ -1286,8 +1308,12 @@ async function refreshManual(): Promise<void> {
       if (manualBrief) manualBrief.value = state.brief || "";
       const savedAgent = state.config.agent || localStorage.getItem("moduleloom_manual_agent") || "codex";
       if (manualAgent) manualAgent.value = savedAgent;
+      if (starterAgent) starterAgent.value = savedAgent;
+      if (modalAgent) modalAgent.value = savedAgent;
       const savedModel = state.config.model || localStorage.getItem("moduleloom_manual_model") || "";
       if (manualModel) manualModel.value = savedModel;
+      if (starterModel) starterModel.value = savedModel;
+      if (modalModel) modalModel.value = savedModel;
       const savedFormat = state.config.format || localStorage.getItem("moduleloom_manual_format") || "mkdocs";
       if (manualFormat) manualFormat.value = savedFormat;
       if (state.config.mkdocs) {
@@ -1298,13 +1324,18 @@ async function refreshManual(): Promise<void> {
       }
       manualProject = project;
     }
-    if (manualAgent) {
-      for (const option of Array.from(manualAgent.options)) {
+
+    const syncAgentOptions = (sel: HTMLSelectElement | null) => {
+      if (!sel) return;
+      for (const option of Array.from(sel.options)) {
         const agent = state.agents.find((item) => item.id === option.value);
         option.disabled = !agent?.available;
         option.textContent = `${agent?.label || option.value}${agent?.available ? "" : "（未検出）"}`;
       }
-    }
+    };
+    syncAgentOptions(manualAgent);
+    syncAgentOptions(starterAgent);
+    syncAgentOptions(modalAgent);
     currentManualPages = state.pages || [];
     const hasConfig = Boolean(state.has_config);
 
@@ -1409,16 +1440,31 @@ async function executeInitTemplate(templateType: "manual" | "api", clear: boolea
   manualBusy = true;
   const docs = getSelectedTemplateDocsDir();
   const output = getSelectedTemplateOutputDir();
-  manualStatus.textContent = `${templateType === "manual" ? "マニュアル" : "APIドキュメント"}テンプレートを生成中…（${docs} / ${output}）`;
+  const agent = getSelectedTemplateAgent();
+  const model = getSelectedTemplateModel();
+  const typeLabel = templateType === "manual" ? "利用マニュアル" : "APIドキュメント";
+
+  manualStatus.textContent = `AI（${agent}）で${typeLabel}のたたき台を生成中…（${docs} / ${output}）`;
   manualView.setAttribute("aria-busy", "true");
+  openManualProgress("draft", agent);
+
   try {
-    await callManual("init-template", { template: templateType, clear, docs, output });
-    manualStatus.textContent = `✓ テンプレートを生成しました（${docs}）`;
+    await callManual("init-template", { template: templateType, clear, docs, output, agent, model });
+    completeManualProgress(`✓ ${typeLabel}のたたき台を生成しました`, `Markdown原稿（${docs}）の配置と初期ビルドが完了しました。`);
+    manualStatus.textContent = `✓ ${typeLabel}のたたき台を生成しました（${docs} / ${agent}）`;
     closeManualTemplateModal();
     closeManualTemplateConfirmModal();
     await refreshManual();
   } catch (err) {
-    manualStatus.textContent = `テンプレート生成失敗: ${String(err)}`;
+    const errStr = String(err);
+    if (errStr.includes("EXISTING_DOCS_CONFIRM_REQUIRED")) {
+      closeManualProgress();
+      openManualTemplateConfirmModal(templateType);
+      manualStatus.textContent = "既存ドキュメントのクリア確認待ちです";
+    } else {
+      failManualProgress(errStr);
+      manualStatus.textContent = `たたき台生成失敗: ${errStr}`;
+    }
   } finally {
     manualBusy = false;
     manualView.removeAttribute("aria-busy");

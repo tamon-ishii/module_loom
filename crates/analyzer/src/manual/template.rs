@@ -11,6 +11,8 @@ pub fn init_template(
     clear: bool,
     docs_opt: Option<&str>,
     output_opt: Option<&str>,
+    agent_opt: Option<&str>,
+    model_opt: Option<&str>,
 ) -> Result<(), String> {
     let existing_cfg = read_config(root);
     let project_name = root
@@ -67,18 +69,29 @@ pub fn init_template(
         "api" => format!("{project_name} アーキテクチャ & API リファレンス"),
         _ => format!("{project_name} 利用マニュアル"),
     };
-    let agent = if ["codex", "claude", "gemini", "grok", "agy"].contains(&existing_cfg.agent.as_str()) {
+    let agent = if let Some(a) = agent_opt.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if ["codex", "claude", "gemini", "grok", "agy"].contains(&a) {
+            a.to_string()
+        } else {
+            return Err(format!("Unsupported AI agent: {a}"));
+        }
+    } else if ["codex", "claude", "gemini", "grok", "agy"].contains(&existing_cfg.agent.as_str()) {
         existing_cfg.agent.clone()
     } else {
         "codex".to_string()
+    };
+    let model = if let Some(m) = model_opt {
+        m.trim().to_string()
+    } else {
+        existing_cfg.model.clone()
     };
     let new_config = ManualConfig {
         docs: docs_dir_name.clone(),
         output: output_dir_name.clone(),
         targets: vec![docs_dir_name.clone(), "README.md".to_string()],
         format: "mkdocs".to_string(),
-        agent,
-        model: existing_cfg.model,
+        agent: agent.clone(),
+        model: model.clone(),
         mkdocs: MkDocsConfig {
             site_name,
             theme: "material".to_string(),
@@ -101,10 +114,139 @@ pub fn init_template(
             .map_err(|e| format!("Failed to write brief.md: {e}"))?;
     }
 
-    match template_type {
-        "api" => init_api_template(root, &templates, project_name)?,
-        _ => init_manual_template(root, &templates, project_name)?,
+    let is_offline_or_test = cfg!(test) || std::env::var("MODULELOOM_OFFLINE_TEMPLATE").is_ok();
+    if !is_offline_or_test {
+        if super::agent::which_binary(&agent).is_none() {
+            return Err(format!("AI CLI is unavailable: {agent}。インストールされているエージェントを選択するか、PATHを確認してください。"));
+        }
+        generate_template_with_llm(root, &templates, &output_dir_name, project_name, template_type, &agent, &model)?;
+    } else {
+        match template_type {
+            "api" => init_api_template(root, &templates, project_name)?,
+            _ => init_manual_template(root, &templates, project_name)?,
+        }
     }
+
+    Ok(())
+}
+
+fn generate_template_with_llm(
+    root: &Path,
+    templates: &Path,
+    output_dir_name: &str,
+    _project_name: &str,
+    template_type: &str,
+    agent: &str,
+    model: &str,
+) -> Result<(), String> {
+    let app_context = super::context::build_application_context(root);
+    let brief_path = root.join("manual").join("brief.md");
+    let brief = if brief_path.is_file() {
+        fs::read_to_string(&brief_path).unwrap_or_else(|_| DEFAULT_BRIEF.to_string())
+    } else {
+        DEFAULT_BRIEF.to_string()
+    };
+
+    let prompt = if template_type == "api" {
+        format!(
+            "Read the application context, AST module structure, UI Map, and manual brief below.\n\
+            Create a comprehensive Japanese MkDocs architecture & API reference outline (たたき台) as JSON pages for this specific application.\n\
+            The API documentation must focus strictly on facts, architecture designs, module specifications, and public interfaces without UI operation narratives.\n\
+            IMPORTANT RULES FOR TASKS & LAYOUT:\n\
+            - index.md is required. Include an architecture overview, module hierarchy, and table of contents.\n\
+            - Create pages for system architecture (e.g. architecture.md), core module API reference (e.g. api_reference.md), and data flows / dependency models.\n\
+            - For architecture and dependency diagrams, insert <!-- ai:task id=... kind=diagram\\nGenerate ModuleLoom Mermaid dependency graph for ...\\n-->.\n\
+            - For API signatures, class hierarchies, and type definitions, use <!-- ai:task id=... kind=text\\n...\\n-->.\n\
+            - Do not invent non-existent modules. Return at most 8 pages.\n\n\
+            {}\n\n\
+            Brief:\n{}",
+            app_context.prompt_summary,
+            brief
+        )
+    } else {
+        format!(
+            "Read the application context, AST module structure, UI Map, and manual brief below.\n\
+            Create a comprehensive Japanese MkDocs user manual outline (たたき台) as JSON pages for this specific application.\n\
+            The manual must explain features, workflows, and step-by-step user operations using screenshots.\n\
+            IMPORTANT RULES FOR TASKS & LAYOUT:\n\
+            - index.md is required. Place an overview/key-visual screenshot task (kind=screenshot) prominently near the top of index.md so readers see what the product looks like first. Place table of contents and navigation links BELOW the overview.\n\
+            - Divide into logical chapters matching the application's actual modules and workflows (e.g. quickstart.md, features.md, settings.md).\n\
+            - For UI operations and button explanations, insert <!-- ai:task id=... kind=screenshot\\n...MarkIts annotations instruction (e.g. markits callout: '説明文', pin: '?', badge: 1, spotlight, rounded-rect, style: primary|danger|warning|info|pink)...\\n--> referencing actual UI elements from the UI Map.\n\
+            - If an explanation, walkthrough, or caption of a screenshot is needed, create a separate dedicated kind=text task directly before or after it.\n\
+            - Do not invent non-existent UI elements. Return at most 8 pages.\n\n\
+            {}\n\n\
+            Brief:\n{}",
+            app_context.prompt_summary,
+            brief
+        )
+    };
+
+    let schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "pages": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "content": {"type": "string"}
+                    },
+                    "required": ["path", "content"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["pages"],
+        "additionalProperties": false
+    });
+
+    let res = super::agent::agent_json(root, &prompt, &schema, agent, model)?;
+    let pages = res
+        .get("pages")
+        .and_then(|p| p.as_array())
+        .ok_or_else(|| format!("{agent} returned an invalid page list"))?;
+
+    let mut has_index = false;
+    let mut valid_pages = Vec::new();
+    for p in pages {
+        let p_str = p.get("path").and_then(|s| s.as_str()).unwrap_or("");
+        let c_str = p.get("content").and_then(|s| s.as_str()).unwrap_or("");
+        let rel = Path::new(p_str);
+        if !rel.is_absolute()
+            && !p_str.contains("..")
+            && rel.extension().map_or(false, |ext| ext == "md")
+            && !p_str.is_empty()
+        {
+            if p_str == "index.md" {
+                has_index = true;
+            }
+            valid_pages.push((p_str.to_string(), c_str.to_string()));
+        }
+    }
+
+    if !has_index || valid_pages.is_empty() {
+        return Err(format!("{agent} draft must include index.md"));
+    }
+
+    fs::create_dir_all(templates).map_err(|e| e.to_string())?;
+    for (rel_path, content) in &valid_pages {
+        let dest = templates.join(rel_path);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(&dest, format!("{}\n", content.trim_end())).map_err(|e| e.to_string())?;
+    }
+
+    let _ = super::uimap::save_ui_map(root, &app_context.ui_map);
+    let _ = super::deps::build_manual_dependency_graph(root, templates);
+    let _ = super::builder::build(
+        templates,
+        &root.join("manual").join("ai"),
+        &root.join(output_dir_name),
+        true,
+        Some(root),
+    );
 
     Ok(())
 }
