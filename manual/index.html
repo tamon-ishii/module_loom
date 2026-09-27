@@ -460,7 +460,7 @@
 
 <!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
 <h1 id="moduleloom-for-pycharm">ModuleLoom for PyCharm 利用ガイド</h1>
-<p>最終ビルド: 2026-09-27T12:14:49Z</p>
+<p>最終ビルド: 2026-09-27T22:55:21Z</p>
 <p>ModuleLoom は、Python プロジェクトのモジュール依存関係の可視化、循環インポートの検知、およびコード診断（肥大化・重複検出など）を支援する PyCharm プラグインおよび解析ツールです。</p>
 <h2 id="_1">概要</h2>
 <!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:12Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
@@ -476,6 +476,17 @@
 <li><strong>生きたドキュメントと自動同期エンジン</strong>: <a href="documentation-preview.html">ドキュメント生成とプレビュー</a>（UI Map、Manual Dependency Graph、⚡ 影響分析、アノテーション撮影）</li>
 <li><strong>API ドキュメント</strong>: <a href="api.md">API カタログ</a></li>
 </ul>
+<h2 id="ai-tag-spec">AI タグ仕様</h2>
+<p>マニュアル原稿の自動生成箇所は、Markdown コメントの <code>ai:task</code> タグで指定します。種類は文章・スクリーンショット・Mermaid 図から選び、説明文は指示としてタグ内に書きます。</p>
+<div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=setup-guide kind=text
+初回起動の手順を説明してください。
+--&gt;</code></pre></div>
+<ul>
+<li><code>id</code> は省略できます。明示する場合は小文字英字で始め、小文字英数字とハイフンだけを使い、原稿全体で重複させません。省略時は自動採番されます。</li>
+<li><code>kind</code> は <code>text</code>、<code>screenshot</code>、<code>diagram</code> のいずれかで、省略時は <code>text</code> です。文章、画像 Markdown、Mermaid 図をそれぞれ別タスクにします。</li>
+<li>生成結果には指示の SHA-256 ハッシュが記録されます。指示を変更したタスクは再生成が必要です。</li>
+</ul>
+<p>構文、生成後タグ、下書き・完成版ビルドの詳しい仕様は <a href="documentation-preview.html#5-ai">AI タグの書き方とルール仕様</a>をご覧ください。</p>
 <!-- /ai:draft -->
 
 
