@@ -163,7 +163,7 @@ async function handlePluginCommand(folder, webview, message) {
     case 'manual_action': {
       if (!args.action) throw new Error('マニュアル操作を指定してください');
       const cliArgs = ['--manual', args.action, '--root', root];
-      for (const key of ['docs', 'output', 'brief', 'agent', 'model', 'id', 'page', 'asset', 'format', 'feedback', 'lang', 'body']) {
+      for (const key of ['docs', 'output', 'brief', 'agent', 'model', 'id', 'page', 'asset', 'format', 'feedback', 'lang', 'body', 'targets', 'template']) {
         if (args[key] !== undefined && args[key] !== null) {
           cliArgs.push(`--${key}`, String(args[key]));
         }
@@ -173,6 +173,9 @@ async function handlePluginCommand(folder, webview, message) {
       }
       if (args.draft === true || args.draft === 'true') {
         cliArgs.push('--draft');
+      }
+      if (args.clear === true || args.clear === 'true') {
+        cliArgs.push('--clear');
       }
       if (args.action === 'generate-task') {
         cliArgs.push('--cli', analyzerExecutable(commandFolder));

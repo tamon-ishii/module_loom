@@ -163,6 +163,7 @@
             <span class="manual-header-sub">スクショ・ダイアグラム・AIテキストを自動同期</span>
           </div>
           <div class="manual-header-actions">
+            <button id="btn-manual-open-templates" class="btn-secondary" type="button" title="マニュアルやAPIドキュメントの初期原稿テンプレートを生成・初期化します">📑 テンプレート生成</button>
             <button id="btn-manual-capture-all" class="btn-secondary" type="button" title="すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます">📸 全スクショ一括撮影</button>
             <button id="btn-manual-diagram-all" class="btn-secondary" type="button" title="プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します">📊 全ダイアグラム更新</button>
             <button id="btn-manual-text-all" class="btn-secondary" type="button" title="原稿内のすべてのAIテキストタスク（ai:task）をAIで一括生成・最新化します">✍️ 全AIテキスト更新</button>
@@ -171,7 +172,64 @@
             <button id="manual-build" class="btn-primary" type="button" title="全タスクが完了・承認されていることを厳格検証して完成版サイトを出力します">🚀 完成版ビルド</button>
           </div>
         </div>
-        <div class="manual-layout">
+
+        <!-- 初見用: テンプレート生成スターター画面 (原稿や設定がない場合に表示) -->
+        <div id="manual-starter-container" class="manual-starter-container hidden" style="padding: 24px 20px; max-width: 920px; margin: 0 auto; text-align: center;">
+          <div style="margin-bottom: 24px;">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🚀</div>
+            <h3 style="font-size: 1.35rem; margin-bottom: 8px;">ドキュメントのテンプレートを作成しましょう</h3>
+            <p style="color: var(--secondary-text); font-size: 0.9rem; max-width: 620px; margin: 0 auto; line-height: 1.5;">
+              初見の方でもすぐにドキュメントを同期・公開できるよう、目的に合わせた Markdown 原稿テンプレート（<code>docs/</code>）を自動作成します。以下の2種類から選択してください。
+            </p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; text-align: left;">
+            <!-- カード1: マニュアル -->
+            <div class="template-card" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                  <span style="font-size: 1.5rem;">📘</span>
+                  <strong style="font-size: 1.1rem; color: var(--accent-color);">マニュアル (利用・操作ガイド)</strong>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 12px; line-height: 1.5;">
+                  <strong>機能面と操作方法</strong>をユーザー視点で解説します。実画面のスクリーンショット自動撮影（<code>ai:task kind=screenshot</code>）や、AI による操作手順文（<code>ai:task kind=text</code>）を活用する構成です。
+                </p>
+                <ul style="font-size: 0.8rem; color: var(--secondary-text); padding-left: 18px; margin-bottom: 16px; line-height: 1.5;">
+                  <li><code>index.md</code>: 全体概要とメイン画面スクリーンショット</li>
+                  <li><code>quickstart.md</code>: 基本的な起動・操作手順</li>
+                  <li><code>features.md</code>: 主要機能ごとの詳しい操作解説</li>
+                  <li><code>settings.md</code>: 各種設定項目とカスタマイズ</li>
+                </ul>
+              </div>
+              <button class="btn-primary btn-init-template-manual" type="button" style="width: 100%; padding: 10px; font-weight: bold;">
+                📘 マニュアルテンプレートを生成
+              </button>
+            </div>
+
+            <!-- カード2: APIドキュメント -->
+            <div class="template-card" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                  <span style="font-size: 1.5rem;">📊</span>
+                  <strong style="font-size: 1.1rem; color: var(--accent-color);">APIドキュメント (技術・構造仕様)</strong>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 12px; line-height: 1.5;">
+                  <strong>ダイアグラム図と事実（Fact）</strong>を中心に構成します。コード解析から自動生成される Mermaid 依存図（<code>ai:task kind=diagram</code>）や、モジュール・クラス・関数の仕様を整理する構成です。
+                </p>
+                <ul style="font-size: 0.8rem; color: var(--secondary-text); padding-left: 18px; margin-bottom: 16px; line-height: 1.5;">
+                  <li><code>index.md</code>: システム全体モジュール依存ダイアグラム</li>
+                  <li><code>architecture.md</code>: レイヤー構造とパッケージ間依存図</li>
+                  <li><code>api.md</code>: AST解析から自動抽出されたモジュール・API仕様</li>
+                </ul>
+              </div>
+              <button class="btn-primary btn-init-template-api" type="button" style="width: 100%; padding: 10px; font-weight: bold;">
+                📊 APIドキュメントテンプレートを生成
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="manual-layout" class="manual-layout">
           <div class="manual-editor">
             <!-- 1. 自動同期アセット一覧（スクリーンショット・ダイアグラム・AIテキスト） -->
             <div class="manual-card">
@@ -439,6 +497,10 @@ def example_function():
                   <input id="manual-output" type="text" value="manual" placeholder="manual" style="margin-top: 4px;" />
                 </label>
               </div>
+              <label style="font-size: 0.82rem;" title="AIタグ（<!-- ai:task -->）の同期・更新対象ファイルまたはフォルダ（カンマ区切り、例: docs, README.md）">
+                🎯 AIタグ対象ファイル / フォルダ (manual_setting.json)
+                <input id="manual-targets" type="text" value="docs, README.md" placeholder="docs, README.md" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
             </div>
           </div>
 
@@ -499,6 +561,93 @@ def example_function():
             <button id="btn-cancel-manual-settings" class="btn-secondary btn-sm" type="button">キャンセル</button>
             <button id="manual-save" class="btn-primary btn-sm" type="button">設定を保存</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- テンプレート生成モーダル (折りたたみダイアログ) -->
+    <div id="manual-template-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-template-title">
+      <div class="modal-container" style="max-width: 720px;">
+        <div class="modal-header">
+          <div class="modal-title-area" style="display: flex; align-items: center; gap: 8px;">
+            <span class="modal-icon" style="font-size: 1.2rem;">📑</span>
+            <strong id="manual-template-title" class="modal-title">ドキュメント テンプレート生成</strong>
+          </div>
+          <button id="btn-close-manual-template" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
+          <p style="font-size: 0.88rem; color: var(--secondary-text); margin: 0; line-height: 1.5;">
+            プロジェクトに合わせた原稿雛形（<code>docs/</code>）を生成します。用途に合わせてテンプレートを選択してください。
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+            <!-- マニュアル -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">📘</span>
+                  <strong style="font-size: 1rem; color: var(--accent-color);">マニュアル (利用・操作ガイド)</strong>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-color); margin-bottom: 10px; line-height: 1.45;">
+                  機能面や操作方法をスクリーンショット（<code>ai:task kind=screenshot</code>）やAI解説文（<code>ai:task kind=text</code>）を使って説明します。
+                </p>
+                <div style="font-size: 0.78rem; color: var(--secondary-text); line-height: 1.4; margin-bottom: 12px;">
+                  構成: 概要・クイックスタート・機能解説・設定
+                </div>
+              </div>
+              <button class="btn-primary btn-sm btn-init-template-manual" type="button" style="width: 100%; font-weight: bold;">
+                📘 このテンプレートで生成
+              </button>
+            </div>
+            <!-- APIドキュメント -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 1.3rem;">📊</span>
+                  <strong style="font-size: 1rem; color: var(--accent-color);">APIドキュメント (技術・構造仕様)</strong>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-color); margin-bottom: 10px; line-height: 1.45;">
+                  モジュール依存図（<code>ai:task kind=diagram</code>）やコード解析から抽出したAPI仕様を中心に事実のみを説明します。
+                </p>
+                <div style="font-size: 0.78rem; color: var(--secondary-text); line-height: 1.4; margin-bottom: 12px;">
+                  構成: 全体アーキテクチャ図・レイヤー図・APIリファレンス
+                </div>
+              </div>
+              <button class="btn-primary btn-sm btn-init-template-api" type="button" style="width: 100%; font-weight: bold;">
+                📊 このテンプレートで生成
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--border-color);">
+          <button id="btn-cancel-manual-template" class="btn-secondary btn-sm" type="button">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 既存ドキュメント初期化の確認モーダル -->
+    <div id="manual-template-confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-confirm-title">
+      <div class="modal-container" style="max-width: 480px;">
+        <div class="modal-header">
+          <div class="modal-title-area" style="display: flex; align-items: center; gap: 8px;">
+            <span class="modal-icon" style="font-size: 1.2rem; color: var(--warning-color);">⚠️</span>
+            <strong id="manual-confirm-title" class="modal-title">既存ドキュメントの再生成確認</strong>
+          </div>
+          <button id="btn-close-manual-confirm" class="btn-icon modal-close" title="閉じる">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px; line-height: 1.5; font-size: 0.88rem;">
+          <p style="margin-bottom: 10px;">
+            既存の <code>docs/</code> 配下にドキュメントが存在します。
+          </p>
+          <p style="color: var(--secondary-text); margin-bottom: 12px;">
+            今までのドキュメント配下をクリアして、新しいテンプレートを生成し直しますか？
+          </p>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; font-size: 0.8rem; color: var(--accent-color);">
+            💡 現在の原稿 Markdown ファイルは、安全のため自動的に <code>manual/.backup/</code> フォルダに退避されます。
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border-color);">
+          <button id="btn-cancel-manual-confirm" class="btn-secondary btn-sm" type="button">キャンセル</button>
+          <button id="btn-accept-manual-confirm" class="btn-primary btn-sm" type="button" style="background-color: var(--danger-color, #e05252);">クリアして再生成</button>
         </div>
       </div>
     </div>

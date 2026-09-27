@@ -675,7 +675,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 String action = extractJsonField(request, "action");
                 if (action == null) throw new IllegalArgumentException("マニュアル操作を指定してください");
                 List<String> args = new ArrayList<>(List.of(findAnalyzerBinary(project), "--manual", action, "--root", root.toString()));
-                for (String key : List.of("docs", "output", "brief", "agent", "model", "id", "page", "asset", "format", "feedback")) {
+                for (String key : List.of("docs", "output", "brief", "agent", "model", "id", "page", "asset", "format", "feedback", "targets", "template")) {
                     String value = extractJsonField(request, key);
                     if (value != null) args.addAll(List.of("--" + key, value));
                 }
@@ -684,6 +684,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                     args.addAll(List.of("--mkdocs-settings", mkdocsSettings));
                 }
                 if ("true".equals(extractJsonField(request, "draft"))) args.add("--draft");
+                if ("true".equals(extractJsonField(request, "clear"))) args.add("--clear");
                 if ("generate-task".equals(action)) args.addAll(List.of("--cli", findAnalyzerBinary(project)));
                 return jsonString(runProcess(root, args, null, false).trim());
             }

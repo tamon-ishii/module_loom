@@ -104,7 +104,7 @@ pub fn read_config(root: &Path) -> ManualConfig {
         config.format = f.to_string();
     }
     if let Some(a) = value.get("agent").and_then(|v| v.as_str()) {
-        if ["codex", "claude", "grok", "agy"].contains(&a) {
+        if ["codex", "claude", "gemini", "grok", "agy"].contains(&a) {
             config.agent = a.to_string();
         }
     }
@@ -185,7 +185,7 @@ pub fn save_settings(
     } else {
         brief.to_string()
     };
-    if !["codex", "claude", "grok", "agy"].contains(&agent) {
+    if !["codex", "claude", "gemini", "grok", "agy"].contains(&agent) {
         return Err(format!("Unsupported AI agent: {agent}"));
     }
     if model.len() > 120 || model.contains('\n') {

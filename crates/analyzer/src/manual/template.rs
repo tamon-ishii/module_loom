@@ -1,37 +1,24 @@
 use std::fs;
 use std::path::Path;
 
-use super::config::{project_path, read_config, save_settings};
+use super::config::{config_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF};
 use super::task::{collect_markdown_files, utc_now};
 use crate::analyze_directory;
 
 pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<(), String> {
-    let mut config = read_config(root);
+    let existing_cfg = read_config(root);
     let project_name = root
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("プロジェクト");
 
-    let setting_file = root.join("manual_setting.json");
-    if !setting_file.is_file() {
-        let site_name = match template_type {
-            "api" => format!("{project_name} アーキテクチャ & API リファレンス"),
-            _ => format!("{project_name} 利用マニュアル"),
-        };
-        config = save_settings(
-            root,
-            "docs",
-            "manual",
-            "",
-            &config.agent,
-            &config.model,
-            "mkdocs",
-            &format!(r#"{{"site_name": "{site_name}"}}"#),
-            Some(&["docs".to_string(), "README.md".to_string()]),
-        )?;
-    }
+    let docs_dir_name = if existing_cfg.docs.trim().is_empty() {
+        "docs".to_string()
+    } else {
+        existing_cfg.docs.clone()
+    };
+    let templates = root.join(&docs_dir_name);
 
-    let templates = project_path(root, &config.docs)?;
     if templates.is_dir() {
         let existing = collect_markdown_files(&templates);
         if !existing.is_empty() {
@@ -56,6 +43,47 @@ pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<()
         }
     } else {
         fs::create_dir_all(&templates).map_err(|e| e.to_string())?;
+    }
+
+    // manual_setting.json を確実に生成
+    let site_name = match template_type {
+        "api" => format!("{project_name} アーキテクチャ & API リファレンス"),
+        _ => format!("{project_name} 利用マニュアル"),
+    };
+    let agent = if ["codex", "claude", "gemini", "grok", "agy"].contains(&existing_cfg.agent.as_str()) {
+        existing_cfg.agent.clone()
+    } else {
+        "codex".to_string()
+    };
+    let new_config = ManualConfig {
+        docs: docs_dir_name,
+        output: if existing_cfg.output.trim().is_empty() {
+            "manual".to_string()
+        } else {
+            existing_cfg.output
+        },
+        targets: vec!["docs".to_string(), "README.md".to_string()],
+        format: "mkdocs".to_string(),
+        agent,
+        model: existing_cfg.model,
+        mkdocs: MkDocsConfig {
+            site_name,
+            theme: "material".to_string(),
+            language: "ja".to_string(),
+            use_directory_urls: false,
+        },
+    };
+    let setting_dest = config_path(root);
+    let json_bytes = serde_json::to_string_pretty(&new_config).map_err(|e| e.to_string())?;
+    fs::write(&setting_dest, format!("{json_bytes}\n"))
+        .map_err(|e| format!("Failed to write manual_setting.json: {e}"))?;
+
+    let brief_path = root.join("manual").join("brief.md");
+    if !brief_path.is_file() {
+        if let Some(parent) = brief_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&brief_path, format!("{DEFAULT_BRIEF}\n"));
     }
 
     match template_type {
