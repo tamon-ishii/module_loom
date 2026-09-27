@@ -1274,10 +1274,8 @@ async function refreshManual(): Promise<void> {
     }
     currentManualPages = state.pages || [];
     const hasConfig = Boolean(state.has_config);
-    const hasPages = currentManualPages.length > 0;
-    const isConfigured = hasConfig || hasPages;
 
-    if (!isConfigured) {
+    if (!hasConfig) {
       manualStarterContainer?.classList.remove("hidden");
       manualLayout?.classList.add("hidden");
       btnManualOpenTemplates?.classList.add("hidden");

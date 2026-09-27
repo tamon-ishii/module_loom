@@ -58,7 +58,7 @@ pub fn config_path(root: &Path) -> PathBuf {
 }
 
 pub fn has_config(root: &Path) -> bool {
-    config_path(root).is_file() || root.join("manual").join("config.json").is_file()
+    config_path(root).is_file()
 }
 
 pub fn read_config(root: &Path) -> ManualConfig {
