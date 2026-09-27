@@ -7,7 +7,7 @@ ModuleLoom は、Python プロジェクトのモジュール依存関係の可�
 
 ## 概要
 
-<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-26T22:56:27Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
+<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:12Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
 ![overview-screenshot](assets/overview-screenshot.png)
 <!-- /ai:generated -->
 
