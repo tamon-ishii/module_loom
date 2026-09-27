@@ -1,74 +1,52 @@
-<!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
-# コード診断を実行する
+# コード品質診断と自動修復
 
-ModuleLoom の「コード診断」タブでは、プロジェクト全体の複雑度、モジュール肥大化、重複コード等の品質メトリクスを測定・確認できます。
+「コード診断」画面（`#complexity-dashboard`）では、プロジェクト全体の複雑度、モジュールの肥大化、重複コード、静的解析エラーを一元的に測定し、自動修復やコーディングエージェント連携を行うことができます。
 
-## コード診断の実行
+## 1. コード診断の実行と問題の絞り込み
 
-1. 上部のタブバーから「コード診断」を選択します。
-2. 「診断実行」ボタンをクリックします。
-3. プロジェクト全体のスコアおよび検出された問題（肥大化モジュール、重複箇所、循環インポート等）が一覧表示されます。
+<!-- ai:task id=diagnostics-overview-text kind=text
+コード診断ダッシュボードで診断を実行し、問題一覧（issues）を検索・フィルタリングして重大な品質リスクを特定する手順を解説してください。
+-->
 
-<!-- ai:generated id=diagnostics-screenshot kind=screenshot created-at=2026-09-26T22:53:25Z source-sha256=49d7cddec740b5965cbb752f9be57d8b4cba6104e6d0dac1d3e1deef5c98ea3a -->
-![diagnostics-screenshot](assets/diagnostics-screenshot.png)
-<!-- /ai:generated -->
+<!-- ai:task id=diagnostics-dashboard-screenshot kind=screenshot
+#btn-quality markits badge: 1, rounded-rect, style: primary, callout: '診断実行ボタンで最新コードをスキャン'
+#issues-search-filter markits badge: 2, rounded-rect, style: info, callout: '問題のキーワード絞り込み'
+-->
 
-## コーディングエージェントとの連携
+<!-- ai:task id=diagnostics-dashboard-caption-text kind=text
+診断実行によって検出される項目（app.order.processor のモジュール肥大化、app.order.export や app.user.activity のコード重複）の見方を補足してください。
+-->
 
-<!-- ai:generated id=diagnostics-skill-install kind=text created-at=2026-09-26T11:28:23Z source-sha256=0aed97d3a92b30756bb3e765ec2533a979b5d9aa052c50effad8f76b5ba17c4b approved-at=2026-09-26T11:39:58Z -->
-「コード診断」画面の「コード診断スキルをインストール」ボタンについて、実装に基づき説明します。
+## 2. Ruff によるコードスタイルの自動修正
 
----
+静的解析ツール Ruff による指摘事項を、GUI 上からワンクリックでソースコードへ安全に適用できます。
 
-### 1. ボタンの概要と動作
+<!-- ai:task id=diagnostics-ruff-fix-text kind=text
+Ruff 自動修正モーダル（#ruff-fix-modal）での差分プレビュー確認手順と、ソースコードへの一括適用フローを解説してください。
+-->
 
-![コード診断スキルをインストールボタンの配置とアノテーション実例](assets/diagnostics-skill-install-screenshot.png)
+<!-- ai:task id=diagnostics-ruff-modal-screenshot kind=screenshot
+#ruff-fix-modal markits spotlight, rounded-rect, style: warning
+#btn-apply-ruff-fix markits callout: '差分をソースコードに適用', rounded-rect, style: primary
+#btn-close-ruff-fix markits circle, style: info, callout: '修正モーダルを閉じる'
+-->
 
-「コード診断」画面の右上ヘッダーには、品質診断とコーディングエージェント連携を担う 2 つのアクションボタンが配置されています。
+<!-- ai:task id=diagnostics-ruff-caption-text kind=text
+差分適用後の自動再診断と、Git コミット前の差分検証に関する注意点を説明してください。
+-->
 
-- **「コード診断スキルをインストール」ボタン（赤枠）**:
-  - **役割**: お使いの PC 環境に導入されているコーディングエージェント（Codex、Claude Code、Cursor）を自動検出し、ModuleLoom のコード診断 CLI（`analyze --diagnostics`）を活用した自動修復スキル（`moduleloom-diagnostics`）を自動配置します。
-  - **クリック時の動作**:
-    1. ボタンをクリックすると一時的に無効化（`disabled`）され、ステータス欄に「コード診断スキルをインストール中...」が表示されます。
-    2. バックエンド処理（アプリ版 Tauri コマンド `install_agent_skill` または CLI `analyze --install-skill`）が呼び出され、検出された各エージェントの設定ディレクトリ配下へ専用のスキル定義（`SKILL.md`）が自動配置されます。
-    3. 完了後、エージェントごとの処理結果（「Codex: インストール完了」「Claude Code: 既にインストール済み」「保護」などのメッセージ）が表示されます。※Web ブラウザ版では「スキルのインストールにはアプリ版が必要です」のエラーとなります。
-- **「診断実行」ボタン（青色ボタン）**:
-  - 左隣の青色ボタンです。現在のソースコードを即座に再スキャンし、循環インポートや重複コード、型チェックなどの最新メトリクスを更新します。
+## 3. コーディングエージェント連携スキルのインストール
 
----
+Codex、Claude Code、Cursor などのコーディングエージェントに対し、ModuleLoom の診断 CLI を活用した自律修復スキル（`moduleloom-diagnostics`）を自動インストールできます。
 
-### 2. 対象コーディングエージェントの検出仕様
+<!-- ai:task id=diagnostics-skill-install-text kind=text
+「コード診断スキルをインストール」ボタンの動作仕様、検出対象エージェントの判定ロジック、およびエージェントが自律的にコードを修正・検証する仕組みを解説してください。
+-->
 
-ユーザーのホームディレクトリ（`HOME` または `USERPROFILE`）を基準に、以下の 3 種類のエージェントを検出します。
+<!-- ai:task id=diagnostics-skill-button-screenshot kind=screenshot
+#btn-install-skill markits callout: '検出したエージェントに診断スキルを自動導入', pin: 'AI', rounded-rect, style: pink
+-->
 
-| エージェント名 | ルートディレクトリ | 検出条件 |
-| :--- | :--- | :--- |
-| **Codex** | 環境変数 `CODEX_HOME`（未設定時は `~/.codex`） | `CODEX_HOME` が指定されている、ルートディレクトリが存在する、または PATH 上に `codex` コマンドが存在する |
-| **Claude Code** | `~/.claude` | `~/.claude` ディレクトリが存在する、または PATH 上に `claude` コマンドが存在する |
-| **Cursor** | `~/.cursor` | `~/.cursor` ディレクトリが存在する、または PATH 上に `cursor` コマンドが存在する |
-
-※いずれのエージェントも検出されなかった場合は「Codex、Claude Code、Cursor が見つかりませんでした」というエラーが返されます。
-
----
-
-### 3. 追加されるスキルと仕様
-
-- **スキル名**: `moduleloom-diagnostics`
-- **配置先パス**: `<各エージェントのルートディレクトリ>/skills/moduleloom-diagnostics/SKILL.md`
-- **既存ファイルの保護（安全性）**:
-  - 既に同パスに同一内容のファイルが存在する場合は、新規書き込みを行わず「既にインストール済み」として報告されます。
-  - 内容が異なる同名ファイルが存在する場合は上書きせず、「既存のスキルを保護しました」として既存の内容を保持します。
-
-#### スキル（SKILL.md）の具体的な内容・機能
-エージェントに対して、ModuleLoom のコード診断 CLI（`analyze` / `moduleloom-analyze`）を利用した Python コードの修正と再検証手順を指示します。
-
-1. **CLI 診断の実行と証跡取得**:
-   - `analyze --diagnostics --findings-only .` や `--rule 'ty/*'` 等のオプションを用いて、構造化された JSON 形式でプロジェクトの診断結果（指摘事項 `findings`、警告 `quality_warnings`）を取得する手順。
-2. **指摘事項の精査**:
-   - 指摘の `rule`, `severity`, `location`, `message`, `evidence`, `verification.recheck_rule` を確認した上で該当コードを把握し、`info` レベルの指摘（型アノテーション欠落など）はレビューのヒントとして扱う方針。
-3. **コード修正と再検証（Edit and verify）**:
-   - 単に警告を隠すためのルール抑制や閾値変更を行わず、ソースコード側で根本原因を解消すること。
-   - 変更後は同一の CLI ルールを再実行して問題解消を確認し、既存のテストスイートや `ty`（`uv run ty check`）による整合性確認を行うこと。
-   - 完了報告時には、実行コマンド、残存件数、検証結果、JSON ファイルのパスを明示すること。
-<!-- /ai:generated -->
-<!-- /ai:draft -->
+<!-- ai:task id=diagnostics-skill-caption-text kind=text
+インストール完了後に各エージェント（Codex / Claude Code / Cursor）から診断スキルを呼び出してコード修復を行うプロンプト例を紹介してください。
+-->

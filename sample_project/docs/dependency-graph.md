@@ -1,71 +1,43 @@
-<!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
-# モジュール依存図を読む
+# モジュール依存図と循環インポート
 
-「モジュール一覧」タブでは、Python プロジェクト内のモジュール間の依存・被依存関係をグラフィカルに確認できます。
+ModuleLoom の中心機能であるモジュール依存関係の可視化と、循環インポートの自動検出・解消アシスタント、コールグラフ機能の活用方法を解説します。
 
-## 画面構成
+## 1. 依存関係の可視化と被依存モジュールの確認
 
-- **ソースツリー (.py)**: 左側パネルに Python ファイルの一覧が表示されます。
-- **依存グラフ領域**: 中央に Cytoscape による依存関係図が表示されます。
-- **モジュール詳細**: 右側パネルに選択中ノードのパス、LOC、依存・被依存モジュール一覧、行番号等が表示されます。
+<!-- ai:task id=depgraph-overview-text kind=text
+モジュール間の依存・被依存関係の読み方、中核モジュール（app.common.database 等）における被依存リストと行番号（L:XX）の確認方法を解説してください。
+-->
 
-<!-- ai:generated id=graph-view-screenshot kind=screenshot created-at=2026-09-26T22:55:41Z source-sha256=bc7f8c1beaf10b41c59e3ac29976cd8d293b31e6fdb25b0c6bf1c2c03c20a024 -->
-![graph-view-screenshot](assets/graph-view-screenshot.png)
-<!-- /ai:generated -->
+## 2. 循環インポートの検出と解消アシスタント
 
-## 循環インポートの確認
+Python プロジェクトで実行時エラーや設計破綻の引き金となる「循環インポート」を検出し、安全に解消するための機能です。
 
-直接の循環インポートや、下流の依存先で発生している循環インポートは、赤色バッジや警告表示、破線エッジ等によって視覚的に特定できます。
+<!-- ai:task id=depgraph-cycle-detect-text kind=text
+app.user.auth と app.user.session 間の直接循環、および app.user.service から検出される下流循環インポート警告の仕組みと、「循環インポートの解消アシスタント」による解決フローを解説してください。
+-->
 
-## CLI によるモジュール図出力の例
+<!-- ai:task id=depgraph-cycle-guide-screenshot kind=screenshot
+#cycle-guide-modal markits rounded-rect, style: danger, callout: '循環インポートの解消アシスタント', pin: '!'
+#btn-close-cycle-guide markits circle, style: info, callout: 'アシスタントを閉じる'
+-->
 
-ModuleLoom CLI の `--mkdocs` オプションにより抽出される Mermaid 形式の依存図例です。
+<!-- ai:task id=depgraph-cycle-guide-caption-text kind=text
+解消アシスタントで提示される修正候補（インターフェース分離や遅延インポート等）の適用時の留意点を説明してください。
+-->
 
-<!-- ai:generated id=example-module-diagram kind=diagram created-at=2026-09-26T15:41:15Z source-sha256=b832e8cfd08e624470a97dd892f2d046655ceb0aea5c5a9f82762488d7fbd98b -->
-```mermaid
-flowchart LR
-  n0["app"]
-  n1["app.api"]
-  n2["app.common"]
-  n3["app.common.database"]
-  n4["app.common.logger"]
-  n5["app.common.utils"]
-  n6["app.config"]
-  n7["app.order"]
-  n8["app.order.controller"]
-  n9["app.order.export"]
-  n10["app.order.payment"]
-  n11["app.order.processor"]
-  n12["app.user"]
-  n13["app.user.activity"]
-  n14["app.user.auth"]
-  n15["app.user.router"]
-  n16["app.user.service"]
-  n17["app.user.session"]
-  n18["main"]
-  n1 --> n6
-  n1 --> n8
-  n1 --> n15
-  n3 --> n4
-  n8 --> n5
-  n8 --> n11
-  n10 --> n3
-  n10 --> n11
-  n11 --> n3
-  n11 --> n5
-  n11 --> n10
-  n14 --> n5
-  n14 --> n17
-  n15 --> n16
-  n16 --> n3
-  n16 --> n14
-  n16 --> n17
-  n17 --> n3
-  n17 --> n5
-  n17 --> n14
-  n18 --> n1
-  n18 --> n4
-  n18 --> n6
-```
-<!-- /ai:generated -->
-<!-- /ai:draft -->
+## 3. コールグラフによる詳細呼び出し分析
+
+モジュール単位の依存にとどまらず、関数・メソッド単位の呼び出し関係を掘り下げて確認できます。
+
+<!-- ai:task id=depgraph-callgraph-text kind=text
+特定のクラスや関数（UserService, authenticate_user 等）の呼び出しフローを視覚化するコールグラフモーダルの機能と操作方法を解説してください。
+-->
+
+<!-- ai:task id=depgraph-callgraph-screenshot kind=screenshot
+#callgraph-modal markits spotlight, rounded-rect, style: primary, callout: '関数コールグラフ詳細ビュー'
+#btn-close-callgraph markits circle, style: info, callout: 'モーダルを閉じる'
+-->
+
+<!-- ai:task id=depgraph-callgraph-caption-text kind=text
+コールグラフ表示領域（#callgraph-cy-container）内での探索方法と、複雑な呼び出し経路の特定手法を説明してください。
+-->

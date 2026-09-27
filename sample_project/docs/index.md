@@ -1,23 +1,40 @@
-<!-- ai:draft created-at=2026-09-26T10:34:37Z agent=agy brief-sha256=f8d1016d6ffbbb934ee6171d66e53d2b99cf877b245377c3cc4a5acb3a3c12f5 -->
-# ModuleLoom for PyCharm 利用ガイド
+# ModuleLoom 利用マニュアル
 
-最終ビルド: {{BUILD_TIMESTAMP}}
+<!-- ai:task id=index-overview-keyvisual kind=screenshot
+#body markits spotlight, callout: 'ModuleLoom メイン解析ダッシュボード', style: primary
+-->
 
-ModuleLoom は、Python プロジェクトのモジュール依存関係の可視化、循環インポートの検知、およびコード診断（肥大化・重複検出など）を支援する PyCharm プラグインおよび解析ツールです。
+<!-- ai:task id=index-overview-caption kind=text
+ModuleLoom の概要と、主要な機能エリア（モジュール依存関係の可視化・コード診断・ドキュメント生成）の画面構成について解説してください。
+-->
 
-## 概要
+## 目次とナビゲーション
 
-<!-- ai:generated id=overview-screenshot kind=screenshot created-at=2026-09-27T00:00:12Z source-sha256=0d2a9c26cfea33fab5676427fa08ca8e272296db60dfdaa400fff2dc3043d8a2 -->
-![overview-screenshot](assets/overview-screenshot.png)
-<!-- /ai:generated -->
+本マニュアルは、Python プロジェクトの構造把握・品質改善・ドキュメント運用の各ワークフローに合わせて以下の構成で解説しています。
 
-本ガイドでは、PyCharm 上でのツールの開き方、モジュール依存図やコード診断の活用法、および MkDocs によるドキュメント連携について説明します。
+- **[クイックスタート](quickstart.md)**  
+  プロジェクトの読み込み手順と、モジュールグラフの直感的なナビゲーション方法を解説します。
+- **[モジュール依存図と循環インポート](dependency-graph.md)**  
+  依存関係グラフの読み方、被依存リストの確認、循環インポートの自動検出・解消アシスタント、コールグラフの活用法を紹介します。
+- **[コード品質診断と自動修復](diagnostics.md)**  
+  コード診断ダッシュボードによる品質測定、Ruff 自動修正の適用、コーディングエージェント向けスキルの導入手順を説明します。
+- **[変更履歴と影響分析](history-analysis.md)**  
+  Git コミット履歴や解析履歴の差分比較を行い、変更による影響範囲を視覚的に特定する手順を解説します。
+- **[ドキュメント自動生成とプレビュー](documentation.md)**  
+  スクリーンショット撮影・Mermaid 依存図・AI 解説文の自動同期エンジンと、下書き・完成版ビルドの運用方法を説明します。
+- **[設定とカスタマイズ](settings.md)**  
+  ドキュメントの出力先や原稿パス、MkDocs の外観設定および設定ファイルの管理方法を解説します。
 
-## ドキュメント構成
+---
 
-- **はじめに・ツールウィンドウの起動**: [ツールウィンドウの開き方](open-tool-window.md)
-- **モジュールの可視化と依存関係の確認**: [モジュール依存図の確認](dependency-graph.md)
-- **プロジェクトの品質向上**: [コード診断の実行と改善](diagnostics.md)
-- **生きたドキュメントと自動同期エンジン**: [ドキュメント生成とプレビュー](documentation-preview.md)（UI Map、Manual Dependency Graph、⚡ 影響分析、アノテーション撮影）
-- **API ドキュメント**: [API カタログ](api.md)
-<!-- /ai:draft -->
+## 検証用サンプルプロジェクトについて
+
+本マニュアルのキャプチャおよび操作説明は、付属の検証用プロジェクト **`sample_project` (v1.0.0)** を基準としています。
+
+- **総モジュール数**: 19 モジュール
+- **エントリポイント**: `main.py`
+- **主要モジュール**: `app.api`, `app.user` (認証・セッション・ユーザー管理), `app.order` (注文・決済・エクスポート), `app.common` (DB接続・ユーティリティ・ロガー)
+- **検出対象ケース**: 
+  - 循環インポート: `app.user.auth` ⇄ `app.user.session`、`app.order.processor` ⇄ `app.order.payment`
+  - 下流の循環依存警告: `app.user.service`
+  - モジュール肥大化 (Bloat) & 重複コード: `app.order.processor`, `app.order.export`, `app.user.activity`

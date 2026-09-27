@@ -174,7 +174,7 @@
         </div>
 
         <!-- 初見用: テンプレート生成スターター画面 (原稿や設定がない場合に表示) -->
-        <div id="manual-starter-container" class="manual-starter-container hidden" style="padding: 24px 20px; max-width: 920px; margin: 0 auto; text-align: center;">
+        <div id="manual-starter-container" class="manual-starter-container hidden" style="flex: 1; min-height: 0; overflow-y: auto; width: 100%; box-sizing: border-box; padding: 24px 20px 60px; max-width: 960px; margin: 0 auto; text-align: center;">
           <div style="margin-bottom: 24px;">
             <div style="font-size: 2.2rem; margin-bottom: 8px;">🚀</div>
             <h3 style="font-size: 1.35rem; margin-bottom: 8px;">ドキュメントのテンプレートを作成しましょう</h3>
@@ -603,7 +603,7 @@ def example_function():
 
     <!-- テンプレート生成モーダル (折りたたみダイアログ) -->
     <div id="manual-template-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manual-template-title">
-      <div class="modal-container" style="max-width: 720px;">
+      <div class="modal-container" style="max-width: 720px; max-height: 85vh; display: flex; flex-direction: column;">
         <div class="modal-header">
           <div class="modal-title-area" style="display: flex; align-items: center; gap: 8px;">
             <span class="modal-icon" style="font-size: 1.2rem;">📑</span>
@@ -611,7 +611,7 @@ def example_function():
           </div>
           <button id="btn-close-manual-template" class="btn-icon modal-close" title="閉じる">&times;</button>
         </div>
-        <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; flex: 1; min-height: 0;">
           <p style="font-size: 0.88rem; color: var(--secondary-text); margin: 0; line-height: 1.5;">
             プロジェクトのコードと構造を解析し、LLMでドキュメントのたたき台（Markdown原稿）を再生成します。AI設定と出力先フォルダを確認し、テンプレートを選択してください。
           </p>
