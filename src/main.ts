@@ -1285,8 +1285,8 @@ async function renderManualPreview(state: ManualState): Promise<void> {
   }
 }
 
-async function refreshManual(): Promise<void> {
-  if (manualBusy) return;
+async function refreshManual(force = false): Promise<void> {
+  if (manualBusy && !force) return;
   try {
     if (!manualRootInput.value.trim()) manualRootInput.value = (window as any).__MODULELOOM_WORKSPACE_PATH__ || currentResult?.root_path || pathInput.value.trim() || "";
     const project = manualRoot();
@@ -1454,7 +1454,6 @@ async function executeInitTemplate(templateType: "manual" | "api", clear: boolea
     manualStatus.textContent = `✓ ${typeLabel}のたたき台を生成しました（${docs} / ${agent}）`;
     closeManualTemplateModal();
     closeManualTemplateConfirmModal();
-    await refreshManual();
   } catch (err) {
     const errStr = String(err);
     if (errStr.includes("EXISTING_DOCS_CONFIRM_REQUIRED")) {
@@ -1468,6 +1467,8 @@ async function executeInitTemplate(templateType: "manual" | "api", clear: boolea
   } finally {
     manualBusy = false;
     manualView.removeAttribute("aria-busy");
+    manualProject = "";
+    await refreshManual(true);
   }
 }
 

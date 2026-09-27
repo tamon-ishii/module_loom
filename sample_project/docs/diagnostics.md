@@ -9,12 +9,13 @@
 -->
 
 <!-- ai:task id=diagnostics-dashboard-screenshot kind=screenshot
+#complexity-dashboard markits spotlight, rounded-rect, style: primary
 #btn-quality markits badge: 1, rounded-rect, style: primary, callout: '診断実行ボタンで最新コードをスキャン'
 #issues-search-filter markits badge: 2, rounded-rect, style: info, callout: '問題のキーワード絞り込み'
 -->
 
 <!-- ai:task id=diagnostics-dashboard-caption-text kind=text
-診断実行によって検出される項目（app.order.processor のモジュール肥大化、app.order.export や app.user.activity のコード重複）の見方を補足してください。
+診断実行によって検出される項目（app.order のモジュール肥大化、app.user.activity のコード重複など）の見方を補足してください。
 -->
 
 ## 2. Ruff によるコードスタイルの自動修正
@@ -48,5 +49,5 @@ Codex、Claude Code、Cursor などのコーディングエージェントに対
 -->
 
 <!-- ai:task id=diagnostics-skill-caption-text kind=text
-インストール完了後に各エージェント（Codex / Claude Code / Cursor）から診断スキルを呼び出してコード修復を行うプロンプト例を紹介してください。
+インストール完了後に各エージェントから診断スキルを呼び出してコード修復を行うプロンプト例を紹介してください。
 -->

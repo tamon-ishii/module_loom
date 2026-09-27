@@ -35,6 +35,6 @@ ModuleLoom の概要と、主要な機能エリア（モジュール依存関係
 - **エントリポイント**: `main.py`
 - **主要モジュール**: `app.api`, `app.user` (認証・セッション・ユーザー管理), `app.order` (注文・決済・エクスポート), `app.common` (DB接続・ユーティリティ・ロガー)
 - **検出対象ケース**: 
-  - 循環インポート: `app.user.auth` ⇄ `app.user.session`、`app.order.processor` ⇄ `app.order.payment`
+  - 循環インポート: `app.user.auth` ⇄ `app.user.session`
   - 下流の循環依存警告: `app.user.service`
-  - モジュール肥大化 (Bloat) & 重複コード: `app.order.processor`, `app.order.export`, `app.user.activity`
+  - 重複コード & モジュール肥大化: `app.user.activity`

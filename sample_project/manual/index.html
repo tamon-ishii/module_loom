@@ -541,9 +541,9 @@
 <li><strong>エントリポイント</strong>: <code>main.py</code></li>
 <li><strong>主要モジュール</strong>: <code>app.api</code>, <code>app.user</code> (認証・セッション・ユーザー管理), <code>app.order</code> (注文・決済・エクスポート), <code>app.common</code> (DB接続・ユーティリティ・ロガー)</li>
 <li><strong>検出対象ケース</strong>: </li>
-<li>循環インポート: <code>app.user.auth</code> ⇄ <code>app.user.session</code>、<code>app.order.processor</code> ⇄ <code>app.order.payment</code></li>
+<li>循環インポート: <code>app.user.auth</code> ⇄ <code>app.user.session</code></li>
 <li>下流の循環依存警告: <code>app.user.service</code></li>
-<li>モジュール肥大化 (Bloat) &amp; 重複コード: <code>app.order.processor</code>, <code>app.order.export</code>, <code>app.user.activity</code></li>
+<li>重複コード &amp; モジュール肥大化: <code>app.user.activity</code></li>
 </ul>
 
 

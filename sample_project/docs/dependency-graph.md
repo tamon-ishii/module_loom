@@ -5,7 +5,7 @@ ModuleLoom の中心機能であるモジュール依存関係の可視化と、
 ## 1. 依存関係の可視化と被依存モジュールの確認
 
 <!-- ai:task id=depgraph-overview-text kind=text
-モジュール間の依存・被依存関係の読み方、中核モジュール（app.common.database 等）における被依存リストと行番号（L:XX）の確認方法を解説してください。
+モジュール間の依存・被依存関係の読み方、中核モジュール（app.common.database 等）における被依存リストと行番号の確認方法を解説してください。
 -->
 
 ## 2. 循環インポートの検出と解消アシスタント
@@ -35,6 +35,7 @@ app.user.auth と app.user.session 間の直接循環、および app.user.servi
 
 <!-- ai:task id=depgraph-callgraph-screenshot kind=screenshot
 #callgraph-modal markits spotlight, rounded-rect, style: primary, callout: '関数コールグラフ詳細ビュー'
+#callgraph-cy-container markits rounded-rect, style: info, callout: 'コールグラフ探索領域'
 #btn-close-callgraph markits circle, style: info, callout: 'モーダルを閉じる'
 -->
 
