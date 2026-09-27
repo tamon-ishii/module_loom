@@ -131,26 +131,35 @@ pub fn read_config(root: &Path) -> ManualConfig {
 
 pub fn project_path(root: &Path, value: &str) -> Result<PathBuf, String> {
     let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    if value.trim().is_empty() || Path::new(value).components().any(|part| matches!(part, std::path::Component::ParentDir)) {
+        return Err(format!("Manual path must stay inside the project: {value}"));
+    }
     let target = root.join(value);
-    let abs_target = if target.exists() {
-        target.canonicalize().map_err(|e| e.to_string())?
-    } else {
-        // 対象がまだ存在しない場合、親ディレクトリで正規化
-        if let Some(parent) = target.parent() {
-            if parent.exists() {
-                let abs_parent = parent.canonicalize().map_err(|e| e.to_string())?;
-                if let Some(file_name) = target.file_name() {
-                    abs_parent.join(file_name)
-                } else {
-                    abs_parent
-                }
-            } else {
-                target
-            }
-        } else {
-            target
+    let mut candidate = target.as_path();
+    while candidate != root {
+        if fs::symlink_metadata(candidate).is_ok_and(|meta| meta.file_type().is_symlink()) {
+            return Err(format!("Manual path contains a symbolic link: {value}"));
         }
-    };
+        let parent = candidate.parent().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+        if parent == candidate {
+            break;
+        }
+        candidate = parent;
+    }
+    let mut nearest = target.as_path();
+    let mut missing = Vec::new();
+    while !nearest.exists() {
+        if fs::symlink_metadata(nearest).is_ok_and(|meta| meta.file_type().is_symlink()) {
+            return Err(format!("Manual path contains a symbolic link: {value}"));
+        }
+        let name = nearest.file_name().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+        missing.push(name.to_os_string());
+        nearest = nearest.parent().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+    }
+    let mut abs_target = nearest.canonicalize().map_err(|e| e.to_string())?;
+    for part in missing.iter().rev() {
+        abs_target.push(part);
+    }
 
     if !abs_target.starts_with(&abs_root) {
         return Err(format!("Manual path must stay inside the project: {value}"));

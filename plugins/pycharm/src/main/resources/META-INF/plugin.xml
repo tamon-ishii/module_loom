@@ -31,6 +31,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <h4>v1.3.0</h4>
+    <ul>
+      <li><b>AI Draft Templates:</b> Create user manuals and API documentation drafts from project context with configurable AI agents, models, and directories.</li>
+      <li><b>Safer Regeneration:</b> Validate drafts before replacing source pages, back up existing Markdown, and preserve manual source data during site builds.</li>
+      <li><b>Recoverable Site Publishing:</b> Keep user files in the output directory and restore the prior site if publishing fails.</li>
+    </ul>
     <h4>v1.2.0</h4>
     <ul>
       <li><b>MarkIts Vector Annotation Engine:</b> Integrated MarkIts (v0.2.0) for professional vector SVG annotations (callouts, pins, badges, spotlights, step/bezier arrows).</li>

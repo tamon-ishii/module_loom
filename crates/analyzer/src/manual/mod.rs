@@ -414,6 +414,86 @@ mod tests {
     }
 
     #[test]
+    fn test_init_template_action_passes_options_and_returns_state() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        let raw = run(
+            root,
+            "init-template",
+            &[
+                ("--template", "manual"),
+                ("--docs", "guide"),
+                ("--output", "published"),
+                ("--agent", "claude"),
+                ("--model", "test-model"),
+            ],
+        )
+        .unwrap();
+        let state: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        assert_eq!(state["has_config"], true);
+        assert_eq!(state["config"]["docs"], "guide");
+        assert_eq!(state["config"]["output"], "published");
+        assert_eq!(state["config"]["agent"], "claude");
+        assert_eq!(state["config"]["model"], "test-model");
+        assert!(root.join("guide/index.md").is_file());
+        assert!(state["tasks"].as_array().unwrap().iter().any(|task| task["kind"] == "screenshot"));
+    }
+
+    #[test]
+    fn test_init_template_without_clear_preserves_existing_files() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Handwritten guide").unwrap();
+        fs::write(root.join("README.md"), "Project readme").unwrap();
+
+        let err = run(root, "init-template", &[("--template", "manual")]).unwrap_err();
+
+        assert_eq!(err, "EXISTING_DOCS_CONFIRM_REQUIRED");
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Handwritten guide");
+        assert_eq!(fs::read_to_string(root.join("README.md")).unwrap(), "Project readme");
+        assert!(!root.join("manual_setting.json").exists());
+    }
+
+    #[test]
+    fn test_init_template_rejects_overlapping_or_escaping_paths() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        for (docs, output) in [
+            ("manual", "manual"),
+            ("manual/docs", "manual"),
+            ("docs", "docs/site"),
+        ] {
+            let err = template::init_template(root, "manual", false, Some(docs), Some(output), None, None).unwrap_err();
+            assert!(err.contains("directories must be separate"));
+        }
+        let err = template::init_template(root, "manual", false, Some("missing/../../outside"), None, None, None).unwrap_err();
+        assert!(err.contains("stay inside the project"));
+        assert!(!root.join("manual_setting.json").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_init_template_rejects_linked_docs_directory() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let real_docs = root.join("real_docs");
+        fs::create_dir_all(&real_docs).unwrap();
+        fs::write(real_docs.join("index.md"), "Original guide").unwrap();
+        symlink(&real_docs, root.join("linked_docs")).unwrap();
+
+        let err = template::init_template(root, "manual", true, Some("linked_docs"), None, None, None).unwrap_err();
+
+        assert!(err.contains("symbolic link"));
+        assert_eq!(fs::read_to_string(real_docs.join("index.md")).unwrap(), "Original guide");
+    }
+
+    #[test]
     fn test_init_template_api_and_clear() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
@@ -442,6 +522,166 @@ mod tests {
         // バックアップが存在すること
         let backup_dir = root.join("manual").join(".backup");
         assert!(backup_dir.is_dir());
+    }
+
+    #[test]
+    fn test_init_template_clear_backs_up_nested_docs_and_keeps_assets() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(docs.join("chapters")).unwrap();
+        fs::create_dir_all(docs.join("assets")).unwrap();
+        fs::write(docs.join("index.md"), "Original index").unwrap();
+        fs::write(docs.join("chapters/usage.md"), "Original usage").unwrap();
+        fs::write(docs.join("assets/figure.png"), b"image bytes").unwrap();
+        fs::write(root.join("README.md"), "Project readme").unwrap();
+        fs::create_dir_all(root.join("manual")).unwrap();
+        fs::write(root.join("manual/brief.md"), "Custom brief").unwrap();
+        fs::create_dir_all(root.join("manual/ai/answers")).unwrap();
+        fs::write(root.join("manual/ai/answers/custom.md"), "Saved answer").unwrap();
+        fs::write(root.join("manual/stale.html"), "Old site page").unwrap();
+
+        run(root, "init-template", &[("--template", "api"), ("--clear", "true")]).unwrap();
+
+        let backup_root = root.join("manual/.backup");
+        let backups: Vec<_> = fs::read_dir(backup_root).unwrap().map(|entry| entry.unwrap().path()).collect();
+        assert_eq!(backups.len(), 1);
+        assert_eq!(fs::read_to_string(backups[0].join("index.md")).unwrap(), "Original index");
+        assert_eq!(fs::read_to_string(backups[0].join("chapters/usage.md")).unwrap(), "Original usage");
+        assert!(!docs.join("chapters/usage.md").exists());
+        assert!(docs.join("api.md").is_file());
+        assert_eq!(fs::read(docs.join("assets/figure.png")).unwrap(), b"image bytes");
+        assert_eq!(fs::read_to_string(root.join("README.md")).unwrap(), "Project readme");
+        assert_eq!(fs::read_to_string(root.join("manual/brief.md")).unwrap(), "Custom brief");
+        assert_eq!(fs::read_to_string(root.join("manual/ai/answers/custom.md")).unwrap(), "Saved answer");
+        assert_eq!(fs::read_to_string(root.join("manual/stale.html")).unwrap(), "Old site page");
+    }
+
+    #[test]
+    fn test_init_template_clear_keeps_docs_when_backup_fails() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original content").unwrap();
+        fs::write(root.join("blocked_output"), "This is a file").unwrap();
+
+        let err = template::init_template(
+            root,
+            "api",
+            true,
+            None,
+            Some("blocked_output"),
+            None,
+            None,
+        )
+        .unwrap_err();
+
+        assert!(err.contains("Failed to create backup directory"));
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original content");
+        assert!(!root.join("manual_setting.json").exists());
+    }
+
+    #[test]
+    fn test_init_template_clear_keeps_docs_for_invalid_agent() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original content").unwrap();
+
+        let err = template::init_template(
+            root, "api", true, None, None, Some("unsupported"), None,
+        )
+        .unwrap_err();
+
+        assert!(err.contains("Unsupported AI agent"));
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original content");
+        assert!(!root.join("manual_setting.json").exists());
+    }
+
+    #[test]
+    fn test_ai_draft_failure_keeps_existing_docs_and_settings() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original guide").unwrap();
+        fs::write(root.join("manual_setting.json"), "Existing settings").unwrap();
+
+        let err = template::init_template_with_response(
+            root,
+            "manual",
+            true,
+            Ok(serde_json::json!({"pages": [{"path": "../outside.md", "content": "Invalid"}]})),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("must include index.md"));
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
+        assert_eq!(fs::read_to_string(root.join("manual_setting.json")).unwrap(), "Existing settings");
+        assert!(!root.join("outside.md").exists());
+    }
+
+    #[test]
+    fn test_ai_cli_failure_keeps_existing_docs() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original guide").unwrap();
+
+        let err = template::init_template_with_response(
+            root, "manual", true, Err("AI CLI failed".to_string()),
+        )
+        .unwrap_err();
+
+        assert_eq!(err, "AI CLI failed");
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
+        assert!(!root.join("manual_setting.json").exists());
+    }
+
+    #[test]
+    fn test_ai_draft_response_replaces_docs_after_validation() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original guide").unwrap();
+
+        template::init_template_with_response(
+            root,
+            "manual",
+            true,
+            Ok(serde_json::json!({"pages": [
+                {"path": "index.md", "content": "# New guide"},
+                {"path": "chapters/start.md", "content": "# Getting started"}
+            ]})),
+        )
+        .unwrap();
+
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "# New guide\n");
+        assert_eq!(fs::read_to_string(docs.join("chapters/start.md")).unwrap(), "# Getting started\n");
+        assert!(root.join("manual/.backup").is_dir());
+    }
+
+    #[test]
+    fn test_build_without_mkdocs_keeps_existing_output() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        let output = root.join("manual");
+        fs::create_dir_all(&docs).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(docs.join("index.md"), "# Guide").unwrap();
+        fs::write(output.join("index.html"), "Existing preview").unwrap();
+        fs::write(output.join("notes.txt"), "User note").unwrap();
+
+        let result = builder::build_without_mkdocs(&docs, &output.join("ai"), &output).unwrap();
+
+        assert!(result.contains("MkDocs site build skipped"));
+        assert_eq!(fs::read_to_string(output.join("index.html")).unwrap(), "Existing preview");
+        assert_eq!(fs::read_to_string(output.join("notes.txt")).unwrap(), "User note");
     }
 
     #[test]
@@ -752,4 +992,3 @@ mod tests {
         assert_eq!(t[0].id, "real-task");
     }
 }
-

@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::Path;
+use tempfile::tempdir_in;
+use walkdir::WalkDir;
 
-use super::config::{config_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF};
+use super::config::{config_path, project_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF};
 use super::task::{collect_markdown_files, utc_now};
 use crate::analyze_directory;
 
@@ -13,6 +15,29 @@ pub fn init_template(
     output_opt: Option<&str>,
     agent_opt: Option<&str>,
     model_opt: Option<&str>,
+) -> Result<(), String> {
+    init_template_inner(root, template_type, clear, docs_opt, output_opt, agent_opt, model_opt, None)
+}
+
+#[cfg(test)]
+pub(crate) fn init_template_with_response(
+    root: &Path,
+    template_type: &str,
+    clear: bool,
+    response: Result<serde_json::Value, String>,
+) -> Result<(), String> {
+    init_template_inner(root, template_type, clear, None, None, None, None, Some(response))
+}
+
+fn init_template_inner(
+    root: &Path,
+    template_type: &str,
+    clear: bool,
+    docs_opt: Option<&str>,
+    output_opt: Option<&str>,
+    agent_opt: Option<&str>,
+    model_opt: Option<&str>,
+    response: Option<Result<serde_json::Value, String>>,
 ) -> Result<(), String> {
     let existing_cfg = read_config(root);
     let project_name = root
@@ -36,39 +61,6 @@ pub fn init_template(
         "manual".to_string()
     };
 
-    let templates = root.join(&docs_dir_name);
-
-    if templates.is_dir() {
-        let existing = collect_markdown_files(&templates);
-        if !existing.is_empty() {
-            if !clear {
-                return Err("EXISTING_DOCS_CONFIRM_REQUIRED".to_string());
-            }
-            // 安全のため既存ファイルをバックアップ
-            let backup_dir = root
-                .join(&output_dir_name)
-                .join(".backup")
-                .join(utc_now().replace(':', "-"));
-            let _ = fs::create_dir_all(&backup_dir);
-            for old_file in &existing {
-                let rel = old_file.strip_prefix(&templates).unwrap_or(old_file);
-                let dest = backup_dir.join(rel);
-                if let Some(parent) = dest.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                let _ = fs::copy(old_file, &dest);
-                let _ = fs::remove_file(old_file);
-            }
-        }
-    } else {
-        fs::create_dir_all(&templates).map_err(|e| e.to_string())?;
-    }
-
-    // manual_setting.json を確実に生成
-    let site_name = match template_type {
-        "api" => format!("{project_name} アーキテクチャ & API リファレンス"),
-        _ => format!("{project_name} 利用マニュアル"),
-    };
     let agent = if let Some(a) = agent_opt.map(|s| s.trim()).filter(|s| !s.is_empty()) {
         if ["codex", "claude", "gemini", "grok", "agy"].contains(&a) {
             a.to_string()
@@ -84,6 +76,95 @@ pub fn init_template(
         m.trim().to_string()
     } else {
         existing_cfg.model.clone()
+    };
+    let is_offline_or_test = response.is_none() && (cfg!(test) || std::env::var("MODULELOOM_OFFLINE_TEMPLATE").is_ok());
+    if !is_offline_or_test && response.is_none() && super::agent::which_binary(&agent).is_none() {
+        return Err(format!("AI CLI is unavailable: {agent}。インストールされているエージェントを選択するか、PATHを確認してください。"));
+    }
+
+    let templates = project_path(root, &docs_dir_name)?;
+    let output_path = project_path(root, &output_dir_name)?;
+    let project_root = root.canonicalize().map_err(|e| e.to_string())?;
+    if templates == project_root || output_path == project_root
+        || templates.starts_with(&output_path) || output_path.starts_with(&templates) {
+        return Err("Template and output directories must be separate".to_string());
+    }
+    let existing = if templates.is_dir() { collect_markdown_files(&templates) } else { Vec::new() };
+    if !existing.is_empty() && !clear {
+        return Err("EXISTING_DOCS_CONFIRM_REQUIRED".to_string());
+    }
+
+    let staging = tempdir_in(root).map_err(|e| e.to_string())?;
+    let staged_docs = staging.path().join("docs");
+    fs::create_dir_all(&staged_docs).map_err(|e| e.to_string())?;
+    if templates.is_dir() {
+        for entry in WalkDir::new(&templates) {
+            let entry = entry.map_err(|e| e.to_string())?;
+            if entry.file_type().is_symlink() {
+                return Err(format!("Symbolic links are not supported in manual templates: {}", entry.path().display()));
+            }
+            if !entry.file_type().is_file() || entry.path().extension().is_some_and(|ext| ext == "md") {
+                continue;
+            }
+            let rel = entry.path().strip_prefix(&templates).map_err(|e| e.to_string())?;
+            let dest = staged_docs.join(rel);
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::copy(entry.path(), dest).map_err(|e| e.to_string())?;
+        }
+    }
+
+    if !is_offline_or_test {
+        generate_template_with_llm(root, &staged_docs, template_type, &agent, &model, response)?;
+    } else {
+        match template_type {
+            "api" => init_api_template(root, &staged_docs, project_name)?,
+            _ => init_manual_template(root, &staged_docs, project_name)?,
+        }
+    }
+
+    if !existing.is_empty() {
+        let backup_root = root.join(&output_dir_name).join(".backup");
+        fs::create_dir_all(&backup_root)
+            .map_err(|e| format!("Failed to create backup directory {}: {e}", backup_root.display()))?;
+        let backup = tempfile::Builder::new()
+            .prefix(&format!("{}-", utc_now().replace(':', "-")))
+            .tempdir_in(&backup_root)
+            .map_err(|e| format!("Failed to create backup directory: {e}"))?;
+        for old_file in &existing {
+            let rel = old_file.strip_prefix(&templates).map_err(|e| e.to_string())?;
+            let dest = backup.path().join(rel);
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::copy(old_file, dest)
+                .map_err(|e| format!("Failed to back up {}: {e}", old_file.display()))?;
+        }
+        let _ = backup.keep();
+    }
+
+    let old_docs = staging.path().join("old-docs");
+    if templates.exists() {
+        fs::rename(&templates, &old_docs).map_err(|e| e.to_string())?;
+    }
+    if let Err(error) = fs::rename(&staged_docs, &templates) {
+        if old_docs.exists() {
+            if let Err(restore) = fs::rename(&old_docs, &templates) {
+                let recovery = staging.keep();
+                return Err(format!(
+                    "Failed to publish template: {error}; failed to restore originals: {restore}; originals are at {}",
+                    recovery.join("old-docs").display()
+                ));
+            }
+        }
+        return Err(format!("Failed to publish template: {error}"));
+    }
+
+    // manual_setting.json を確実に生成
+    let site_name = match template_type {
+        "api" => format!("{project_name} アーキテクチャ & API リファレンス"),
+        _ => format!("{project_name} 利用マニュアル"),
     };
     let new_config = ManualConfig {
         docs: docs_dir_name.clone(),
@@ -114,17 +195,8 @@ pub fn init_template(
             .map_err(|e| format!("Failed to write brief.md: {e}"))?;
     }
 
-    let is_offline_or_test = cfg!(test) || std::env::var("MODULELOOM_OFFLINE_TEMPLATE").is_ok();
     if !is_offline_or_test {
-        if super::agent::which_binary(&agent).is_none() {
-            return Err(format!("AI CLI is unavailable: {agent}。インストールされているエージェントを選択するか、PATHを確認してください。"));
-        }
-        generate_template_with_llm(root, &templates, &output_dir_name, project_name, template_type, &agent, &model)?;
-    } else {
-        match template_type {
-            "api" => init_api_template(root, &templates, project_name)?,
-            _ => init_manual_template(root, &templates, project_name)?,
-        }
+        finish_generated_template(root, &templates, &output_dir_name);
     }
 
     Ok(())
@@ -133,11 +205,10 @@ pub fn init_template(
 fn generate_template_with_llm(
     root: &Path,
     templates: &Path,
-    output_dir_name: &str,
-    _project_name: &str,
     template_type: &str,
     agent: &str,
     model: &str,
+    response: Option<Result<serde_json::Value, String>>,
 ) -> Result<(), String> {
     let app_context = super::context::build_application_context(root);
     let brief_path = root.join("manual").join("brief.md");
@@ -201,7 +272,7 @@ fn generate_template_with_llm(
         "additionalProperties": false
     });
 
-    let res = super::agent::agent_json(root, &prompt, &schema, agent, model)?;
+    let res = if let Some(response) = response { response? } else { super::agent::agent_json(root, &prompt, &schema, agent, model)? };
     let pages = res
         .get("pages")
         .and_then(|p| p.as_array())
@@ -238,6 +309,10 @@ fn generate_template_with_llm(
         fs::write(&dest, format!("{}\n", content.trim_end())).map_err(|e| e.to_string())?;
     }
 
+    Ok(())
+}
+
+fn finish_generated_template(root: &Path, templates: &Path, output_dir_name: &str) {
     // 生成されたタスクのうち diagram と text の回答を自動生成して保存
     if let Ok(task_list) = super::task::tasks(templates) {
         let generated = root.join("manual").join("ai");
@@ -254,6 +329,7 @@ fn generate_template_with_llm(
         }
     }
 
+    let app_context = super::context::build_application_context(root);
     let _ = super::uimap::save_ui_map(root, &app_context.ui_map);
     let _ = super::deps::build_manual_dependency_graph(root, templates);
     let _ = super::builder::build(
@@ -264,7 +340,6 @@ fn generate_template_with_llm(
         Some(root),
     );
 
-    Ok(())
 }
 
 fn init_manual_template(root: &Path, templates: &Path, project_name: &str) -> Result<(), String> {

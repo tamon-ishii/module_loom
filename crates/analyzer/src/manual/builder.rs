@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 use std::process::Command;
-use tempfile::tempdir;
+use tempfile::{tempdir, tempdir_in};
 use walkdir::WalkDir;
 
 use super::agent::which_binary;
@@ -11,12 +11,158 @@ use super::task::{
     collect_markdown_files, parse_page_tags, read_answer, source_hash, tasks, utc_now, PageTag,
 };
 
+const SITE_MANIFEST: &str = ".moduleloom-site-files.json";
+
+fn site_relative_path(path: &str) -> Result<&Path, String> {
+    let relative = Path::new(path);
+    if path.is_empty() || !relative.components().all(|part| matches!(part, Component::Normal(_))) {
+        return Err(format!("Invalid generated site path: {path}"));
+    }
+    Ok(relative)
+}
+
+fn publish_site(temp_site: &Path, output_root: &Path) -> Result<(), String> {
+    publish_site_inner(temp_site, output_root, false)
+}
+
+fn copy_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    if !source.exists() {
+        return Ok(());
+    }
+    for entry in WalkDir::new(source) {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if entry.file_type().is_symlink() {
+            return Err(format!("Symbolic links are not supported in manual output: {}", entry.path().display()));
+        }
+        let relative = entry.path().strip_prefix(source).map_err(|e| e.to_string())?;
+        let target = destination.join(relative);
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(target).map_err(|e| e.to_string())?;
+        } else {
+            fs::copy(entry.path(), target).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn publish_site_inner(temp_site: &Path, output_root: &Path, fail_after_old_rename: bool) -> Result<(), String> {
+    if fs::symlink_metadata(output_root).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        return Err(format!("Symbolic links are not supported for manual output: {}", output_root.display()));
+    }
+    let parent = output_root.parent().ok_or_else(|| "Manual output needs a parent directory".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let staging = tempdir_in(parent).map_err(|e| e.to_string())?;
+    let prepared = staging.path().join("prepared");
+    copy_tree(output_root, &prepared)?;
+    fs::create_dir_all(&prepared).map_err(|e| e.to_string())?;
+
+    let manifest_path = output_root.join(SITE_MANIFEST);
+    let legacy_site = !manifest_path.exists()
+        && fs::read_to_string(output_root.join("index.html"))
+            .is_ok_and(|html| html.contains("name=\"generator\" content=\"mkdocs-"));
+    let old_files: BTreeSet<String> = if manifest_path.is_file() {
+        serde_json::from_slice::<Vec<String>>(&fs::read(&manifest_path).map_err(|e| e.to_string())?)
+            .map_err(|e| format!("Invalid site manifest: {e}"))?
+            .into_iter()
+            .collect()
+    } else {
+        BTreeSet::new()
+    };
+    for path in &old_files {
+        site_relative_path(path)?;
+    }
+
+    let mut new_files = BTreeSet::new();
+    for entry in WalkDir::new(temp_site) {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let rel = entry.path().strip_prefix(temp_site).map_err(|e| e.to_string())?;
+        let name = rel.to_string_lossy().replace('\\', "/");
+        site_relative_path(&name)?;
+        if name == SITE_MANIFEST {
+            return Err("Generated site conflicts with the site manifest".to_string());
+        }
+        let dest = output_root.join(rel);
+        let top_level = name.split('/').next().unwrap_or("");
+        if ["ai", "brief.md", ".backup"].contains(&top_level) {
+            return Err(format!("Generated site conflicts with manual source data: {name}"));
+        }
+        if dest.exists() && !old_files.contains(&name) && !legacy_site {
+            return Err(format!("Generated site would overwrite an unmanaged file: {}", dest.display()));
+        }
+        new_files.insert(name);
+    }
+
+    for name in old_files.difference(&new_files) {
+        let path = prepared.join(site_relative_path(name)?);
+        if path.is_file() {
+            fs::remove_file(path).map_err(|e| e.to_string())?;
+        }
+    }
+    for name in &new_files {
+        let rel = site_relative_path(name)?;
+        let dest = prepared.join(rel);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::copy(temp_site.join(rel), &dest).map_err(|e| e.to_string())?;
+    }
+    let manifest = serde_json::to_vec_pretty(&new_files).map_err(|e| e.to_string())?;
+    fs::write(prepared.join(SITE_MANIFEST), manifest).map_err(|e| e.to_string())?;
+
+    let old_output = staging.path().join("previous");
+    let had_output = output_root.exists();
+    if had_output {
+        fs::rename(output_root, &old_output).map_err(|e| e.to_string())?;
+    }
+    let publish_result = if fail_after_old_rename {
+        Err("Simulated publication failure".to_string())
+    } else {
+        fs::rename(&prepared, output_root).map_err(|e| e.to_string())
+    };
+    if let Err(error) = publish_result {
+        if had_output {
+            if let Err(restore) = fs::rename(&old_output, output_root) {
+                let recovery = staging.keep();
+                return Err(format!(
+                    "{error}; failed to restore previous site: {restore}; previous site is at {}",
+                    recovery.join("previous").display()
+                ));
+            }
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
 pub fn build(
     templates: &Path,
     generated: &Path,
     output_root: &Path,
     draft: bool,
     root: Option<&Path>,
+) -> Result<String, String> {
+    build_inner(templates, generated, output_root, draft, root, false)
+}
+
+#[cfg(test)]
+pub(crate) fn build_without_mkdocs(
+    templates: &Path,
+    generated: &Path,
+    output_root: &Path,
+) -> Result<String, String> {
+    build_inner(templates, generated, output_root, true, None, true)
+}
+
+fn build_inner(
+    templates: &Path,
+    generated: &Path,
+    output_root: &Path,
+    draft: bool,
+    root: Option<&Path>,
+    no_mkdocs: bool,
 ) -> Result<String, String> {
     let task_list = tasks(templates)?;
     let mut answers = HashMap::new();
@@ -47,6 +193,7 @@ pub fn build(
     let tmp = tempdir().map_err(|e| e.to_string())?;
     let temp_root = tmp.path();
     let temp_docs = temp_root.join("docs");
+    let temp_site = temp_root.join("site");
     fs::create_dir_all(&temp_docs).map_err(|e| e.to_string())?;
 
     let built_at = utc_now();
@@ -172,7 +319,7 @@ pub fn build(
         theme_name,
         theme_lang,
         if use_dir_urls { "true" } else { "false" },
-        serde_json::to_string(&output_root.canonicalize().unwrap_or_else(|_| output_root.to_path_buf()).to_string_lossy()).unwrap(),
+        serde_json::to_string(&temp_site.to_string_lossy()).unwrap(),
         nav_lines
     );
 
@@ -213,7 +360,7 @@ pub fn build(
         }
     }
 
-    if let Some(cmd_parts) = mkdocs_cmd {
+    if let Some(cmd_parts) = if no_mkdocs { None } else { mkdocs_cmd } {
         let (prog, args) = cmd_parts.split_first().unwrap();
         let mut final_args: Vec<String> = args.to_vec();
         final_args.extend([
@@ -221,11 +368,7 @@ pub fn build(
             "-f".to_string(),
             temp_config.to_string_lossy().into_owned(),
             "-d".to_string(),
-            output_root
-                .canonicalize()
-                .unwrap_or_else(|_| output_root.to_path_buf())
-                .to_string_lossy()
-                .into_owned(),
+            temp_site.to_string_lossy().into_owned(),
         ]);
 
         let output = Command::new(prog)
@@ -240,6 +383,7 @@ pub fn build(
             let msg = if !err.trim().is_empty() { err.trim() } else { out.trim() };
             return Err(format!("MkDocs site build failed: {msg}"));
         }
+        publish_site(&temp_site, output_root)?;
         Ok(format!("{}\nSite: {}", output_root.display(), output_root.display()))
     } else {
         Ok(format!(
@@ -247,5 +391,108 @@ pub fn build(
             output_root.display(),
             output_root.display()
         ))
+    }
+}
+
+#[cfg(test)]
+mod site_tests {
+    use super::*;
+
+    #[test]
+    fn publish_removes_only_previously_generated_files() {
+        let tmp = tempdir().unwrap();
+        let site = tmp.path().join("site");
+        let output = tmp.path().join("output");
+        fs::create_dir_all(&site).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(site.join("old.html"), "Old page").unwrap();
+        fs::write(output.join("notes.txt"), "User note").unwrap();
+        publish_site(&site, &output).unwrap();
+
+        fs::remove_file(site.join("old.html")).unwrap();
+        fs::write(site.join("new.html"), "New page").unwrap();
+        publish_site(&site, &output).unwrap();
+
+        assert!(!output.join("old.html").exists());
+        assert_eq!(fs::read_to_string(output.join("new.html")).unwrap(), "New page");
+        assert_eq!(fs::read_to_string(output.join("notes.txt")).unwrap(), "User note");
+    }
+
+    #[test]
+    fn publish_rejects_unmanaged_file_collision() {
+        let tmp = tempdir().unwrap();
+        let site = tmp.path().join("site");
+        let output = tmp.path().join("output");
+        fs::create_dir_all(&site).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(site.join("index.html"), "Generated page").unwrap();
+        fs::write(output.join("index.html"), "User page").unwrap();
+
+        let err = publish_site(&site, &output).unwrap_err();
+
+        assert!(err.contains("unmanaged file"));
+        assert_eq!(fs::read_to_string(output.join("index.html")).unwrap(), "User page");
+        assert!(!output.join(SITE_MANIFEST).exists());
+    }
+
+    #[test]
+    fn publish_adopts_legacy_mkdocs_site_without_removing_user_files() {
+        let tmp = tempdir().unwrap();
+        let site = tmp.path().join("site");
+        let output = tmp.path().join("output");
+        fs::create_dir_all(&site).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(site.join("index.html"), "New page").unwrap();
+        fs::write(output.join("index.html"), "<meta name=\"generator\" content=\"mkdocs-1.6\">").unwrap();
+        fs::write(output.join("notes.txt"), "User note").unwrap();
+
+        publish_site(&site, &output).unwrap();
+
+        assert_eq!(fs::read_to_string(output.join("index.html")).unwrap(), "New page");
+        assert_eq!(fs::read_to_string(output.join("notes.txt")).unwrap(), "User note");
+        assert!(output.join(SITE_MANIFEST).is_file());
+    }
+
+    #[test]
+    fn publication_failure_restores_previous_site_and_user_files() {
+        let tmp = tempdir().unwrap();
+        let site = tmp.path().join("site");
+        let output = tmp.path().join("output");
+        fs::create_dir_all(&site).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(site.join("index.html"), "First version").unwrap();
+        fs::write(output.join("notes.txt"), "User note").unwrap();
+        publish_site(&site, &output).unwrap();
+        let original_manifest = fs::read(output.join(SITE_MANIFEST)).unwrap();
+
+        fs::write(site.join("index.html"), "Second version").unwrap();
+        let err = publish_site_inner(&site, &output, true).unwrap_err();
+
+        assert_eq!(err, "Simulated publication failure");
+        assert_eq!(fs::read_to_string(output.join("index.html")).unwrap(), "First version");
+        assert_eq!(fs::read_to_string(output.join("notes.txt")).unwrap(), "User note");
+        assert_eq!(fs::read(output.join(SITE_MANIFEST)).unwrap(), original_manifest);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn publication_rejects_symlinks_without_touching_their_target() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempdir().unwrap();
+        let site = tmp.path().join("site");
+        let output = tmp.path().join("output");
+        fs::create_dir_all(&site).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        fs::write(site.join("index.html"), "Generated page").unwrap();
+        let outside = tmp.path().join("outside.txt");
+        fs::write(&outside, "Outside data").unwrap();
+        symlink(&outside, output.join("link.txt")).unwrap();
+
+        let err = publish_site(&site, &output).unwrap_err();
+
+        assert!(err.contains("Symbolic links are not supported"));
+        assert_eq!(fs::read_to_string(outside).unwrap(), "Outside data");
+        assert!(!output.join(SITE_MANIFEST).exists());
     }
 }
