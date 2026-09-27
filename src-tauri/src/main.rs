@@ -149,9 +149,12 @@ async fn manual_action(
     action: String,
     docs: Option<String>,
     output: Option<String>,
+    targets: Option<String>,
     brief: Option<String>,
     agent: Option<String>,
     model: Option<String>,
+    format: Option<String>,
+    mkdocs_settings: Option<String>,
     id: Option<String>,
     page: Option<String>,
     asset: Option<String>,
@@ -166,9 +169,12 @@ async fn manual_action(
         let mut options = Vec::<(&str, &str)>::new();
         if let Some(ref value) = docs { options.push(("--docs", value)); }
         if let Some(ref value) = output { options.push(("--output", value)); }
+        if let Some(ref value) = targets { options.push(("--targets", value)); }
         if let Some(ref value) = brief { options.push(("--brief", value)); }
         if let Some(ref value) = agent { options.push(("--agent", value)); }
         if let Some(ref value) = model { options.push(("--model", value)); }
+        if let Some(ref value) = format { options.push(("--format", value)); }
+        if let Some(ref value) = mkdocs_settings { options.push(("--mkdocs-settings", value)); }
         if let Some(ref value) = id { options.push(("--id", value)); }
         if let Some(ref value) = page { options.push(("--page", value)); }
         if let Some(ref value) = asset { options.push(("--asset", value)); }

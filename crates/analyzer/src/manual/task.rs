@@ -7,6 +7,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+use super::config::{read_config, ManualConfig};
+
 pub fn utc_now() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
@@ -147,6 +149,71 @@ pub fn collect_markdown_files(dir: &Path) -> Vec<PathBuf> {
         }
     }
     files.sort();
+    files
+}
+
+pub fn collect_target_markdown_files(root: &Path, config: &ManualConfig) -> Vec<(String, PathBuf)> {
+    let mut files = Vec::new();
+    let mut visited_paths = HashSet::new();
+    let templates = root.join(&config.docs);
+
+    for target in &config.targets {
+        let trimmed = target.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let target_path = root.join(trimmed);
+        if target_path.is_file() {
+            if target_path.extension().map_or(false, |ext| ext == "md") {
+                let canon = target_path.canonicalize().unwrap_or_else(|_| target_path.clone());
+                if visited_paths.insert(canon) {
+                    let rel = trimmed.replace('\\', "/");
+                    files.push((rel, target_path));
+                }
+            }
+        } else if target_path.is_dir() {
+            let is_docs_dir = trimmed == config.docs || target_path == templates;
+            for entry in WalkDir::new(&target_path).into_iter().filter_map(|e| e.ok()) {
+                if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md") {
+                    let path = entry.path().to_path_buf();
+                    let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+                    if visited_paths.insert(canon) {
+                        let rel = if is_docs_dir {
+                            path.strip_prefix(&templates)
+                                .unwrap_or(&path)
+                                .to_string_lossy()
+                                .replace('\\', "/")
+                        } else {
+                            path.strip_prefix(root)
+                                .unwrap_or(&path)
+                                .to_string_lossy()
+                                .replace('\\', "/")
+                        };
+                        files.push((rel, path));
+                    }
+                }
+            }
+        }
+    }
+
+    if templates.is_dir() && !config.targets.iter().any(|t| t == &config.docs) {
+        for entry in WalkDir::new(&templates).into_iter().filter_map(|e| e.ok()) {
+            if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md") {
+                let path = entry.path().to_path_buf();
+                let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+                if visited_paths.insert(canon) {
+                    let rel = path
+                        .strip_prefix(&templates)
+                        .unwrap_or(&path)
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    files.push((rel, path));
+                }
+            }
+        }
+    }
+
+    files.sort_by(|a, b| a.0.cmp(&b.0));
     files
 }
 
@@ -306,7 +373,30 @@ pub fn parse_page_tags(
     Ok(tags)
 }
 
+pub fn tasks_for_config(root: &Path, config: &ManualConfig) -> Result<Vec<Task>, String> {
+    let mut found = Vec::new();
+    let mut ids = HashSet::new();
+
+    for (page_rel, page_path) in collect_target_markdown_files(root, config) {
+        let content = fs::read_to_string(&page_path).map_err(|e| e.to_string())?;
+        let tags = parse_page_tags(&page_rel, &content, &mut ids)?;
+        for tag in tags {
+            match tag {
+                PageTag::Task { task, .. } => found.push(task),
+                PageTag::Generated { task, .. } => found.push(task),
+            }
+        }
+    }
+    Ok(found)
+}
+
 pub fn tasks(templates: &Path) -> Result<Vec<Task>, String> {
+    if let Some(parent) = templates.parent() {
+        if parent.join("manual_setting.json").is_file() || parent.join("manual").join("config.json").is_file() {
+            let config = read_config(parent);
+            return tasks_for_config(parent, &config);
+        }
+    }
     if !templates.is_dir() {
         return Err(format!("Template directory is missing: {}", templates.display()));
     }
@@ -396,7 +486,17 @@ pub fn update_task_in_docs(
     body: &str,
     approved: Option<&str>,
 ) -> Result<(), String> {
-    let page_path = templates.join(&task.page);
+    let page_path = if templates.join(&task.page).is_file() {
+        templates.join(&task.page)
+    } else if let Some(parent) = templates.parent() {
+        if parent.join(&task.page).is_file() {
+            parent.join(&task.page)
+        } else {
+            templates.join(&task.page)
+        }
+    } else {
+        templates.join(&task.page)
+    };
     if !page_path.is_file() {
         return Err(format!("Page file not found: {}", page_path.display()));
     }

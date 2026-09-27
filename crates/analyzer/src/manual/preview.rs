@@ -11,7 +11,7 @@ use super::agent::get_agents;
 use super::builder::build;
 use super::config::{project_path, read_config, DEFAULT_BRIEF};
 use super::task::{
-    collect_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks, utc_now, PageTag,
+    collect_target_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks, utc_now, PageTag,
 };
 
 pub fn render_page_markdown(
@@ -20,7 +20,17 @@ pub fn render_page_markdown(
     page_rel: &Path,
     _draft: bool,
 ) -> Result<String, String> {
-    let page_path = templates.join(page_rel);
+    let page_path = if templates.join(page_rel).is_file() {
+        templates.join(page_rel)
+    } else if let Some(parent) = templates.parent() {
+        if parent.join(page_rel).is_file() {
+            parent.join(page_rel)
+        } else {
+            templates.join(page_rel)
+        }
+    } else {
+        templates.join(page_rel)
+    };
     if !page_path.is_file() {
         return Err(format!("Preview page is missing: {}", page_rel.display()));
     }
@@ -195,7 +205,15 @@ pub fn preview_page(root: &Path, page: &str) -> Result<String, String> {
     let config = read_config(root);
     let templates = project_path(root, &config.docs)?;
     let generated = root.join("manual").join("ai");
-    let target = project_path(&templates, page)?;
+    let target = if let Ok(tp) = project_path(&templates, page) {
+        if tp.is_file() {
+            tp
+        } else {
+            project_path(root, page)?
+        }
+    } else {
+        project_path(root, page)?
+    };
     if target.extension().map_or(true, |ext| ext != "md") || !target.is_file() {
         return Err(format!("Preview page is missing: {page}"));
     }
@@ -239,6 +257,17 @@ pub fn preview_html(root: &Path, page: &str) -> Result<String, String> {
     }
 
     if !target.is_file() {
+        if let Ok(md_content) = preview_page(root, page) {
+            let escaped = md_content
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;");
+            let html_body = format!(
+                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>{}</title><style>body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 20px; line-height: 1.6; color: #24292f; }} pre {{ background: #f6f8fa; padding: 16px; border-radius: 6px; overflow: auto; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace; }}</style></head><body><h2>{}</h2><pre style=\"white-space: pre-wrap;\">{}</pre></body></html>",
+                page, page, escaped
+            );
+            return Ok(html_body);
+        }
         return Err(format!("HTML page is missing: {page}. Please build the manual first."));
     }
 
@@ -297,23 +326,17 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
     let output = project_path(root, &config.output)?;
     let brief_path = root.join("manual").join("brief.md");
 
-    let pages: Vec<String> = if templates.is_dir() {
-        collect_markdown_files(&templates)
-            .into_iter()
-            .map(|p| {
-                p.strip_prefix(&templates)
-                    .unwrap_or(&p)
-                    .to_string_lossy()
-                    .replace('\\', "/")
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let target_files = collect_target_markdown_files(root, &config);
+    let mut pages: Vec<String> = target_files.into_iter().map(|(rel, _)| rel).collect();
+    pages.sort();
 
-    let preview = if templates.is_dir() && templates.join("index.md").is_file() {
-        render_page_markdown(&templates, &generated, Path::new("index.md"), true)
-            .unwrap_or_else(|_| fs::read_to_string(templates.join("index.md")).unwrap_or_default())
+    let first_page = if pages.contains(&"index.md".to_string()) {
+        "index.md"
+    } else {
+        pages.first().map(|s| s.as_str()).unwrap_or("")
+    };
+    let preview = if !first_page.is_empty() {
+        preview_page(root, first_page).unwrap_or_default()
     } else {
         String::new()
     };

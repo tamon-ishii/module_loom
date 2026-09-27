@@ -339,9 +339,17 @@
           "role": "input",
           "title": null,
           "parent_view": "manual-settings-modal"
+        },
+        {
+          "id": "manual-targets",
+          "selector": "#manual-targets",
+          "name": "manual-targets",
+          "role": "input",
+          "title": null,
+          "parent_view": "manual-settings-modal"
         }
       ]
     }
   ],
-  "total_elements": 34
+  "total_elements": 35
 }

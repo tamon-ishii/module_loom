@@ -256,6 +256,7 @@ interface ManualState {
   config: {
     docs: string;
     output: string;
+    targets?: string[];
     format?: string;
     agent: string;
     model: string;
@@ -281,6 +282,7 @@ const manualModel = document.getElementById("manual-model") as HTMLInputElement 
 const manualModelOptions = document.getElementById("manual-model-options") as HTMLDataListElement | null;
 const manualDocs = document.getElementById("manual-docs") as HTMLInputElement;
 const manualOutput = document.getElementById("manual-output") as HTMLInputElement;
+const manualTargets = document.getElementById("manual-targets") as HTMLInputElement | null;
 const manualBrief = document.getElementById("manual-brief") as HTMLTextAreaElement | null;
 const manualMkdocsSiteName = document.getElementById("manual-mkdocs-sitename") as HTMLInputElement | null;
 const manualMkdocsTheme = document.getElementById("manual-mkdocs-theme") as HTMLSelectElement | null;
@@ -1207,6 +1209,12 @@ async function refreshManual(): Promise<void> {
     if (manualProject !== project) {
       manualDocs.value = state.config.docs || "docs";
       manualOutput.value = state.config.output || "manual";
+      if (manualTargets) {
+        const tList = (state.config.targets && state.config.targets.length > 0)
+          ? state.config.targets
+          : [state.config.docs || "docs", "README.md"];
+        manualTargets.value = tList.join(", ");
+      }
       if (manualBrief) manualBrief.value = state.brief || "";
       const savedAgent = state.config.agent || localStorage.getItem("moduleloom_manual_agent") || "codex";
       if (manualAgent) manualAgent.value = savedAgent;
@@ -1260,9 +1268,11 @@ async function runManual(action: string, extras: Record<string, unknown> = {}): 
       language: manualMkdocsLanguage?.value || "ja",
       use_directory_urls: Boolean(manualMkdocsDirUrls?.checked),
     };
+    const targetVal = manualTargets?.value.trim() || `${manualDocs.value.trim() || "docs"}, README.md`;
     const settings = {
       docs: manualDocs.value.trim() || "docs",
       output: manualOutput.value.trim() || "manual",
+      targets: targetVal,
       format: manualFormat?.value || "mkdocs",
       brief: manualBrief?.value || "",
       agent: manualAgent?.value || "codex",

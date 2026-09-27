@@ -67,11 +67,13 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut ref_opt: Option<&str> = None;
     let mut json_opt: Option<&str> = None;
     let mut input_opt: Option<&str> = None;
+    let mut targets_opt: Option<&str> = None;
 
     for (key, value) in options {
         match *key {
             "--docs" => docs_opt = Some(*value),
             "--output" => output_opt = Some(*value),
+            "--targets" => targets_opt = Some(*value),
             "--brief" => brief_opt = Some(*value),
             "--agent" => agent_opt = Some(*value),
             "--model" => model_opt = Some(*value),
@@ -142,7 +144,23 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let model = model_opt.unwrap_or(&cfg.model);
             let doc_format = format_opt.unwrap_or(&cfg.format);
             let mkdocs_raw = mkdocs_settings_opt.unwrap_or("");
-            save_settings(root, docs, output, brief, agent, model, doc_format, mkdocs_raw)?;
+            let targets_vec = targets_opt.map(|t| {
+                t.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+            });
+            save_settings(
+                root,
+                docs,
+                output,
+                brief,
+                agent,
+                model,
+                doc_format,
+                mkdocs_raw,
+                targets_vec.as_deref(),
+            )?;
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
         }
@@ -291,8 +309,12 @@ mod tests {
             "gpt-4o",
             "mkdocs",
             r#"{"site_name": "Test Site"}"#,
+            Some(&["docs".to_string(), "README.md".to_string()]),
         )
         .unwrap();
+
+        let setting_file = root.join("manual_setting.json");
+        assert!(setting_file.is_file());
 
         let cfg = read_config(root);
         assert_eq!(cfg.docs, "docs");
@@ -300,6 +322,61 @@ mod tests {
         assert_eq!(cfg.agent, "codex");
         assert_eq!(cfg.model, "gpt-4o");
         assert_eq!(cfg.mkdocs.site_name, "Test Site");
+        assert_eq!(cfg.targets, vec!["docs", "README.md"]);
+    }
+
+    #[test]
+    fn test_manual_targets_readme() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+
+        let readme = root.join("README.md");
+        fs::write(
+            &readme,
+            "# My Project\n\n<!-- ai:task id=readme-intro kind=text\nREADME用の概要文\n-->\n",
+        )
+        .unwrap();
+
+        let doc_page = docs.join("index.md");
+        fs::write(
+            &doc_page,
+            "# Manual Top\n\n<!-- ai:task id=doc-intro kind=text\nドキュメントの紹介\n-->\n",
+        )
+        .unwrap();
+
+        save_settings(
+            root,
+            "docs",
+            "manual",
+            "",
+            "codex",
+            "",
+            "mkdocs",
+            "",
+            Some(&["docs".to_string(), "README.md".to_string()]),
+        )
+        .unwrap();
+
+        let state = get_state(root).unwrap();
+        let pages = state["pages"].as_array().unwrap();
+        assert!(pages.iter().any(|p| p.as_str() == Some("README.md")));
+        assert!(pages.iter().any(|p| p.as_str() == Some("index.md")));
+
+        let tasks = state["tasks"].as_array().unwrap();
+        assert_eq!(tasks.len(), 2);
+        assert!(tasks.iter().any(|t| t["id"] == "readme-intro"));
+        assert!(tasks.iter().any(|t| t["id"] == "doc-intro"));
+
+        // update_task_in_docs for README.md
+        let readme_task = task::find_task(&docs, "readme-intro").unwrap();
+        assert_eq!(readme_task.page, "README.md");
+        update_task_in_docs(&docs, &readme_task, "これは素晴らしいプロジェクトです。", None).unwrap();
+
+        let updated_readme = fs::read_to_string(&readme).unwrap();
+        assert!(updated_readme.contains("<!-- ai:generated id=readme-intro"));
+        assert!(updated_readme.contains("これは素晴らしいプロジェクトです。"));
     }
 
     #[test]

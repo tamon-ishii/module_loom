@@ -1,6 +1,14 @@
 # ModuleLoom 検証用サンプルプロジェクト (Sample E-Commerce API)
 
+<!-- ai:generated id=sample-readme-summary kind=text created-at=2026-09-27T21:00:00Z source-sha256=3c9b4b9c15984878ade0ff12bb099c5c3c9b4b9c15984878ade0ff12bb099c5c approved-at=2026-09-27T21:00:00Z -->
 このプロジェクトは、**ModuleLoom** の依存関係解析・可視化機能をテスト・体験するために設計されたサンプルPythonプロジェクトです。
+<!-- /ai:generated -->
+
+<!-- ai:generated id=sample-readme-features kind=text created-at=2026-09-27T12:31:54Z source-sha256=88afe808e112765bbbe1beefb3f4c5bb51f012e9a422fe99325ba476a15f6276 -->
+- モジュール依存グラフの双方向可視化
+- 循環インポートの自動検出・経路ハイライト
+- コード診断と重複コードの検知
+<!-- /ai:generated -->
 
 ## ディレクトリ構成とモジュール一覧
 

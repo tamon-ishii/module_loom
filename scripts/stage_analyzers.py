@@ -43,7 +43,7 @@ def stage(artifact_root: Path, project_root: Path) -> None:
         license_source = source.parent / "jscpd-LICENSE"
         if not jscpd_source.is_file() or not license_source.is_file():
             raise FileNotFoundError(f"Missing jscpd binary or license for {platform}")
-        if license_source.read_bytes() != JSCPD_LICENSE.read_bytes():
+        if license_source.read_bytes().replace(b"\r\n", b"\n") != JSCPD_LICENSE.read_bytes().replace(b"\r\n", b"\n"):
             raise ValueError(f"Unexpected jscpd license for {platform}")
         for destination in destinations:
             shutil.copy2(jscpd_source, destination / platform / jscpd_name)

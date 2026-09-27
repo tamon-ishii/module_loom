@@ -23,10 +23,16 @@ impl Default for MkDocsConfig {
     }
 }
 
+pub fn default_targets() -> Vec<String> {
+    vec!["docs".to_string(), "README.md".to_string()]
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManualConfig {
     pub docs: String,
     pub output: String,
+    #[serde(default = "default_targets")]
+    pub targets: Vec<String>,
     pub format: String,
     pub agent: String,
     pub model: String,
@@ -38,6 +44,7 @@ impl Default for ManualConfig {
         Self {
             docs: "docs".to_string(),
             output: "manual".to_string(),
+            targets: default_targets(),
             format: "mkdocs".to_string(),
             agent: "codex".to_string(),
             model: "".to_string(),
@@ -47,14 +54,20 @@ impl Default for ManualConfig {
 }
 
 pub fn config_path(root: &Path) -> PathBuf {
-    root.join("manual").join("config.json")
+    root.join("manual_setting.json")
 }
 
 pub fn read_config(root: &Path) -> ManualConfig {
-    let path = config_path(root);
-    if !path.is_file() {
+    let setting_json = root.join("manual_setting.json");
+    let legacy_json = root.join("manual").join("config.json");
+    let path = if setting_json.is_file() {
+        setting_json
+    } else if legacy_json.is_file() {
+        legacy_json
+    } else {
         return ManualConfig::default();
-    }
+    };
+
     let content = match fs::read_to_string(&path) {
         Ok(c) => c,
         Err(_) => return ManualConfig::default(),
@@ -70,6 +83,18 @@ pub fn read_config(root: &Path) -> ManualConfig {
     }
     if let Some(o) = value.get("output").and_then(|v| v.as_str()) {
         config.output = o.to_string();
+    }
+    if let Some(arr) = value.get("targets").and_then(|v| v.as_array()) {
+        let t_list: Vec<String> = arr
+            .iter()
+            .filter_map(|item| item.as_str().map(|s| s.trim().to_string()))
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !t_list.is_empty() {
+            config.targets = t_list;
+        }
+    } else {
+        config.targets = vec![config.docs.clone(), "README.md".to_string()];
     }
     if let Some(f) = value.get("format").and_then(|v| v.as_str()) {
         config.format = f.to_string();
@@ -138,6 +163,7 @@ pub fn save_settings(
     model: &str,
     doc_format: &str,
     mkdocs_raw: &str,
+    targets: Option<&[String]>,
 ) -> Result<ManualConfig, String> {
     let docs_path = project_path(root, docs)?;
     let output_path = project_path(root, output)?;
@@ -186,9 +212,30 @@ pub fn save_settings(
     let rel_docs = docs_path.strip_prefix(&abs_root).unwrap_or(&docs_path).to_string_lossy().into_owned();
     let rel_output = output_path.strip_prefix(&abs_root).unwrap_or(&output_path).to_string_lossy().into_owned();
 
+    let final_targets: Vec<String> = if let Some(t_list) = targets {
+        let list: Vec<String> = t_list
+            .iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if list.is_empty() {
+            vec![rel_docs.clone(), "README.md".to_string()]
+        } else {
+            list
+        }
+    } else {
+        let current = read_config(root);
+        if !current.targets.is_empty() {
+            current.targets
+        } else {
+            vec![rel_docs.clone(), "README.md".to_string()]
+        }
+    };
+
     let config = ManualConfig {
         docs: rel_docs,
         output: rel_output,
+        targets: final_targets,
         format: doc_format.to_string(),
         agent: agent.to_string(),
         model: model.trim().to_string(),

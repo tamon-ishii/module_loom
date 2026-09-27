@@ -69,9 +69,9 @@ def check(release_dir: Path) -> None:
             expected = {cli_name, jscpd_name, license_name, skill_name}
             if set(archive.namelist()) != expected:
                 raise RuntimeError(f"Unexpected files in {archive_path}: {archive.namelist()}")
-            if archive.read(license_name) != JSCPD_LICENSE.read_bytes():
+            if archive.read(license_name).replace(b"\r\n", b"\n") != JSCPD_LICENSE.read_bytes().replace(b"\r\n", b"\n"):
                 raise RuntimeError(f"jscpd license mismatch in {archive_path}")
-            if archive.read(skill_name) != SKILL.read_bytes():
+            if archive.read(skill_name).replace(b"\r\n", b"\n") != SKILL.read_bytes().replace(b"\r\n", b"\n"):
                 raise RuntimeError(f"Skill mismatch in {archive_path}")
             for name in (cli_name, jscpd_name):
                 if not archive.read(name):

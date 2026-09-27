@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::config::{project_path, read_config};
-use super::task::{collect_markdown_files, parse_page_tags, utc_now, PageTag};
+use super::task::{collect_target_markdown_files, parse_page_tags, utc_now, PageTag};
 use super::uimap::extract_ui_map;
 use crate::analyze_directory;
 
@@ -72,7 +72,7 @@ pub fn read_dependency_graph(root: &Path) -> Option<ManualDependencyGraph> {
     serde_json::from_str(&content).ok()
 }
 
-pub fn build_manual_dependency_graph(root: &Path, docs_path: &Path) -> ManualDependencyGraph {
+pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDependencyGraph {
     let mut pages = HashMap::new();
     let mut symbol_to_pages: HashMap<String, Vec<String>> = HashMap::new();
     let mut ui_to_pages: HashMap<String, Vec<String>> = HashMap::new();
@@ -111,18 +111,13 @@ pub fn build_manual_dependency_graph(root: &Path, docs_path: &Path) -> ManualDep
     let asset_re = Regex::new(r#"!\[[^\]]*\]\(([^)]+)\)"#).unwrap();
     let selector_re = Regex::new(r#"#([a-zA-Z0-9_-]+)"#).unwrap();
 
-    let md_files = collect_markdown_files(docs_path);
+    let config = read_config(root);
+    let md_files = collect_target_markdown_files(root, &config);
 
-    for file_path in md_files {
+    for (rel_path, file_path) in md_files {
         let Ok(content) = fs::read_to_string(&file_path) else {
             continue;
         };
-
-        let rel_path = file_path
-            .strip_prefix(docs_path)
-            .unwrap_or(&file_path)
-            .to_string_lossy()
-            .to_string();
 
         let title = title_re
             .captures(&content)
