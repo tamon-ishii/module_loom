@@ -150,6 +150,8 @@ async fn manual_action(
     docs: Option<String>,
     output: Option<String>,
     targets: Option<String>,
+    template: Option<String>,
+    clear: Option<bool>,
     brief: Option<String>,
     agent: Option<String>,
     model: Option<String>,
@@ -170,6 +172,8 @@ async fn manual_action(
         if let Some(ref value) = docs { options.push(("--docs", value)); }
         if let Some(ref value) = output { options.push(("--output", value)); }
         if let Some(ref value) = targets { options.push(("--targets", value)); }
+        if let Some(ref value) = template { options.push(("--template", value)); }
+        if clear.unwrap_or(false) { options.push(("--clear", "")); }
         if let Some(ref value) = brief { options.push(("--brief", value)); }
         if let Some(ref value) = agent { options.push(("--agent", value)); }
         if let Some(ref value) = model { options.push(("--model", value)); }

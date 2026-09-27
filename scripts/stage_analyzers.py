@@ -37,6 +37,8 @@ def stage(artifact_root: Path, project_root: Path) -> None:
             target = destination / platform / filename
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+            if platform != "windows-x64":
+                target.chmod(0o755)
 
         jscpd_name = "jscpd.exe" if platform == "windows-x64" else "jscpd"
         jscpd_source = source.parent / jscpd_name
@@ -46,7 +48,10 @@ def stage(artifact_root: Path, project_root: Path) -> None:
         if license_source.read_bytes().replace(b"\r\n", b"\n") != JSCPD_LICENSE.read_bytes().replace(b"\r\n", b"\n"):
             raise ValueError(f"Unexpected jscpd license for {platform}")
         for destination in destinations:
-            shutil.copy2(jscpd_source, destination / platform / jscpd_name)
+            dest_jscpd = destination / platform / jscpd_name
+            shutil.copy2(jscpd_source, dest_jscpd)
+            if platform != "windows-x64":
+                dest_jscpd.chmod(0o755)
 
         archive_path = release_dir / f"ModuleLoom-CLI-{platform}.zip"
         cli_name = "moduleloom-analyze.exe" if platform == "windows-x64" else "moduleloom-analyze"

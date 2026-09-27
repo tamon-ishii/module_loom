@@ -301,10 +301,26 @@ const btnPreviewModeMd = document.getElementById("btn-preview-mode-md") as HTMLB
 const btnManualBack = document.getElementById("btn-manual-back") as HTMLButtonElement | null;
 const btnManualForward = document.getElementById("btn-manual-forward") as HTMLButtonElement | null;
 const btnManualOpenSettings = document.getElementById("btn-manual-open-settings") as HTMLButtonElement | null;
+const btnManualOpenTemplates = document.getElementById("btn-manual-open-templates") as HTMLButtonElement | null;
+const manualStarterContainer = document.getElementById("manual-starter-container") as HTMLDivElement | null;
+const manualLayout = document.getElementById("manual-layout") as HTMLDivElement | null;
+
 const manualSettingsModal = document.getElementById("manual-settings-modal") as HTMLDivElement | null;
 const btnCloseManualSettings = document.getElementById("btn-close-manual-settings") as HTMLButtonElement | null;
 const btnCancelManualSettings = document.getElementById("btn-cancel-manual-settings") as HTMLButtonElement | null;
 const manualSettingsSaveStatus = document.getElementById("manual-settings-save-status") as HTMLElement | null;
+
+const manualTemplateModal = document.getElementById("manual-template-modal") as HTMLDivElement | null;
+const btnCloseManualTemplate = document.getElementById("btn-close-manual-template") as HTMLButtonElement | null;
+const btnCancelManualTemplate = document.getElementById("btn-cancel-manual-template") as HTMLButtonElement | null;
+
+const manualTemplateConfirmModal = document.getElementById("manual-template-confirm-modal") as HTMLDivElement | null;
+const btnCloseManualConfirm = document.getElementById("btn-close-manual-confirm") as HTMLButtonElement | null;
+const btnCancelManualConfirm = document.getElementById("btn-cancel-manual-confirm") as HTMLButtonElement | null;
+const btnAcceptManualConfirm = document.getElementById("btn-accept-manual-confirm") as HTMLButtonElement | null;
+
+let currentManualPages: string[] = [];
+let pendingTemplateType: "manual" | "api" | null = null;
 
 function openManualSettingsModal(): void {
   if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "";
@@ -313,6 +329,24 @@ function openManualSettingsModal(): void {
 
 function closeManualSettingsModal(): void {
   manualSettingsModal?.classList.add("hidden");
+}
+
+function openManualTemplateModal(): void {
+  manualTemplateModal?.classList.remove("hidden");
+}
+
+function closeManualTemplateModal(): void {
+  manualTemplateModal?.classList.add("hidden");
+}
+
+function openManualTemplateConfirmModal(type: "manual" | "api"): void {
+  pendingTemplateType = type;
+  manualTemplateConfirmModal?.classList.remove("hidden");
+}
+
+function closeManualTemplateConfirmModal(): void {
+  pendingTemplateType = null;
+  manualTemplateConfirmModal?.classList.add("hidden");
 }
 
 const manualScreenshotCache: Record<string, string> = {};
@@ -1237,9 +1271,18 @@ async function refreshManual(): Promise<void> {
         option.textContent = `${agent?.label || option.value}${agent?.available ? "" : "（未検出）"}`;
       }
     }
+    currentManualPages = state.pages || [];
+    const hasPages = currentManualPages.length > 0;
+    if (!hasPages) {
+      manualStarterContainer?.classList.remove("hidden");
+      manualLayout?.classList.add("hidden");
+    } else {
+      manualStarterContainer?.classList.add("hidden");
+      manualLayout?.classList.remove("hidden");
+    }
     const currentPage = manualPage.value;
     manualPage.innerHTML = (state.pages.length ? state.pages : ["index.md"]).map((page) => `<option value="${escapeHtml(page)}">${escapeHtml(page)}</option>`).join("");
-    manualPage.value = state.pages.includes(currentPage) ? currentPage : "index.md";
+    manualPage.value = state.pages.includes(currentPage) ? currentPage : (state.pages[0] || "index.md");
     renderManualTasks(state.tasks);
     await renderManualPreview(state);
     updateManualNavButtons();
@@ -1322,6 +1365,59 @@ btnPreviewModeMd?.addEventListener("click", () => {
   btnPreviewModeMd.classList.add("active");
   btnPreviewModeHtml.classList.remove("active");
   void refreshManual();
+});
+
+async function executeInitTemplate(templateType: "manual" | "api", clear: boolean): Promise<void> {
+  if (manualBusy) return;
+  manualBusy = true;
+  manualStatus.textContent = `${templateType === "manual" ? "マニュアル" : "APIドキュメント"}テンプレートを生成中…`;
+  manualView.setAttribute("aria-busy", "true");
+  try {
+    await callManual("init-template", { template: templateType, clear });
+    manualStatus.textContent = "✓ テンプレートを生成しました";
+    closeManualTemplateModal();
+    closeManualTemplateConfirmModal();
+    await refreshManual();
+  } catch (err) {
+    manualStatus.textContent = `テンプレート生成失敗: ${String(err)}`;
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+  }
+}
+
+function handleTemplateSelection(templateType: "manual" | "api"): void {
+  if (currentManualPages.length > 0) {
+    openManualTemplateConfirmModal(templateType);
+  } else {
+    void executeInitTemplate(templateType, false);
+  }
+}
+
+btnManualOpenTemplates?.addEventListener("click", openManualTemplateModal);
+btnCloseManualTemplate?.addEventListener("click", closeManualTemplateModal);
+btnCancelManualTemplate?.addEventListener("click", closeManualTemplateModal);
+manualTemplateModal?.addEventListener("click", (e) => {
+  if (e.target === manualTemplateModal) closeManualTemplateModal();
+});
+
+btnCloseManualConfirm?.addEventListener("click", closeManualTemplateConfirmModal);
+btnCancelManualConfirm?.addEventListener("click", closeManualTemplateConfirmModal);
+manualTemplateConfirmModal?.addEventListener("click", (e) => {
+  if (e.target === manualTemplateConfirmModal) closeManualTemplateConfirmModal();
+});
+btnAcceptManualConfirm?.addEventListener("click", () => {
+  if (pendingTemplateType) {
+    const targetType = pendingTemplateType;
+    void executeInitTemplate(targetType, true);
+  }
+});
+
+document.querySelectorAll(".btn-init-template-manual").forEach((btn) => {
+  btn.addEventListener("click", () => handleTemplateSelection("manual"));
+});
+document.querySelectorAll(".btn-init-template-api").forEach((btn) => {
+  btn.addEventListener("click", () => handleTemplateSelection("api"));
 });
 
 document.getElementById("manual-refresh")?.addEventListener("click", () => { void refreshManual(); });

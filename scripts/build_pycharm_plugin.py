@@ -136,6 +136,8 @@ def stage_local_analyzer():
         source = None
     if source is None:
         if os.path.isfile(destination):
+            if system != "windows":
+                os.chmod(destination, 0o755)
             print(f"Keeping existing local analyzer: {destination}")
             return
         print(f"No local analyzer found for {platform_name}; the plugin will use PATH fallback.")
@@ -172,9 +174,9 @@ def stage_local_jscpd():
     if source is not None and not os.path.isfile(destination):
         os.makedirs(os.path.dirname(destination), exist_ok=True)
         shutil.copy2(source, destination)
+    if os.path.isfile(destination):
         if system != "windows":
             os.chmod(destination, 0o755)
-    if os.path.isfile(destination):
         version = subprocess.run([destination, "--version"], capture_output=True, text=True, encoding="utf-8")
         if version.returncode != 0 or version.stdout.strip() != "jscpd 5.3.2":
             raise RuntimeError(f"Bundled jscpd must be v5.3.2: {destination}")

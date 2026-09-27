@@ -6,6 +6,7 @@ pub mod context;
 pub mod deps;
 pub mod preview;
 pub mod task;
+pub mod template;
 pub mod uimap;
 
 use std::fs;
@@ -25,6 +26,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "preview-asset",
         "save",
         "draft",
+        "init-template",
         "generate-task",
         "generate-text-all",
         "generate-diagram-all",
@@ -68,12 +70,16 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut json_opt: Option<&str> = None;
     let mut input_opt: Option<&str> = None;
     let mut targets_opt: Option<&str> = None;
+    let mut template_opt: Option<&str> = None;
+    let mut clear_flag = false;
 
     for (key, value) in options {
         match *key {
             "--docs" => docs_opt = Some(*value),
             "--output" => output_opt = Some(*value),
             "--targets" => targets_opt = Some(*value),
+            "--template" => template_opt = Some(*value),
+            "--clear" => clear_flag = true,
             "--brief" => brief_opt = Some(*value),
             "--agent" => agent_opt = Some(*value),
             "--model" => model_opt = Some(*value),
@@ -166,6 +172,12 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "draft" => {
             author::draft(root)?;
+            let state_val = get_state(root)?;
+            serde_json::to_string(&state_val).map_err(|e| e.to_string())
+        }
+        "init-template" => {
+            let tmpl_type = template_opt.unwrap_or("manual");
+            template::init_template(root, tmpl_type, clear_flag)?;
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
         }
@@ -377,6 +389,59 @@ mod tests {
         let updated_readme = fs::read_to_string(&readme).unwrap();
         assert!(updated_readme.contains("<!-- ai:generated id=readme-intro"));
         assert!(updated_readme.contains("これは素晴らしいプロジェクトです。"));
+    }
+
+    #[test]
+    fn test_init_template_manual() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        template::init_template(root, "manual", false).unwrap();
+
+        let setting = root.join("manual_setting.json");
+        assert!(setting.is_file());
+
+        let docs = root.join("docs");
+        assert!(docs.join("index.md").is_file());
+        assert!(docs.join("quickstart.md").is_file());
+        assert!(docs.join("features.md").is_file());
+        assert!(docs.join("settings.md").is_file());
+
+        let state = get_state(root).unwrap();
+        let tasks = state["tasks"].as_array().unwrap();
+        assert!(tasks.iter().any(|t| t["kind"] == "screenshot"));
+        assert!(tasks.iter().any(|t| t["kind"] == "text"));
+    }
+
+    #[test]
+    fn test_init_template_api_and_clear() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        // 1回目: manual テンプレート
+        template::init_template(root, "manual", false).unwrap();
+        assert!(root.join("docs").join("quickstart.md").is_file());
+
+        // 2回目: clear=false では上書き拒否（確認必要）
+        let err = template::init_template(root, "api", false).unwrap_err();
+        assert_eq!(err, "EXISTING_DOCS_CONFIRM_REQUIRED");
+
+        // 3回目: clear=true で再生成
+        template::init_template(root, "api", true).unwrap();
+        let docs = root.join("docs");
+        assert!(docs.join("index.md").is_file());
+        assert!(docs.join("architecture.md").is_file());
+        assert!(docs.join("api.md").is_file());
+        // quickstart.md はクリアされていること
+        assert!(!docs.join("quickstart.md").is_file());
+
+        let state = get_state(root).unwrap();
+        let tasks = state["tasks"].as_array().unwrap();
+        assert!(tasks.iter().any(|t| t["kind"] == "diagram"));
+
+        // バックアップが存在すること
+        let backup_dir = root.join("manual").join(".backup");
+        assert!(backup_dir.is_dir());
     }
 
     #[test]
