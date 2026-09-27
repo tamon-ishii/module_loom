@@ -528,19 +528,79 @@ let manualDiagramGraphs: Core[] = [];
 function renderManualMarkdown(source: string): void {
   manualDiagramGraphs.forEach((graph) => graph.destroy());
   manualDiagramGraphs = [];
-  const lines = source.replace(/<!-- ai:(?:generated|draft)[^>]*-->/g, "").replace(/<!-- \/ai:(?:generated|draft) -->/g, "").split("\n");
+
+  const rawLines = source.split("\n");
   let fenced = false;
   let code: string[] = [];
   let codeLanguage = "";
   const diagrams: string[] = [];
   const html: string[] = [];
-  for (const line of lines) {
+
+  let currentTaskId: string | null = null;
+  let currentTaskKind: string | null = null;
+  let currentTaskPrompt: string[] = [];
+  let inTaskTag = false;
+
+  for (const line of rawLines) {
+    // 1. ai:generated or ai:draft open
+    const genOpen = /<!--\s*ai:(?:generated|draft)\s+([^>]+)-->/.exec(line);
+    if (genOpen) {
+      const idMatch = /\bid=([^\s>]+)/.exec(genOpen[1]);
+      const kindMatch = /\bkind=([^\s>]+)/.exec(genOpen[1]);
+      currentTaskId = idMatch ? idMatch[1] : null;
+      currentTaskKind = kindMatch ? kindMatch[1] : null;
+      continue;
+    }
+
+    // 2. ai:task open (pending asset)
+    const taskOpen = /<!--\s*ai:task\s+([^>]+)-->/.exec(line);
+    if (taskOpen) {
+      inTaskTag = true;
+      const idMatch = /\bid=([^\s>]+)/.exec(taskOpen[1]);
+      const kindMatch = /\bkind=([^\s>]+)/.exec(taskOpen[1]);
+      currentTaskId = idMatch ? idMatch[1] : null;
+      currentTaskKind = kindMatch ? kindMatch[1] : null;
+      currentTaskPrompt = [];
+      continue;
+    }
+
+    // 3. ai:task close
+    if (/<!--\s*\/ai:task\s*-->/.test(line)) {
+      if (inTaskTag && currentTaskId) {
+        const promptText = currentTaskPrompt.join(" ").trim();
+        const typeLabel = currentTaskKind === "screenshot" ? "📸 スクショ" : currentTaskKind === "diagram" ? "📊 ダイアグラム" : "📝 テキスト";
+        html.push(`<div class="manual-task-placeholder manual-preview-asset" id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}">📌 <strong>[未作成 ${typeLabel}: ${escapeHtml(currentTaskId)}]</strong> ${escapeHtml(promptText || "タスク指示")}</div>`);
+      }
+      inTaskTag = false;
+      currentTaskId = null;
+      currentTaskKind = null;
+      currentTaskPrompt = [];
+      continue;
+    }
+
+    // 4. ai:generated or ai:draft close
+    if (/<!--\s*\/ai:(?:generated|draft)\s*-->/.test(line)) {
+      currentTaskId = null;
+      currentTaskKind = null;
+      continue;
+    }
+
+    // If inside ai:task tag, collect prompt text
+    if (inTaskTag) {
+      if (line.trim()) currentTaskPrompt.push(line.trim());
+      continue;
+    }
+
     if (line.startsWith("```")) {
       if (fenced) {
         if (codeLanguage === "mermaid") {
           const index = diagrams.push(code.join("\n")) - 1;
-          html.push(`<div class="manual-diagram" data-diagram-index="${index}"></div>`);
-        } else html.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+          const assetAttr = currentTaskId ? ` id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}"` : "";
+          html.push(`<div class="manual-diagram manual-preview-asset"${assetAttr} data-diagram-index="${index}"></div>`);
+        } else {
+          const assetAttr = currentTaskId ? ` id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}"` : "";
+          html.push(`<pre${assetAttr}><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+        }
         code = [];
       } else codeLanguage = line.slice(3).trim();
       fenced = !fenced;
@@ -548,14 +608,38 @@ function renderManualMarkdown(source: string): void {
     }
     if (fenced) { code.push(line); continue; }
     if (!line.trim()) continue;
+
     const heading = /^(#{1,4})\s+(.+)$/.exec(line);
-    if (heading) { const level = heading[1].length; html.push(`<h${level}>${inlineManualMarkdown(heading[2])}</h${level}>`); continue; }
+    if (heading) {
+      const level = heading[1].length;
+      html.push(`<h${level}>${inlineManualMarkdown(heading[2])}</h${level}>`);
+      continue;
+    }
+
     const image = /^!\[([^\]]*)\]\(([^)]+)\)/.exec(line);
-    if (image) { html.push(`<figure><img class="manual-preview-image" data-asset="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" /><figcaption>${escapeHtml(image[1])}</figcaption></figure>`); continue; }
-    if (line.startsWith("> ")) { html.push(`<blockquote>${inlineManualMarkdown(line.slice(2))}</blockquote>`); continue; }
-    if (/^[-*] /.test(line)) { html.push(`<p>• ${inlineManualMarkdown(line.slice(2))}</p>`); continue; }
-    html.push(`<p>${inlineManualMarkdown(line)}</p>`);
+    if (image) {
+      const targetId = currentTaskId || image[1] || "";
+      const assetAttr = targetId ? ` id="manual-asset-${escapeHtml(targetId)}" data-task-id="${escapeHtml(targetId)}"` : "";
+      html.push(`<figure class="manual-preview-asset"${assetAttr}><img class="manual-preview-image" data-asset="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" /><figcaption>${escapeHtml(image[1])}</figcaption></figure>`);
+      continue;
+    }
+
+    if (line.startsWith("> ")) {
+      const assetAttr = currentTaskId ? ` id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}"` : "";
+      html.push(`<blockquote class="manual-preview-asset"${assetAttr}>${inlineManualMarkdown(line.slice(2))}</blockquote>`);
+      continue;
+    }
+
+    if (/^[-*] /.test(line)) {
+      const assetAttr = currentTaskId ? ` id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}"` : "";
+      html.push(`<p class="manual-preview-asset"${assetAttr}>• ${inlineManualMarkdown(line.slice(2))}</p>`);
+      continue;
+    }
+
+    const assetAttr = currentTaskId ? ` id="manual-asset-${escapeHtml(currentTaskId)}" data-task-id="${escapeHtml(currentTaskId)}"` : "";
+    html.push(`<p class="manual-preview-asset"${assetAttr}>${inlineManualMarkdown(line)}</p>`);
   }
+
   manualPreview.innerHTML = html.join("") || "<p>プレビューするページがありません。</p>";
   manualPreview.querySelectorAll<HTMLElement>(".manual-diagram").forEach((container) => {
     const source = diagrams[Number(container.dataset.diagramIndex)] || "";
@@ -577,6 +661,142 @@ function renderManualMarkdown(source: string): void {
       if (element.isConnected && value.startsWith("data:image/")) element.src = value;
     }).catch(() => { if (element.isConnected) element.alt = `${element.alt}（画像を読み込めません）`; });
   });
+}
+
+function highlightElement(el: HTMLElement, doc: Document): void {
+  if (!doc.getElementById("manual-asset-highlight-style")) {
+    const styleTag = doc.createElement("style");
+    styleTag.id = "manual-asset-highlight-style";
+    styleTag.textContent = `
+      @keyframes manualAssetPulse {
+        0% {
+          outline: 4px solid #89b4fa;
+          outline-offset: 4px;
+          box-shadow: 0 0 24px rgba(137, 180, 250, 0.95);
+          background-color: rgba(137, 180, 250, 0.25);
+        }
+        40% {
+          outline: 4px solid #f9e2af;
+          outline-offset: 4px;
+          box-shadow: 0 0 30px rgba(249, 226, 175, 0.95);
+          background-color: rgba(249, 226, 175, 0.3);
+        }
+        100% {
+          outline: 4px solid transparent;
+          outline-offset: 0;
+          box-shadow: none;
+          background-color: transparent;
+        }
+      }
+      .manual-asset-highlight {
+        animation: manualAssetPulse 2.5s ease-out forwards !important;
+        border-radius: 6px;
+      }
+    `;
+    (doc.head || doc.body)?.appendChild(styleTag);
+  }
+
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("manual-asset-highlight");
+  void el.offsetWidth;
+  el.classList.add("manual-asset-highlight");
+}
+
+function findAssetElementInDocument(doc: Document, taskId: string): HTMLElement | null {
+  // 1. Direct ID / data-task-id
+  let el = doc.getElementById(`manual-asset-${taskId}`) ||
+           doc.querySelector<HTMLElement>(`[data-task-id="${taskId}"]`) ||
+           doc.querySelector<HTMLElement>(`[data-asset-id="${taskId}"]`);
+  if (el) return el;
+
+  // 2. Img by alt or src
+  const pureId = taskId.replace(/^[^a-zA-Z0-9]+/, "");
+  el = doc.querySelector<HTMLElement>(`img[alt="${taskId}"]`) ||
+       doc.querySelector<HTMLElement>(`img[src*="${taskId}"]`) ||
+       doc.querySelector<HTMLElement>(`img[data-asset*="${taskId}"]`);
+  if (el) {
+    const parentFigure = el.closest<HTMLElement>("figure, p");
+    return parentFigure || el;
+  }
+
+  // 3. TreeWalker comments for <!-- ai:generated id=... --> or <!-- ai:task id=... -->
+  try {
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_COMMENT, null);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const val = node.nodeValue || "";
+      if (
+        (val.includes("ai:generated") || val.includes("ai:task") || val.includes("ai:draft")) &&
+        (val.includes(`id=${taskId}`) || val.includes(`id="${taskId}"`) || val.includes(`id='${taskId}'`))
+      ) {
+        let next = node.nextSibling;
+        while (next && next.nodeType !== Node.ELEMENT_NODE) {
+          next = next.nextSibling;
+        }
+        if (next && next instanceof HTMLElement) return next;
+        if (node.parentElement) return node.parentElement;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // 4. Fallback search by pureId in images
+  el = doc.querySelector<HTMLElement>(`img[src*="${pureId}"]`) ||
+       doc.querySelector<HTMLElement>(`img[data-asset*="${pureId}"]`);
+  if (el) {
+    const parentFigure = el.closest<HTMLElement>("figure, p");
+    return parentFigure || el;
+  }
+
+  return null;
+}
+
+async function jumpToAssetInPreview(taskPage: string, taskId: string): Promise<void> {
+  // タスクカードの選択状態を更新
+  document.querySelectorAll(".manual-task.is-selected").forEach((c) => c.classList.remove("is-selected"));
+  const card = document.getElementById(`manual-task-card-${taskId}`);
+  card?.classList.add("is-selected");
+
+  const currentPage = manualPage.value || "index.md";
+  const pageChanged = Boolean(taskPage && taskPage !== currentPage);
+
+  if (pageChanged) {
+    manualPage.value = taskPage;
+    pushManualPageHistory(taskPage);
+    updateManualNavButtons();
+    await refreshManual();
+  }
+
+  const attemptJump = (retriesLeft = 6) => {
+    let found = false;
+    if (manualPreviewMode === "html" && !manualPreviewIframe.hidden) {
+      try {
+        const doc = manualPreviewIframe.contentDocument || manualPreviewIframe.contentWindow?.document;
+        if (doc && doc.body) {
+          const el = findAssetElementInDocument(doc, taskId);
+          if (el) {
+            highlightElement(el, doc);
+            found = true;
+          }
+        }
+      } catch {
+        // cross-origin if any
+      }
+    } else {
+      const el = findAssetElementInDocument(document, taskId);
+      if (el) {
+        highlightElement(el, document);
+        found = true;
+      }
+    }
+
+    if (!found && retriesLeft > 0) {
+      setTimeout(() => attemptJump(retriesLeft - 1), 200);
+    }
+  };
+
+  setTimeout(() => attemptJump(pageChanged ? 8 : 2), pageChanged ? 300 : 50);
 }
 
 async function captureBackgroundScreenshot(taskId: string, annotationHint?: string): Promise<string> {
@@ -885,14 +1105,17 @@ function renderManualTasks(tasks: ManualTask[]): void {
       `;
     }
 
-    return `<div class="manual-task" id="manual-task-card-${escapeHtml(task.id)}">
+    return `<div class="manual-task" id="manual-task-card-${escapeHtml(task.id)}" data-manual-task-id="${escapeHtml(task.id)}" data-manual-task-page="${escapeHtml(task.page)}" title="クリックでプレビューの使用箇所にジャンプ">
       <div class="manual-task-header">
         <div class="manual-task-meta">
           <span class="manual-task-badge ${typeBadgeClass}">${typeLabel}</span>
           <strong>${escapeHtml(task.id)}</strong>
           <small>${escapeHtml(task.page)}</small>
         </div>
-        ${statusBadge}
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${statusBadge}
+          <span class="manual-task-jump-hint" title="クリックでプレビューの使用箇所にジャンプ">🔍 ジャンプ</span>
+        </div>
       </div>
       <p>${escapeHtml(task.prompt)}</p>
       ${thumbHtml}
@@ -1218,6 +1441,19 @@ manualTasks.addEventListener("click", (event) => {
     overlay.addEventListener("click", () => overlay.remove());
     document.body.appendChild(overlay);
     return;
+  }
+
+  // タスクカード本体をクリックした時にプレビューの使用箇所へジャンプ
+  // （ボタンや入力フォーム、テキストエリアなどの操作コントロールをクリックした場合は除外）
+  if (!target.closest("button") && !target.closest("input") && !target.closest("textarea")) {
+    const card = target.closest<HTMLElement>(".manual-task");
+    if (card) {
+      const taskId = card.dataset.manualTaskId;
+      const taskPage = card.dataset.manualTaskPage;
+      if (taskId && taskPage) {
+        void jumpToAssetInPreview(taskPage, taskId);
+      }
+    }
   }
 
   const button = target.closest<HTMLButtonElement>("button");
