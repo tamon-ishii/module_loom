@@ -238,7 +238,7 @@ pub fn save_settings(
 
     let config = ManualConfig {
         docs: rel_docs,
-        output: rel_output,
+        output: rel_output.clone(),
         targets: final_targets,
         format: doc_format.to_string(),
         agent: agent.to_string(),

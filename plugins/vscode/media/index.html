@@ -179,8 +179,23 @@
             <div style="font-size: 2.2rem; margin-bottom: 8px;">🚀</div>
             <h3 style="font-size: 1.35rem; margin-bottom: 8px;">ドキュメントのテンプレートを作成しましょう</h3>
             <p style="color: var(--secondary-text); font-size: 0.9rem; max-width: 620px; margin: 0 auto; line-height: 1.5;">
-              初見の方でもすぐにドキュメントを同期・公開できるよう、目的に合わせた Markdown 原稿テンプレート（<code>docs/</code>）を自動作成します。以下の2種類から選択してください。
+              初見の方でもすぐにドキュメントを同期・公開できるよう、目的に合わせた Markdown 原稿テンプレートを自動作成します。以下のディレクトリ設定を確認し、2種類から選択してください。
             </p>
+          </div>
+
+          <div style="max-width: 580px; margin: 0 auto 24px auto; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; text-align: left;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.88rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
+            <div class="form-row" style="display: flex; gap: 12px;">
+              <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
+                <input id="starter-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
+              <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
+                <input id="starter-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--secondary-text); margin-top: 6px;">
+              ※ テンプレート生成時に、上記設定で <code>manual_setting.json</code> が作成されます。
+            </div>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; text-align: left;">
@@ -577,8 +592,21 @@ def example_function():
         </div>
         <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
           <p style="font-size: 0.88rem; color: var(--secondary-text); margin: 0; line-height: 1.5;">
-            プロジェクトに合わせた原稿雛形（<code>docs/</code>）を生成します。用途に合わせてテンプレートを選択してください。
+            プロジェクトに合わせた原稿雛形を生成します。原稿先フォルダ・出力先フォルダを確認し、テンプレートを選択してください。
           </p>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px;">
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; color: var(--accent-color);">📁 ディレクトリ設定（原稿と出力先）</div>
+            <div class="form-row" style="display: flex; gap: 12px;">
+              <label style="flex: 1; font-size: 0.82rem;">📝 原稿フォルダ (Markdown作成先)
+                <input id="modal-docs-dir" type="text" value="docs" placeholder="docs" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
+              <label style="flex: 1; font-size: 0.82rem;">🌐 出力先フォルダ (HTMLサイト出力先)
+                <input id="modal-output-dir" type="text" value="manual" placeholder="manual" style="width: 100%; box-sizing: border-box; margin-top: 4px;" />
+              </label>
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
             <!-- マニュアル -->
             <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
@@ -636,13 +664,13 @@ def example_function():
         </div>
         <div class="modal-body" style="padding: 16px; line-height: 1.5; font-size: 0.88rem;">
           <p style="margin-bottom: 10px;">
-            既存の <code>docs/</code> 配下にドキュメントが存在します。
+            既存の <code id="confirm-docs-folder-label">docs/</code> 配下にドキュメントが存在します。
           </p>
           <p style="color: var(--secondary-text); margin-bottom: 12px;">
             今までのドキュメント配下をクリアして、新しいテンプレートを生成し直しますか？
           </p>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px 12px; font-size: 0.8rem; color: var(--accent-color);">
-            💡 現在の原稿 Markdown ファイルは、安全のため自動的に <code>manual/.backup/</code> フォルダに退避されます。
+            💡 現在の原稿 Markdown ファイルは、安全のため自動的に <code id="confirm-backup-folder-label">manual/.backup/</code> フォルダに退避されます。
           </div>
         </div>
         <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border-color);">

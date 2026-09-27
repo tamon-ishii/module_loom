@@ -5,18 +5,35 @@ use super::config::{config_path, read_config, ManualConfig, MkDocsConfig, DEFAUL
 use super::task::{collect_markdown_files, utc_now};
 use crate::analyze_directory;
 
-pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<(), String> {
+pub fn init_template(
+    root: &Path,
+    template_type: &str,
+    clear: bool,
+    docs_opt: Option<&str>,
+    output_opt: Option<&str>,
+) -> Result<(), String> {
     let existing_cfg = read_config(root);
     let project_name = root
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("プロジェクト");
 
-    let docs_dir_name = if existing_cfg.docs.trim().is_empty() {
-        "docs".to_string()
-    } else {
+    let docs_dir_name = if let Some(d) = docs_opt.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        d.to_string()
+    } else if !existing_cfg.docs.trim().is_empty() {
         existing_cfg.docs.clone()
+    } else {
+        "docs".to_string()
     };
+
+    let output_dir_name = if let Some(o) = output_opt.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        o.to_string()
+    } else if !existing_cfg.output.trim().is_empty() {
+        existing_cfg.output.clone()
+    } else {
+        "manual".to_string()
+    };
+
     let templates = root.join(&docs_dir_name);
 
     if templates.is_dir() {
@@ -27,7 +44,7 @@ pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<()
             }
             // 安全のため既存ファイルをバックアップ
             let backup_dir = root
-                .join("manual")
+                .join(&output_dir_name)
                 .join(".backup")
                 .join(utc_now().replace(':', "-"));
             let _ = fs::create_dir_all(&backup_dir);
@@ -56,13 +73,9 @@ pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<()
         "codex".to_string()
     };
     let new_config = ManualConfig {
-        docs: docs_dir_name,
-        output: if existing_cfg.output.trim().is_empty() {
-            "manual".to_string()
-        } else {
-            existing_cfg.output
-        },
-        targets: vec!["docs".to_string(), "README.md".to_string()],
+        docs: docs_dir_name.clone(),
+        output: output_dir_name.clone(),
+        targets: vec![docs_dir_name.clone(), "README.md".to_string()],
         format: "mkdocs".to_string(),
         agent,
         model: existing_cfg.model,
@@ -81,9 +94,11 @@ pub fn init_template(root: &Path, template_type: &str, clear: bool) -> Result<()
     let brief_path = root.join("manual").join("brief.md");
     if !brief_path.is_file() {
         if let Some(parent) = brief_path.parent() {
-            let _ = fs::create_dir_all(parent);
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent dir for brief.md: {e}"))?;
         }
-        let _ = fs::write(&brief_path, format!("{DEFAULT_BRIEF}\n"));
+        fs::write(&brief_path, format!("{DEFAULT_BRIEF}\n"))
+            .map_err(|e| format!("Failed to write brief.md: {e}"))?;
     }
 
     match template_type {

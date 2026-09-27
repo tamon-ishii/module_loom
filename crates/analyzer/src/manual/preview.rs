@@ -324,7 +324,8 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
     let templates = project_path(root, &config.docs)?;
     let generated = root.join("manual").join("ai");
     let output = project_path(root, &config.output)?;
-    let brief_path = root.join("manual").join("brief.md");
+    let brief_path = root.join(&config.output).join("brief.md");
+    let legacy_brief = root.join("manual").join("brief.md");
 
     let target_files = collect_target_markdown_files(root, &config);
     let mut pages: Vec<String> = target_files.into_iter().map(|(rel, _)| rel).collect();
@@ -356,6 +357,8 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
 
     let brief = if brief_path.is_file() {
         fs::read_to_string(&brief_path).unwrap_or_else(|_| DEFAULT_BRIEF.to_string())
+    } else if legacy_brief.is_file() {
+        fs::read_to_string(&legacy_brief).unwrap_or_else(|_| DEFAULT_BRIEF.to_string())
     } else {
         DEFAULT_BRIEF.to_string()
     };

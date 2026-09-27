@@ -320,8 +320,29 @@ const btnCloseManualConfirm = document.getElementById("btn-close-manual-confirm"
 const btnCancelManualConfirm = document.getElementById("btn-cancel-manual-confirm") as HTMLButtonElement | null;
 const btnAcceptManualConfirm = document.getElementById("btn-accept-manual-confirm") as HTMLButtonElement | null;
 
+const starterDocsDir = document.getElementById("starter-docs-dir") as HTMLInputElement | null;
+const starterOutputDir = document.getElementById("starter-output-dir") as HTMLInputElement | null;
+const modalDocsDir = document.getElementById("modal-docs-dir") as HTMLInputElement | null;
+const modalOutputDir = document.getElementById("modal-output-dir") as HTMLInputElement | null;
+const confirmDocsFolderLabel = document.getElementById("confirm-docs-folder-label") as HTMLElement | null;
+const confirmBackupFolderLabel = document.getElementById("confirm-backup-folder-label") as HTMLElement | null;
+
 let currentManualPages: string[] = [];
 let pendingTemplateType: "manual" | "api" | null = null;
+
+function getSelectedTemplateDocsDir(): string {
+  if (manualTemplateModal && !manualTemplateModal.classList.contains("hidden")) {
+    return modalDocsDir?.value.trim() || manualDocs?.value.trim() || "docs";
+  }
+  return starterDocsDir?.value.trim() || manualDocs?.value.trim() || "docs";
+}
+
+function getSelectedTemplateOutputDir(): string {
+  if (manualTemplateModal && !manualTemplateModal.classList.contains("hidden")) {
+    return modalOutputDir?.value.trim() || manualOutput?.value.trim() || "manual";
+  }
+  return starterOutputDir?.value.trim() || manualOutput?.value.trim() || "manual";
+}
 
 function openManualSettingsModal(): void {
   if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "";
@@ -333,6 +354,10 @@ function closeManualSettingsModal(): void {
 }
 
 function openManualTemplateModal(): void {
+  const currentDocs = manualDocs?.value.trim() || starterDocsDir?.value.trim() || "docs";
+  const currentOut = manualOutput?.value.trim() || starterOutputDir?.value.trim() || "manual";
+  if (modalDocsDir) modalDocsDir.value = currentDocs;
+  if (modalOutputDir) modalOutputDir.value = currentOut;
   manualTemplateModal?.classList.remove("hidden");
 }
 
@@ -342,6 +367,10 @@ function closeManualTemplateModal(): void {
 
 function openManualTemplateConfirmModal(type: "manual" | "api"): void {
   pendingTemplateType = type;
+  const targetDocs = getSelectedTemplateDocsDir();
+  const targetOutput = getSelectedTemplateOutputDir();
+  if (confirmDocsFolderLabel) confirmDocsFolderLabel.textContent = `${targetDocs}/`;
+  if (confirmBackupFolderLabel) confirmBackupFolderLabel.textContent = `${targetOutput}/.backup/`;
   manualTemplateConfirmModal?.classList.remove("hidden");
 }
 
@@ -1244,6 +1273,10 @@ async function refreshManual(): Promise<void> {
     if (manualProject !== project) {
       manualDocs.value = state.config.docs || "docs";
       manualOutput.value = state.config.output || "manual";
+      if (starterDocsDir) starterDocsDir.value = state.config.docs || "docs";
+      if (starterOutputDir) starterOutputDir.value = state.config.output || "manual";
+      if (modalDocsDir) modalDocsDir.value = state.config.docs || "docs";
+      if (modalOutputDir) modalOutputDir.value = state.config.output || "manual";
       if (manualTargets) {
         const tList = (state.config.targets && state.config.targets.length > 0)
           ? state.config.targets
@@ -1374,11 +1407,13 @@ btnPreviewModeMd?.addEventListener("click", () => {
 async function executeInitTemplate(templateType: "manual" | "api", clear: boolean): Promise<void> {
   if (manualBusy) return;
   manualBusy = true;
-  manualStatus.textContent = `${templateType === "manual" ? "マニュアル" : "APIドキュメント"}テンプレートを生成中…`;
+  const docs = getSelectedTemplateDocsDir();
+  const output = getSelectedTemplateOutputDir();
+  manualStatus.textContent = `${templateType === "manual" ? "マニュアル" : "APIドキュメント"}テンプレートを生成中…（${docs} / ${output}）`;
   manualView.setAttribute("aria-busy", "true");
   try {
-    await callManual("init-template", { template: templateType, clear });
-    manualStatus.textContent = "✓ テンプレートを生成しました";
+    await callManual("init-template", { template: templateType, clear, docs, output });
+    manualStatus.textContent = `✓ テンプレートを生成しました（${docs}）`;
     closeManualTemplateModal();
     closeManualTemplateConfirmModal();
     await refreshManual();

@@ -177,7 +177,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "init-template" => {
             let tmpl_type = template_opt.unwrap_or("manual");
-            template::init_template(root, tmpl_type, clear_flag)?;
+            template::init_template(root, tmpl_type, clear_flag, docs_opt, output_opt)?;
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
         }
@@ -396,7 +396,7 @@ mod tests {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
 
-        template::init_template(root, "manual", false).unwrap();
+        template::init_template(root, "manual", false, None, None).unwrap();
 
         let setting = root.join("manual_setting.json");
         assert!(setting.is_file());
@@ -419,15 +419,15 @@ mod tests {
         let root = tmp.path();
 
         // 1回目: manual テンプレート
-        template::init_template(root, "manual", false).unwrap();
+        template::init_template(root, "manual", false, None, None).unwrap();
         assert!(root.join("docs").join("quickstart.md").is_file());
 
         // 2回目: clear=false では上書き拒否（確認必要）
-        let err = template::init_template(root, "api", false).unwrap_err();
+        let err = template::init_template(root, "api", false, None, None).unwrap_err();
         assert_eq!(err, "EXISTING_DOCS_CONFIRM_REQUIRED");
 
         // 3回目: clear=true で再生成
-        template::init_template(root, "api", true).unwrap();
+        template::init_template(root, "api", true, None, None).unwrap();
         let docs = root.join("docs");
         assert!(docs.join("index.md").is_file());
         assert!(docs.join("architecture.md").is_file());
@@ -442,6 +442,28 @@ mod tests {
         // バックアップが存在すること
         let backup_dir = root.join("manual").join(".backup");
         assert!(backup_dir.is_dir());
+    }
+
+    #[test]
+    fn test_init_template_custom_dirs() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        // docs="my_docs", output="dist_site"
+        template::init_template(root, "manual", false, Some("my_docs"), Some("dist_site")).unwrap();
+
+        let setting = root.join("manual_setting.json");
+        assert!(setting.is_file());
+        let cfg = config::read_config(root);
+        assert_eq!(cfg.docs, "my_docs");
+        assert_eq!(cfg.output, "dist_site");
+        assert!(cfg.targets.contains(&"my_docs".to_string()));
+
+        let custom_docs = root.join("my_docs");
+        assert!(custom_docs.join("index.md").is_file());
+        assert!(custom_docs.join("quickstart.md").is_file());
+
+        assert!(root.join("manual").join("brief.md").is_file());
     }
 
     #[test]
