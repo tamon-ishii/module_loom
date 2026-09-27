@@ -588,15 +588,19 @@
 <p>「コード診断」画面の「コード診断スキルをインストール」ボタンについて、実装に基づき説明します。</p>
 <hr />
 <h3 id="1">1. ボタンの概要と動作</h3>
+<p><img alt="コード診断スキルをインストールボタンの配置とアノテーション実例" src="assets/diagnostics-skill-install-screenshot.png" /></p>
+<p>「コード診断」画面の右上ヘッダーには、品質診断とコーディングエージェント連携を担う 2 つのアクションボタンが配置されています。</p>
 <ul>
-<li><strong>UI 要素</strong>:</li>
-<li><strong>配置場所</strong>: 「コード診断」タブ（ヘッダー:「コード診断」）</li>
-<li><strong>ボタン表示名</strong>: 「コード診断スキルをインストール」（<code>title</code>: <code>検出したコーディングエージェントにコード診断スキルをインストール</code>）</li>
-<li><strong>隣接ボタン</strong>: 「診断実行」（<code>title</code>: <code>現在のコードを診断して結果を更新</code>）</li>
-<li><strong>実行時の挙動</strong>:</li>
-<li>ボタンをクリックすると一時的にボタンが無効化（<code>disabled</code>）され、ステータス欄に「コード診断スキルをインストール中...」が表示されます。</li>
-<li>バックエンド処理（Tauri コマンド <code>install_agent_skill</code> または CLI <code>analyze --install-skill</code>）を呼び出し、ローカル環境で検出されたコーディングエージェントの設定ディレクトリ配下へ専用のスキルファイルを自動配置します。</li>
-<li>完了後、エージェントごとの処理結果（インストール完了、既にインストール済み、保護などのメッセージ）が表示されます。※Web ブラウザ版では「スキルのインストールにはアプリ版が必要です」のエラーとなります。</li>
+<li><strong>「コード診断スキルをインストール」ボタン（赤枠）</strong>:</li>
+<li><strong>役割</strong>: お使いの PC 環境に導入されているコーディングエージェント（Codex、Claude Code、Cursor）を自動検出し、ModuleLoom のコード診断 CLI（<code>analyze --diagnostics</code>）を活用した自動修復スキル（<code>moduleloom-diagnostics</code>）を自動配置します。</li>
+<li><strong>クリック時の動作</strong>:<ol>
+<li>ボタンをクリックすると一時的に無効化（<code>disabled</code>）され、ステータス欄に「コード診断スキルをインストール中...」が表示されます。</li>
+<li>バックエンド処理（アプリ版 Tauri コマンド <code>install_agent_skill</code> または CLI <code>analyze --install-skill</code>）が呼び出され、検出された各エージェントの設定ディレクトリ配下へ専用のスキル定義（<code>SKILL.md</code>）が自動配置されます。</li>
+<li>完了後、エージェントごとの処理結果（「Codex: インストール完了」「Claude Code: 既にインストール済み」「保護」などのメッセージ）が表示されます。※Web ブラウザ版では「スキルのインストールにはアプリ版が必要です」のエラーとなります。</li>
+</ol>
+</li>
+<li><strong>「診断実行」ボタン（青色ボタン）</strong>:</li>
+<li>左隣の青色ボタンです。現在のソースコードを即座に再スキャンし、循環インポートや重複コード、型チェックなどの最新メトリクスを更新します。</li>
 </ul>
 <hr />
 <h3 id="2">2. 対象コーディングエージェントの検出仕様</h3>

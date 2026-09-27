@@ -1,30 +1,30 @@
 {
   "version": "1.0",
-  "updated_at": "2026-09-27T00:17:38Z",
+  "updated_at": "2026-09-27T12:14:50Z",
   "pages": {
     "dependency-graph.md": {
       "path": "dependency-graph.md",
       "title": "モジュール依存図を読む",
       "symbols": [
-        "app.user.session",
+        "app.user.service",
+        "main",
         "app.common.logger",
         "app.order",
-        "app.config",
-        "app.order.export",
-        "app.common.database",
-        "main",
-        "app",
-        "app.user.router",
-        "app.user.auth",
-        "app.common",
-        "app.order.payment",
         "app.order.processor",
-        "app.user",
-        "app.order.controller",
+        "app.common",
         "app.common.utils",
-        "app.user.service",
-        "app.user.activity",
-        "app.api"
+        "app.user.session",
+        "app.config",
+        "app.api",
+        "app.order.payment",
+        "app.order.controller",
+        "app.order.export",
+        "app.user.auth",
+        "app.user",
+        "app.user.router",
+        "app.common.database",
+        "app",
+        "app.user.activity"
       ],
       "ui_elements": [],
       "configs": [
@@ -44,29 +44,17 @@
         "app"
       ],
       "ui_elements": [
-        "#btn-install-skill",
-        "#btn-quality"
+        "#btn-quality",
+        "#btn-install-skill"
       ],
       "configs": [],
       "assets": [
-        "assets/diagnostics-screenshot.png"
+        "assets/diagnostics-screenshot.png",
+        "assets/diagnostics-skill-install-screenshot.png"
       ],
       "tasks": [
         "diagnostics-screenshot",
         "diagnostics-skill-install"
-      ]
-    },
-    "index.md": {
-      "path": "index.md",
-      "title": "ModuleLoom for PyCharm 利用ガイド",
-      "symbols": [],
-      "ui_elements": [],
-      "configs": [],
-      "assets": [
-        "assets/overview-screenshot.png"
-      ],
-      "tasks": [
-        "overview-screenshot"
       ]
     },
     "open-tool-window.md": {
@@ -85,34 +73,47 @@
         "tool-window-settings-screenshot"
       ]
     },
+    "index.md": {
+      "path": "index.md",
+      "title": "ModuleLoom for PyCharm 利用ガイド",
+      "symbols": [],
+      "ui_elements": [],
+      "configs": [],
+      "assets": [
+        "assets/overview-screenshot.png"
+      ],
+      "tasks": [
+        "overview-screenshot"
+      ]
+    },
     "documentation-preview.md": {
       "path": "documentation-preview.md",
       "title": "ドキュメント生成とプレビュー",
       "symbols": [
-        "app",
-        "main"
+        "main",
+        "app"
       ],
       "ui_elements": [
-        "#btn-preview-mode-html",
+        "#btn-preview-mode-md",
         "#btn-manual-capture-all",
         "#btn-quality",
-        "#btn-preview-mode-md",
-        "#manual-build",
-        "#manual-build-draft",
         "#btn-manual-diagram-all",
+        "#btn-preview-mode-html",
+        "#manual-build",
         "#btn-manual-text-all",
+        "#manual-build-draft",
         "#btn-manual-open-settings"
       ],
       "configs": [
         "mkdocs.language"
       ],
       "assets": [
-        "assets/annotation-rect-example.png",
-        "assets/overview-screenshot.png",
-        "assets/manual-tab-screenshot.png",
         "assets/<ファイル名>.png",
+        "assets/manual-tab-screenshot.png",
+        "assets/annotation-rect-example.png",
+        "assets/annotation-components-preview.png",
         "assets/annotation-circle-example.png",
-        "assets/annotation-components-preview.png"
+        "assets/overview-screenshot.png"
       ],
       "tasks": [
         "manual-tab-screenshot"
@@ -123,40 +124,34 @@
     "app.user.session": [
       "dependency-graph.md"
     ],
+    "app.common.database": [
+      "dependency-graph.md"
+    ],
+    "app.order.controller": [
+      "dependency-graph.md"
+    ],
+    "app.order.export": [
+      "dependency-graph.md"
+    ],
+    "app.user": [
+      "dependency-graph.md"
+    ],
+    "app.user.activity": [
+      "dependency-graph.md"
+    ],
+    "app.order.processor": [
+      "dependency-graph.md"
+    ],
     "app": [
       "dependency-graph.md",
       "diagnostics.md",
       "documentation-preview.md",
       "open-tool-window.md"
     ],
-    "app.user.router": [
-      "dependency-graph.md"
-    ],
-    "app.user": [
-      "dependency-graph.md"
-    ],
-    "app.order.controller": [
-      "dependency-graph.md"
-    ],
-    "app.common.logger": [
+    "app.user.auth": [
       "dependency-graph.md"
     ],
     "app.config": [
-      "dependency-graph.md"
-    ],
-    "app.order.processor": [
-      "dependency-graph.md"
-    ],
-    "app.api": [
-      "dependency-graph.md"
-    ],
-    "app.order.export": [
-      "dependency-graph.md"
-    ],
-    "app.common.database": [
-      "dependency-graph.md"
-    ],
-    "app.user.auth": [
       "dependency-graph.md"
     ],
     "app.common.utils": [
@@ -166,36 +161,49 @@
       "dependency-graph.md",
       "documentation-preview.md"
     ],
-    "app.order.payment": [
+    "app.common": [
+      "dependency-graph.md"
+    ],
+    "app.user.router": [
       "dependency-graph.md"
     ],
     "app.order": [
       "dependency-graph.md"
     ],
-    "app.common": [
-      "dependency-graph.md"
-    ],
     "app.user.service": [
       "dependency-graph.md"
     ],
-    "app.user.activity": [
+    "app.common.logger": [
+      "dependency-graph.md"
+    ],
+    "app.order.payment": [
+      "dependency-graph.md"
+    ],
+    "app.api": [
       "dependency-graph.md"
     ]
   },
   "ui_to_pages": {
-    "#btn-manual-text-all": [
+    "#btn-manual-open-settings": [
       "documentation-preview.md"
     ],
-    "#btn-manual-open-settings": [
+    "#btn-quality": [
+      "diagnostics.md",
+      "documentation-preview.md"
+    ],
+    "#btn-manual-diagram-all": [
+      "documentation-preview.md"
+    ],
+    "#manual-build": [
       "documentation-preview.md"
     ],
     "#btn-install-skill": [
       "diagnostics.md"
     ],
-    "#btn-manual-diagram-all": [
+    "#btn-manual-capture-all": [
       "documentation-preview.md"
     ],
-    "#btn-preview-mode-md": [
+    "#btn-manual-text-all": [
       "documentation-preview.md"
     ],
     "#manual-build-draft": [
@@ -204,18 +212,25 @@
     "#btn-preview-mode-html": [
       "documentation-preview.md"
     ],
-    "#manual-build": [
-      "documentation-preview.md"
-    ],
-    "#btn-manual-capture-all": [
-      "documentation-preview.md"
-    ],
-    "#btn-quality": [
-      "diagnostics.md",
+    "#btn-preview-mode-md": [
       "documentation-preview.md"
     ]
   },
   "task_dependencies": {
+    "graph-view-screenshot": {
+      "id": "graph-view-screenshot",
+      "page": "dependency-graph.md",
+      "kind": "screenshot",
+      "symbols": [],
+      "ui_elements": []
+    },
+    "manual-tab-screenshot": {
+      "id": "manual-tab-screenshot",
+      "page": "documentation-preview.md",
+      "kind": "screenshot",
+      "symbols": [],
+      "ui_elements": []
+    },
     "diagnostics-screenshot": {
       "id": "diagnostics-screenshot",
       "page": "diagnostics.md",
@@ -230,13 +245,6 @@
       "symbols": [],
       "ui_elements": []
     },
-    "manual-tab-screenshot": {
-      "id": "manual-tab-screenshot",
-      "page": "documentation-preview.md",
-      "kind": "screenshot",
-      "symbols": [],
-      "ui_elements": []
-    },
     "pycharm-open-tool-window": {
       "id": "pycharm-open-tool-window",
       "page": "open-tool-window.md",
@@ -244,9 +252,9 @@
       "symbols": [],
       "ui_elements": []
     },
-    "graph-view-screenshot": {
-      "id": "graph-view-screenshot",
-      "page": "dependency-graph.md",
+    "tool-window-settings-screenshot": {
+      "id": "tool-window-settings-screenshot",
+      "page": "open-tool-window.md",
       "kind": "screenshot",
       "symbols": [],
       "ui_elements": []
@@ -254,13 +262,6 @@
     "overview-screenshot": {
       "id": "overview-screenshot",
       "page": "index.md",
-      "kind": "screenshot",
-      "symbols": [],
-      "ui_elements": []
-    },
-    "tool-window-settings-screenshot": {
-      "id": "tool-window-settings-screenshot",
-      "page": "open-tool-window.md",
       "kind": "screenshot",
       "symbols": [],
       "ui_elements": []

@@ -28,7 +28,7 @@ def current_platform() -> str | None:
 
 def smoke(analyzer: Path, jscpd: Path) -> None:
     version = subprocess.run([str(jscpd), "--version"],
-                             capture_output=True, text=True, check=True).stdout.strip()
+                             capture_output=True, text=True, encoding="utf-8", check=True).stdout.strip()
     if not version.startswith("jscpd 5."):
         raise RuntimeError(f"Unexpected bundled jscpd version: {version}")
     with tempfile.TemporaryDirectory() as directory:
@@ -40,7 +40,7 @@ def smoke(analyzer: Path, jscpd: Path) -> None:
         environment["PATH"] = ""
         environment.pop("MODULELOOM_JSCPD_PATH", None)
         output = subprocess.run([str(analyzer.resolve()), "--diagnostics", str(project)],
-                                capture_output=True, text=True, check=True, env=environment)
+                                capture_output=True, text=True, encoding="utf-8", check=True, env=environment)
         report = json.loads(output.stdout)
         if report["schema_version"] != 1 or report["complexity"]["duplication_source"] != "jscpd":
             raise RuntimeError(f"Bundled diagnostics did not use jscpd: {analyzer}")
@@ -51,7 +51,7 @@ def smoke(analyzer: Path, jscpd: Path) -> None:
         environment["USERPROFILE"] = str(project)
         environment["CODEX_HOME"] = str(codex_home)
         subprocess.run([str(analyzer.resolve()), "--install-skill"],
-                       capture_output=True, text=True, check=True, env=environment)
+                       capture_output=True, text=True, encoding="utf-8", check=True, env=environment)
         installed = codex_home / "skills/moduleloom-diagnostics/SKILL.md"
         if installed.read_bytes() != SKILL.read_bytes():
             raise RuntimeError(f"Bundled skill installation failed: {analyzer}")

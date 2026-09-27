@@ -166,7 +166,7 @@ def stage_local_jscpd():
     ]
     source = next((path for path in candidates if path and os.path.isfile(path)), None)
     if source is not None:
-        version = subprocess.run([source, "--version"], capture_output=True, text=True)
+        version = subprocess.run([source, "--version"], capture_output=True, text=True, encoding="utf-8")
         if version.returncode != 0 or version.stdout.strip() != "jscpd 5.3.2":
             source = None
     if source is not None and not os.path.isfile(destination):
@@ -175,7 +175,7 @@ def stage_local_jscpd():
         if system != "windows":
             os.chmod(destination, 0o755)
     if os.path.isfile(destination):
-        version = subprocess.run([destination, "--version"], capture_output=True, text=True)
+        version = subprocess.run([destination, "--version"], capture_output=True, text=True, encoding="utf-8")
         if version.returncode != 0 or version.stdout.strip() != "jscpd 5.3.2":
             raise RuntimeError(f"Bundled jscpd must be v5.3.2: {destination}")
         license_source = os.path.join(PROJECT_ROOT, "third_party", "jscpd", "LICENSE")
