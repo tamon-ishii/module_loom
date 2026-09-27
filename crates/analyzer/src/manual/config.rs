@@ -57,6 +57,10 @@ pub fn config_path(root: &Path) -> PathBuf {
     root.join("manual_setting.json")
 }
 
+pub fn has_config(root: &Path) -> bool {
+    config_path(root).is_file() || root.join("manual").join("config.json").is_file()
+}
+
 pub fn read_config(root: &Path) -> ManualConfig {
     let setting_json = root.join("manual_setting.json");
     let legacy_json = root.join("manual").join("config.json");

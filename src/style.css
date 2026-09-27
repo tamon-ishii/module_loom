@@ -18,7 +18,8 @@
   padding: 0;
 }
 
-[hidden] {
+[hidden],
+.hidden {
   display: none !important;
 }
 

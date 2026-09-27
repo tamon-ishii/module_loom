@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 
 use super::agent::get_agents;
 use super::builder::build;
-use super::config::{project_path, read_config, DEFAULT_BRIEF};
+use super::config::{has_config, project_path, read_config, DEFAULT_BRIEF};
 use super::task::{
     collect_target_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks, utc_now, PageTag,
 };
@@ -360,10 +360,12 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
         DEFAULT_BRIEF.to_string()
     };
 
+    let has_cfg = has_config(root);
     let tasks = scan_entries(&templates, &generated);
     let has_html = !preview_html_content.is_empty();
 
     Ok(json!({
+        "has_config": has_cfg,
         "config": config,
         "agents": get_agents(),
         "brief": brief,

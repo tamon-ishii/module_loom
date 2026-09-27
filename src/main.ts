@@ -253,6 +253,7 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
 
 interface ManualTask { id: string; kind: "text" | "diagram" | "screenshot"; page: string; prompt: string; status: "missing" | "current" | "approved" | "stale" }
 interface ManualState {
+  has_config?: boolean;
   config: {
     docs: string;
     output: string;
@@ -1272,13 +1273,18 @@ async function refreshManual(): Promise<void> {
       }
     }
     currentManualPages = state.pages || [];
+    const hasConfig = Boolean(state.has_config);
     const hasPages = currentManualPages.length > 0;
-    if (!hasPages) {
+    const isConfigured = hasConfig || hasPages;
+
+    if (!isConfigured) {
       manualStarterContainer?.classList.remove("hidden");
       manualLayout?.classList.add("hidden");
+      btnManualOpenTemplates?.classList.add("hidden");
     } else {
       manualStarterContainer?.classList.add("hidden");
       manualLayout?.classList.remove("hidden");
+      btnManualOpenTemplates?.classList.remove("hidden");
     }
     const currentPage = manualPage.value;
     manualPage.innerHTML = (state.pages.length ? state.pages : ["index.md"]).map((page) => `<option value="${escapeHtml(page)}">${escapeHtml(page)}</option>`).join("");

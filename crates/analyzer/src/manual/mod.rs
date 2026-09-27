@@ -445,6 +445,23 @@ mod tests {
     }
 
     #[test]
+    fn test_has_config_state() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+
+        // 初期状態: 設定なし
+        assert!(!config::has_config(root));
+        let state = get_state(root).unwrap();
+        assert_eq!(state["has_config"], false);
+
+        // manual_setting.json 作成後
+        fs::write(root.join("manual_setting.json"), "{}").unwrap();
+        assert!(config::has_config(root));
+        let state2 = get_state(root).unwrap();
+        assert_eq!(state2["has_config"], true);
+    }
+
+    #[test]
     fn test_task_scan_and_approval() {
         let tmp = tempdir().unwrap();
         let root = tmp.path();
