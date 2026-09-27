@@ -26,6 +26,8 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - run: npm ci
       - run: npm run build
+      - name: Stage jscpd for Tauri tests
+        run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
       - name: Build and stage analyzer for Tauri tests
         run: |
           cargo build --locked --bin analyze
