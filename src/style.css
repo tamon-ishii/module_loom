@@ -1154,6 +1154,18 @@ body.resizing-panes .tree-panel, body.resizing-panes .inspector-panel { transiti
   display: none;
 }
 
+#manual-template-modal {
+  z-index: 1000;
+}
+
+#manual-template-confirm-modal {
+  z-index: 1100;
+}
+
+#manual-progress-modal {
+  z-index: 2000;
+}
+
 .modal-container {
   width: 90vw;
   max-width: 1280px;

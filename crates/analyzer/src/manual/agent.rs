@@ -84,6 +84,8 @@ pub fn agent_json(
                 "--skip-git-repo-check".into(),
                 "--sandbox".into(),
                 "read-only".into(),
+                "-c".into(),
+                "model_reasoning_effort=\"low\"".into(),
                 "--cd".into(),
                 root.to_string_lossy().into_owned(),
                 "--output-schema".into(),

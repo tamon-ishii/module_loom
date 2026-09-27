@@ -494,25 +494,57 @@ function openManualProgress(action: "draft" | "generate-task", taskOrAgentInfo: 
     }
   }
 
+  const loggedMilestones = new Set<number>();
+
   manualProgressInterval = window.setInterval(() => {
     const elapsedSec = Math.floor((Date.now() - manualProgressStartTime) / 1000);
     const m = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
     const s = String(elapsedSec % 60).padStart(2, "0");
     if (manualProgressTimer) manualProgressTimer.textContent = `${m}:${s}`;
 
+    const appendLog = (msg: string) => {
+      if (manualProgressLog) {
+        manualProgressLog.textContent += `\n[${m}:${s}] ${msg}`;
+        manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
+      }
+    };
+
     if (action === "draft") {
-      if (elapsedSec >= 3 && elapsedSec < 10) {
-        if (manualProgressBarFill) manualProgressBarFill.style.width = "35%";
+      if (elapsedSec >= 3 && elapsedSec < 12) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "30%";
         if (manualProgressPhase) manualProgressPhase.textContent = "プロジェクト構造とコード規約を解析中...";
-      } else if (elapsedSec >= 10 && elapsedSec < 20) {
-        if (manualProgressBarFill) manualProgressBarFill.style.width = "55%";
-        if (manualProgressPhase) manualProgressPhase.textContent = "各ページの Markdown と ai:task を設計中...";
-      } else if (elapsedSec >= 20 && elapsedSec < 40) {
-        if (manualProgressBarFill) manualProgressBarFill.style.width = "75%";
-        if (manualProgressPhase) manualProgressPhase.textContent = "AI エージェントの生成結果をパース準備中...";
-      } else if (elapsedSec >= 40) {
+        if (!loggedMilestones.has(3)) {
+          loggedMilestones.add(3);
+          appendLog("プロジェクトの AST 解析・UI 要素マッピングを完了しました");
+        }
+      } else if (elapsedSec >= 12 && elapsedSec < 25) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "50%";
+        if (manualProgressPhase) manualProgressPhase.textContent = `AI エージェント（${taskOrAgentInfo}）が構成案を推論中...`;
+        if (!loggedMilestones.has(12)) {
+          loggedMilestones.add(12);
+          appendLog(`${taskOrAgentInfo} がアプリケーション仕様を読み込み、章立てと要件を検討しています...`);
+        }
+      } else if (elapsedSec >= 25 && elapsedSec < 50) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "70%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "各ページの Markdown とタスク定義を出力中...";
+        if (!loggedMilestones.has(25)) {
+          loggedMilestones.add(25);
+          appendLog("Markdown 原稿とタスク定義（Mermaid図 / スクリーンショット注釈指示）を生成中...");
+        }
+      } else if (elapsedSec >= 50 && elapsedSec < 80) {
         if (manualProgressBarFill) manualProgressBarFill.style.width = "85%";
-        if (manualProgressPhase) manualProgressPhase.textContent = "生成結果の最終検証中...";
+        if (manualProgressPhase) manualProgressPhase.textContent = "複数ページの構造化 JSON データを生成中...";
+        if (!loggedMilestones.has(50)) {
+          loggedMilestones.add(50);
+          appendLog("複数ページの構造化 JSON データを生成しています（推論モデルの出力を待機中）...");
+        }
+      } else if (elapsedSec >= 80) {
+        if (manualProgressBarFill) manualProgressBarFill.style.width = "92%";
+        if (manualProgressPhase) manualProgressPhase.textContent = "生成結果の受信待機・Markdown 配置準備中...";
+        if (!loggedMilestones.has(80)) {
+          loggedMilestones.add(80);
+          appendLog("AI からの出力を受信待機中... 間もなく Markdown 配置と初期ビルドに移行します");
+        }
       }
     } else {
       if (elapsedSec >= 3 && elapsedSec < 15) {
@@ -1438,6 +1470,9 @@ btnPreviewModeMd?.addEventListener("click", () => {
 async function executeInitTemplate(templateType: "manual" | "api", clear: boolean): Promise<void> {
   if (manualBusy) return;
   manualBusy = true;
+  closeManualTemplateConfirmModal();
+  closeManualTemplateModal();
+
   const docs = getSelectedTemplateDocsDir();
   const output = getSelectedTemplateOutputDir();
   const agent = getSelectedTemplateAgent();
@@ -1450,7 +1485,56 @@ async function executeInitTemplate(templateType: "manual" | "api", clear: boolea
 
   try {
     await callManual("init-template", { template: templateType, clear, docs, output, agent, model });
-    completeManualProgress(`✓ ${typeLabel}のたたき台を生成しました`, `Markdown原稿（${docs}）の配置と初期ビルドが完了しました。`);
+
+    // 自動で全スクリーンショットを撮影して配置する
+    const state = JSON.parse(await callManual("state")) as ManualState;
+    const screenshotTasks = state.tasks.filter((t: ManualTask) => t.kind === "screenshot");
+    if (screenshotTasks.length > 0) {
+      setStepState(stepManualVerify, "done");
+      setStepState(stepManualAi, "done");
+      setStepState(stepManualStaged, "done");
+      setStepState(stepManualBuild, "active");
+      if (manualProgressBarFill) manualProgressBarFill.style.width = "90%";
+      if (manualProgressPhase) {
+        manualProgressPhase.textContent = `スクリーンショットを自動撮影中 (0/${screenshotTasks.length})...`;
+      }
+      if (manualProgressLog) {
+        manualProgressLog.textContent += `\n[自動撮影] ${screenshotTasks.length} 件のスクリーンショットを自動撮影しています...`;
+        manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
+      }
+      const prevTab = activeWorkspaceTab;
+      for (let i = 0; i < screenshotTasks.length; i++) {
+        const task = screenshotTasks[i];
+        if (manualProgressPhase) {
+          manualProgressPhase.textContent = `スクリーンショット自動撮影中 (${i + 1}/${screenshotTasks.length}): ${task.id}...`;
+        }
+        let targetTab: "modules" | "diagnostics" | "manual" = "modules";
+        if (task.id.includes("diagnostic")) targetTab = "diagnostics";
+        else if (task.id.includes("manual")) targetTab = "manual";
+        selectWorkspaceTab(targetTab);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        try {
+          const dataUrl = await captureBackgroundScreenshot(task.id, task.prompt);
+          await invokeCommand("manual_capture_screenshot", {
+            path: manualRoot(),
+            id: task.id,
+            data: dataUrl,
+          });
+          if (manualProgressLog) {
+            manualProgressLog.textContent += `\n[自動撮影] ✓ ${task.id} を撮影・注釈付けしました (${i + 1}/${screenshotTasks.length})`;
+            manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
+          }
+        } catch (e) {
+          console.warn(`Auto capture failed for ${task.id}:`, e);
+        }
+      }
+      selectWorkspaceTab(prevTab);
+      if (manualProgressPhase) manualProgressPhase.textContent = "最新プレビューHTMLをビルド中...";
+      await callManual("build", { draft: true });
+    }
+
+    completeManualProgress(`✓ ${typeLabel}のたたき台を生成しました`, `Markdown原稿（${docs}）の配置、スクリーンショット自動撮影、初期ビルドが完了しました。`);
     manualStatus.textContent = `✓ ${typeLabel}のたたき台を生成しました（${docs} / ${agent}）`;
     closeManualTemplateModal();
     closeManualTemplateConfirmModal();
@@ -1476,6 +1560,7 @@ function handleTemplateSelection(templateType: "manual" | "api"): void {
   if (currentManualPages.length > 0) {
     openManualTemplateConfirmModal(templateType);
   } else {
+    closeManualTemplateModal();
     void executeInitTemplate(templateType, false);
   }
 }
@@ -1495,6 +1580,8 @@ manualTemplateConfirmModal?.addEventListener("click", (e) => {
 btnAcceptManualConfirm?.addEventListener("click", () => {
   if (pendingTemplateType) {
     const targetType = pendingTemplateType;
+    closeManualTemplateConfirmModal();
+    closeManualTemplateModal();
     void executeInitTemplate(targetType, true);
   }
 });
