@@ -109,3 +109,7 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 ```
 
 `task` を省くとページ全体、指定すると同じページの `ai:task` に結び付きます。`file` はプロジェクト内の相対パスで、Python 以外のファイルも指定できます。`symbol` と `ui` も指定できます。複数のファイルを結ぶ場合は行を分けてください。宣言は HTML コメントとして扱われ、マニュアル本文には表示されません。`--manual deps --root .` の `evidence` には明示した関係を `ai:depends` として記録します。推測で見つけた関係は `text-match` として区別します。
+
+変更後に更新対象を確認するには `--manual impact-plan --root . --ref HEAD` を実行します。結果の `generate_tasks` は自動更新できる文章・図、`manual_tasks` は撮影などの手作業が必要なタスク、`approved_tasks` は承認済みで自動更新しないタスクです。`page_only` は変更の影響があるものの、個別のタスクまで特定できないページです。
+
+`--manual generate-impacted --root . --ref HEAD` は、同じ計画の `generate_tasks` だけを順に更新します。実行前に `impact-plan` で対象を確認してください。途中で生成が失敗した場合はその時点で終了し、それ以前に更新したタスクは残ります。スクリーンショットや承認済みタスク、ページ単位の候補は自動更新しません。

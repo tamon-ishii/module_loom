@@ -445,21 +445,22 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
     // 1. Get changed files via git
     let mut changed_files = Vec::new();
 
-    // Try git diff with reference
     let diff_output = Command::new("git")
         .current_dir(root)
         .args(["diff", "--name-only", &git_ref])
-        .output();
-
-    if let Ok(out) = diff_output {
-        if out.status.success() {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            for line in stdout.lines() {
-                let trimmed = line.trim();
-                if !trimmed.is_empty() {
-                    changed_files.push(trimmed.to_string());
-                }
-            }
+        .output()
+        .map_err(|error| format!("Failed to run git diff: {error}"))?;
+    if !diff_output.status.success() {
+        return Err(format!(
+            "Failed to compare Git ref {git_ref}: {}",
+            String::from_utf8_lossy(&diff_output.stderr).trim()
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&diff_output.stdout);
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            changed_files.push(trimmed.to_string());
         }
     }
 
@@ -467,18 +468,20 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
     let status_output = Command::new("git")
         .current_dir(root)
         .args(["status", "--porcelain"])
-        .output();
-
-    if let Ok(out) = status_output {
-        if out.status.success() {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            for line in stdout.lines() {
-                if line.len() >= 3 {
-                    let file_path = line[3..].trim();
-                    if !file_path.is_empty() && !changed_files.contains(&file_path.to_string()) {
-                        changed_files.push(file_path.to_string());
-                    }
-                }
+        .output()
+        .map_err(|error| format!("Failed to run git status: {error}"))?;
+    if !status_output.status.success() {
+        return Err(format!(
+            "Failed to read Git status: {}",
+            String::from_utf8_lossy(&status_output.stderr).trim()
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&status_output.stdout);
+    for line in stdout.lines() {
+        if line.len() >= 3 {
+            let file_path = line[3..].trim();
+            if !file_path.is_empty() && !changed_files.contains(&file_path.to_string()) {
+                changed_files.push(file_path.to_string());
             }
         }
     }

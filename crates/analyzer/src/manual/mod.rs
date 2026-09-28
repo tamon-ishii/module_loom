@@ -10,8 +10,11 @@ pub mod template;
 pub mod uimap;
 pub mod window_capture;
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use serde::Serialize;
 
 use config::{project_path, read_config, save_settings};
 use preview::{get_state, preview_asset, preview_html, preview_page};
@@ -42,6 +45,8 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "ui-map-import",
         "deps",
         "impact",
+        "impact-plan",
+        "generate-impacted",
         "context",
         "markits-render",
         "list-windows",
@@ -345,6 +350,28 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let report = deps::analyze_git_impact(root, ref_opt)?;
             serde_json::to_string_pretty(&report).map_err(|e| e.to_string())
         }
+        "impact-plan" | "generate-impacted" => {
+            let report = deps::analyze_git_impact(root, ref_opt)?;
+            let all_tasks = task::tasks(&templates_path)?;
+            let plan = plan_impacted_tasks(report, &all_tasks);
+            if action == "impact-plan" {
+                return serde_json::to_string_pretty(&plan).map_err(|e| e.to_string());
+            }
+            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let mut generated = Vec::new();
+            for task_id in &plan.generate_tasks {
+                author::generate_task(root, task_id, cli, "")
+                    .map_err(|error| format!("Failed to generate impacted task {task_id}: {error}"))?;
+                generated.push(task_id.clone());
+            }
+            serde_json::to_string_pretty(&serde_json::json!({
+                "generated": generated,
+                "manual_tasks": plan.manual_tasks,
+                "approved_tasks": plan.approved_tasks,
+                "page_only": plan.page_only,
+            }))
+            .map_err(|e| e.to_string())
+        }
         "context" => {
             let ctx = context::build_application_context(root);
             serde_json::to_string_pretty(&ctx).map_err(|e| e.to_string())
@@ -366,6 +393,57 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             markits::render_from_json(&json_content).map_err(|e| e.to_string())
         }
         _ => unreachable!(),
+    }
+}
+
+#[derive(Serialize)]
+struct ImpactPlan {
+    impact: deps::ImpactReport,
+    generate_tasks: Vec<String>,
+    manual_tasks: Vec<String>,
+    approved_tasks: Vec<String>,
+    page_only: Vec<String>,
+}
+
+fn plan_impacted_tasks(impact: deps::ImpactReport, all_tasks: &[task::Task]) -> ImpactPlan {
+    let affected: HashSet<&str> = impact
+        .impacted_pages
+        .iter()
+        .flat_map(|page| page.impacted_tasks.iter().map(String::as_str))
+        .collect();
+    let mut generate_tasks = Vec::new();
+    let mut manual_tasks = Vec::new();
+    let mut approved_tasks = Vec::new();
+    for task in all_tasks {
+        if !affected.contains(task.id.as_str()) {
+            continue;
+        }
+        if task.status == "approved" {
+            approved_tasks.push(task.id.clone());
+        } else if task.kind == "screenshot" {
+            manual_tasks.push(task.id.clone());
+        } else if task.kind == "text" || task.kind == "diagram" {
+            generate_tasks.push(task.id.clone());
+        } else {
+            manual_tasks.push(task.id.clone());
+        }
+    }
+    let mut page_only: Vec<String> = impact
+        .impacted_pages
+        .iter()
+        .filter(|page| page.impacted_tasks.is_empty())
+        .map(|page| page.path.clone())
+        .collect();
+    generate_tasks.sort();
+    manual_tasks.sort();
+    approved_tasks.sort();
+    page_only.sort();
+    ImpactPlan {
+        impact,
+        generate_tasks,
+        manual_tasks,
+        approved_tasks,
+        page_only,
     }
 }
 
@@ -1409,6 +1487,14 @@ mod tests {
             .reasons
             .iter()
             .any(|r| r.contains("src/settings.rs")));
+        let plan: serde_json::Value =
+            serde_json::from_str(&run(root, "impact-plan", &[("--ref", "HEAD")]).unwrap())
+                .unwrap();
+        assert_eq!(plan["manual_tasks"], serde_json::json!(["settings-shot"]));
+        assert_eq!(plan["generate_tasks"], serde_json::json!([]));
+        assert!(deps::analyze_git_impact(root, Some("no-such-ref"))
+            .unwrap_err()
+            .contains("Failed to compare Git ref"));
     }
 
     #[test]
@@ -1423,6 +1509,50 @@ mod tests {
         .unwrap();
         let error = deps::build_manual_dependency_graph(root, &root.join("docs")).unwrap_err();
         assert!(error.contains("Invalid ai:depends file"));
+    }
+
+    #[test]
+    fn test_impact_plan_limits_generation_and_preserves_manual_review() {
+        let impact = deps::ImpactReport {
+            impacted_pages: vec![
+                deps::ImpactedPage {
+                    path: "guide.md".into(),
+                    reasons: vec!["changed".into()],
+                    impacted_tasks: vec![
+                        "write-guide".into(),
+                        "capture-guide".into(),
+                        "locked-guide".into(),
+                    ],
+                    requires_rebuild: true,
+                },
+                deps::ImpactedPage {
+                    path: "overview.md".into(),
+                    reasons: vec!["changed".into()],
+                    impacted_tasks: vec![],
+                    requires_rebuild: true,
+                },
+            ],
+            ..Default::default()
+        };
+        let make_task = |id: &str, kind: &str, status: &str| task::Task {
+            id: id.into(),
+            kind: kind.into(),
+            page: "guide.md".into(),
+            prompt: String::new(),
+            source_sha256: String::new(),
+            status: status.into(),
+        };
+        let tasks = vec![
+            make_task("write-guide", "text", "current"),
+            make_task("capture-guide", "screenshot", "current"),
+            make_task("locked-guide", "text", "approved"),
+            make_task("unrelated", "text", "current"),
+        ];
+        let plan = plan_impacted_tasks(impact, &tasks);
+        assert_eq!(plan.generate_tasks, vec!["write-guide"]);
+        assert_eq!(plan.manual_tasks, vec!["capture-guide"]);
+        assert_eq!(plan.approved_tasks, vec!["locked-guide"]);
+        assert_eq!(plan.page_only, vec!["overview.md"]);
     }
 
     #[test]
