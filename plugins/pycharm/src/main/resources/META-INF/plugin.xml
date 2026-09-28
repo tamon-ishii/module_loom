@@ -31,6 +31,12 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <h4>v1.4.0</h4>
+    <ul>
+      <li><b>Persistent AI Update Instructions:</b> Keep each ai:task beside its generated result so screenshots and other assets remain refreshable.</li>
+      <li><b>Reliable Screenshot Capture:</b> Capture the documentation settings dialog directly and reject empty or invalid PNG data.</li>
+      <li><b>Manual Asset Registration:</b> Register existing manual screenshots as updateable assets and keep the Markdown source and built site synchronized.</li>
+    </ul>
     <h4>v1.3.0</h4>
     <ul>
       <li><b>AI Draft Templates:</b> Create user manuals and API documentation drafts from project context with configurable AI agents, models, and directories.</li>
