@@ -2,11 +2,14 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use super::config::{project_path, read_config};
-use super::task::{collect_target_markdown_files, parse_page_tags, utc_now, PageTag};
+use super::task::{
+    collect_target_markdown_files, get_code_block_ranges, is_inside_ranges, parse_page_tags,
+    utc_now, PageTag,
+};
 use super::uimap::extract_ui_map;
 use crate::analyze_directory;
 
@@ -17,6 +20,8 @@ pub struct ManualDependencyGraph {
     pub pages: HashMap<String, PageDependencies>,
     pub symbol_to_pages: HashMap<String, Vec<String>>,
     pub ui_to_pages: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub file_to_pages: HashMap<String, Vec<String>>,
     pub task_dependencies: HashMap<String, TaskDependencies>,
 }
 
@@ -26,9 +31,21 @@ pub struct PageDependencies {
     pub title: String,
     pub symbols: Vec<String>,
     pub ui_elements: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
     pub configs: Vec<String>,
     pub assets: Vec<String>,
     pub tasks: Vec<String>,
+    #[serde(default)]
+    pub evidence: Vec<DependencyEvidence>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencyEvidence {
+    pub reference: String,
+    pub origin: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -38,6 +55,8 @@ pub struct TaskDependencies {
     pub kind: String,
     pub symbols: Vec<String>,
     pub ui_elements: Vec<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -72,10 +91,95 @@ pub fn read_dependency_graph(root: &Path) -> Option<ManualDependencyGraph> {
     serde_json::from_str(&content).ok()
 }
 
-pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDependencyGraph {
+#[derive(Default)]
+struct DependencyHint {
+    task_id: Option<String>,
+    file: Option<String>,
+    symbol: Option<String>,
+    ui: Option<String>,
+}
+
+fn parse_dependency_hints(page: &str, content: &str) -> Result<Vec<DependencyHint>, String> {
+    let hint_re = Regex::new(r"<!--\s*ai:depends(?P<attrs>[^\r\n>]*?)-->").unwrap();
+    let attr_re =
+        Regex::new(r#"(?:^|\s)(task|file|symbol|ui)=(?:"([^"]+)"|'([^']+)'|([^\s>]+))"#).unwrap();
+    let id_re = Regex::new(r"^[a-z][a-z0-9-]*$").unwrap();
+    let code_blocks = get_code_block_ranges(content);
+    let mut hints = Vec::new();
+
+    for cap in hint_re.captures_iter(content) {
+        let whole = cap.get(0).unwrap();
+        if is_inside_ranges(&(whole.start()..whole.end()), &code_blocks) {
+            continue;
+        }
+        let attrs = cap.name("attrs").unwrap().as_str();
+        let mut hint = DependencyHint::default();
+        let mut cursor = 0;
+        for attr in attr_re.captures_iter(attrs) {
+            let matched = attr.get(0).unwrap();
+            if !attrs[cursor..matched.start()].trim().is_empty() {
+                return Err(format!("Invalid ai:depends attribute in {page}"));
+            }
+            cursor = matched.end();
+            let key = &attr[1];
+            let value = attr
+                .get(2)
+                .or_else(|| attr.get(3))
+                .or_else(|| attr.get(4))
+                .unwrap()
+                .as_str()
+                .trim();
+            if value.is_empty() {
+                return Err(format!("Empty ai:depends {key} in {page}"));
+            }
+            let slot = match key {
+                "task" => &mut hint.task_id,
+                "file" => &mut hint.file,
+                "symbol" => &mut hint.symbol,
+                "ui" => &mut hint.ui,
+                _ => unreachable!(),
+            };
+            if slot.is_some() {
+                return Err(format!("Duplicate ai:depends {key} in {page}"));
+            }
+            *slot = Some(value.to_string());
+        }
+        if !attrs[cursor..].trim().is_empty() {
+            return Err(format!("Invalid ai:depends attribute in {page}"));
+        }
+        if hint.file.is_none() && hint.symbol.is_none() && hint.ui.is_none() {
+            return Err(format!("ai:depends requires file, symbol or ui in {page}"));
+        }
+        if let Some(id) = &hint.task_id {
+            if !id_re.is_match(id) {
+                return Err(format!("Invalid ai:depends task ID in {page}: {id}"));
+            }
+        }
+        if let Some(file) = &mut hint.file {
+            *file = file.replace('\\', "/");
+            let path = Path::new(file);
+            if path.is_absolute()
+                || file.contains(':')
+                || !path
+                    .components()
+                    .all(|part| matches!(part, Component::Normal(_)))
+            {
+                return Err(format!("Invalid ai:depends file in {page}: {file}"));
+            }
+        }
+        hints.push(hint);
+    }
+    Ok(hints)
+}
+
+pub fn build_manual_dependency_graph(
+    root: &Path,
+    _docs_path: &Path,
+) -> Result<ManualDependencyGraph, String> {
     let mut pages = HashMap::new();
     let mut symbol_to_pages: HashMap<String, Vec<String>> = HashMap::new();
     let mut ui_to_pages: HashMap<String, Vec<String>> = HashMap::new();
+    let mut file_to_pages: HashMap<String, Vec<String>> = HashMap::new();
     let mut task_dependencies = HashMap::new();
 
     // 1. Collect known code symbols from AST
@@ -126,9 +230,11 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
 
         let mut page_symbols = HashSet::new();
         let mut page_ui = HashSet::new();
+        let mut page_files = HashSet::new();
         let mut page_configs = HashSet::new();
         let mut page_assets = HashSet::new();
         let mut page_tasks = Vec::new();
+        let mut evidence = Vec::new();
 
         // Assets
         for cap in asset_re.captures_iter(&content) {
@@ -139,16 +245,31 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
         for mod_id in &known_modules {
             if content.contains(mod_id) {
                 page_symbols.insert(mod_id.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("symbol:{mod_id}"),
+                    origin: "text-match".to_string(),
+                    task_id: None,
+                });
             }
         }
         for cls in &known_classes {
             if cls.len() >= 4 && content.contains(cls) {
                 page_symbols.insert(cls.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("symbol:{cls}"),
+                    origin: "text-match".to_string(),
+                    task_id: None,
+                });
             }
         }
         for func in &known_functions {
             if func.len() >= 4 && content.contains(func) {
                 page_symbols.insert(func.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("symbol:{func}"),
+                    origin: "text-match".to_string(),
+                    task_id: None,
+                });
             }
         }
 
@@ -156,6 +277,11 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
         for (sel, name) in &known_ui_ids {
             if content.contains(sel) || (name.len() >= 3 && content.contains(name)) {
                 page_ui.insert(sel.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("ui:{sel}"),
+                    origin: "text-match".to_string(),
+                    task_id: None,
+                });
             }
         }
 
@@ -194,8 +320,52 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
                         kind,
                         symbols: task_symbols,
                         ui_elements: task_ui,
+                        files: Vec::new(),
                     },
                 );
+            }
+        }
+
+        for hint in parse_dependency_hints(&rel_path, &content)? {
+            if let Some(task_id) = &hint.task_id {
+                if !task_dependencies.contains_key(task_id)
+                    || task_dependencies[task_id].page != rel_path
+                {
+                    return Err(format!("Unknown ai:depends task in {rel_path}: {task_id}"));
+                }
+            }
+            if let Some(file) = hint.file {
+                page_files.insert(file.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("file:{file}"),
+                    origin: "ai:depends".to_string(),
+                    task_id: hint.task_id.clone(),
+                });
+                if let Some(id) = &hint.task_id {
+                    task_dependencies.get_mut(id).unwrap().files.push(file);
+                }
+            }
+            if let Some(symbol) = hint.symbol {
+                page_symbols.insert(symbol.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("symbol:{symbol}"),
+                    origin: "ai:depends".to_string(),
+                    task_id: hint.task_id.clone(),
+                });
+                if let Some(id) = &hint.task_id {
+                    task_dependencies.get_mut(id).unwrap().symbols.push(symbol);
+                }
+            }
+            if let Some(ui) = hint.ui {
+                page_ui.insert(ui.clone());
+                evidence.push(DependencyEvidence {
+                    reference: format!("ui:{ui}"),
+                    origin: "ai:depends".to_string(),
+                    task_id: hint.task_id.clone(),
+                });
+                if let Some(id) = &hint.task_id {
+                    task_dependencies.get_mut(id).unwrap().ui_elements.push(ui);
+                }
             }
         }
 
@@ -220,6 +390,12 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
                 .or_default()
                 .push(rel_path.clone());
         }
+        for file in &page_files {
+            file_to_pages
+                .entry(file.clone())
+                .or_default()
+                .push(rel_path.clone());
+        }
 
         pages.insert(
             rel_path.clone(),
@@ -228,19 +404,22 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
                 title,
                 symbols: page_symbols.into_iter().collect(),
                 ui_elements: page_ui.into_iter().collect(),
+                files: page_files.into_iter().collect(),
                 configs: page_configs.into_iter().collect(),
                 assets: page_assets.into_iter().collect(),
                 tasks: page_tasks,
+                evidence,
             },
         );
     }
 
     let graph = ManualDependencyGraph {
-        version: "1.0".to_string(),
+        version: "1.1".to_string(),
         updated_at: utc_now(),
         pages,
         symbol_to_pages,
         ui_to_pages,
+        file_to_pages,
         task_dependencies,
     };
 
@@ -251,7 +430,7 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
         let _ = fs::write(graph_path(root), json);
     }
 
-    graph
+    Ok(graph)
 }
 
 pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<ImpactReport, String> {
@@ -259,7 +438,7 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
     let docs_path = project_path(root, &cfg.docs)?;
     // The saved graph is a report, not a cache: source, docs and the UI map
     // may all have changed since it was written.
-    let graph = build_manual_dependency_graph(root, &docs_path);
+    let graph = build_manual_dependency_graph(root, &docs_path)?;
 
     let git_ref = git_ref_opt.unwrap_or("HEAD~1").to_string();
 
@@ -309,6 +488,16 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
     let mut page_impact_map: HashMap<String, (Vec<String>, HashSet<String>)> = HashMap::new();
 
     for file in &changed_files {
+        if let Some(pages) = graph.file_to_pages.get(file) {
+            for page in pages {
+                let entry = page_impact_map
+                    .entry(page.clone())
+                    .or_insert_with(|| (Vec::new(), HashSet::new()));
+                entry
+                    .0
+                    .push(format!("明示依存: ファイル `{file}` が変更されました"));
+            }
+        }
         // Python file changed
         if file.ends_with(".py") {
             let path_parts: Vec<&str> = file.trim_end_matches(".py").split('/').collect();
@@ -383,6 +572,9 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
                     break;
                 }
             }
+        }
+        if !task_affected {
+            task_affected = t_dep.files.iter().any(|file| changed_files.contains(file));
         }
 
         if task_affected {

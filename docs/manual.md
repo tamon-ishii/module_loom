@@ -14,6 +14,9 @@
 ![manual-settings](assets/manual-settings.png)
 <!-- /ai:generated -->
 
+<!-- ai:depends task=manual-settings file=index.html ui=#manual-settings-modal -->
+<!-- ai:depends task=manual-settings file=src/main.ts -->
+
 原稿がない場合は **テンプレート生成**から下書きを作れます。既存の原稿がある場合は、その内容を確認してから生成を実行してください。
 
 <!-- ai:task id=manual-template kind=screenshot
@@ -96,4 +99,13 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 
 `source` には確認した URL または画面名を入れます。デスクトップアプリでは `platform` に `linux-x11` などを、`selector` にアクセシビリティ識別子などを記録できます。ModuleLoom は観測元と取り込み時刻を保存し、静的解析の要素と統合します。対象プロジェクトの UI ソースが変わると、古い観測結果は Map から外れます。外部アプリのコード変更は検知できないため、その場合は再探索して取り込み直してください。
 
-`--manual impact --root . --ref HEAD` は、Git の変更と原稿の関連付けから更新候補ページを表示します。実行時に依存関係グラフを作り直します。現状、コードの変更判定は主に Python モジュール、UI の変更判定はソース中に現れる要素 ID に基づくため、結果は確認候補として扱ってください。操作シナリオの実行や文章の事実検証は行いません。
+`--manual impact --root . --ref HEAD` は、Git の変更と原稿の関連付けから更新候補ページを表示します。実行時に依存関係グラフを作り直します。自動推測は主に Python モジュールと UI 要素 ID に基づきます。明示した `file` は言語を問わず、Git の変更パスと照合します。結果は確認候補として扱ってください。操作シナリオの実行や文章の事実検証は行いません。
+
+ページやタスクとコードの関係が分かっている場合は、原稿に依存関係を明記できます。
+
+```markdown
+<!-- ai:depends file=src/settings.rs -->
+<!-- ai:depends task=settings-shot file=src/settings.rs ui=#model -->
+```
+
+`task` を省くとページ全体、指定すると同じページの `ai:task` に結び付きます。`file` はプロジェクト内の相対パスで、Python 以外のファイルも指定できます。`symbol` と `ui` も指定できます。複数のファイルを結ぶ場合は行を分けてください。宣言は HTML コメントとして扱われ、マニュアル本文には表示されません。`--manual deps --root .` の `evidence` には明示した関係を `ai:depends` として記録します。推測で見つけた関係は `text-match` として区別します。

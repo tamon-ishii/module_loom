@@ -338,7 +338,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
         }
         "deps" => {
-            let graph = deps::build_manual_dependency_graph(root, &templates_path);
+            let graph = deps::build_manual_dependency_graph(root, &templates_path)?;
             serde_json::to_string_pretty(&graph).map_err(|e| e.to_string())
         }
         "impact" => {
@@ -1268,7 +1268,7 @@ mod tests {
         )
         .unwrap();
 
-        let graph = deps::build_manual_dependency_graph(root, &docs);
+        let graph = deps::build_manual_dependency_graph(root, &docs).unwrap();
         assert!(graph.pages.contains_key("guide.md"));
 
         let page_dep = graph.pages.get("guide.md").unwrap();
@@ -1323,7 +1323,7 @@ mod tests {
             "initial",
         ]);
 
-        let stale = deps::build_manual_dependency_graph(root, &root.join("docs"));
+        let stale = deps::build_manual_dependency_graph(root, &root.join("docs")).unwrap();
         assert!(!stale.symbol_to_pages.contains_key("app"));
         fs::write(root.join("docs/guide.md"), "# Guide\n\nCall `app.run`.\n").unwrap();
         fs::write(root.join("app.py"), "def run():\n    return 2\n").unwrap();
@@ -1339,6 +1339,90 @@ mod tests {
         assert_eq!(impact.impacted_pages[0].path, "guide.md");
         assert!(impact.affected_symbols.contains(&"app".to_string()));
         assert!(impact.affected_ui_elements.is_empty());
+    }
+
+    #[test]
+    fn test_explicit_file_dependency_impacts_rust_task() {
+        use std::process::Command;
+
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/settings.rs"), "pub fn open() {}\n").unwrap();
+        fs::write(
+            root.join("docs/guide.md"),
+            "# Guide\n\n<!-- ai:task id=settings-shot kind=screenshot\n設定画面を撮影する。\n-->\n\n<!-- ai:depends task=settings-shot file=src/settings.rs ui=#settings -->\n\n```md\n<!-- ai:depends file=src/example.rs -->\n```\n",
+        )
+        .unwrap();
+
+        let graph = deps::build_manual_dependency_graph(root, &root.join("docs")).unwrap();
+        let page = &graph.pages["guide.md"];
+        assert_eq!(page.files, vec!["src/settings.rs"]);
+        assert_eq!(
+            graph.task_dependencies["settings-shot"].files,
+            vec!["src/settings.rs"]
+        );
+        assert!(page.evidence.iter().any(|e| {
+            e.reference == "file:src/settings.rs"
+                && e.origin == "ai:depends"
+                && e.task_id.as_deref() == Some("settings-shot")
+        }));
+        assert!(!graph.file_to_pages.contains_key("src/example.rs"));
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(root)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["init", "-q"]);
+        git(&["add", "."]);
+        git(&[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "initial",
+        ]);
+        fs::write(
+            root.join("src/settings.rs"),
+            "pub fn open() { println!(\"open\"); }\n",
+        )
+        .unwrap();
+
+        let impact = deps::analyze_git_impact(root, Some("HEAD")).unwrap();
+        assert_eq!(impact.total_impacted_pages, 1);
+        assert_eq!(
+            impact.impacted_pages[0].impacted_tasks,
+            vec!["settings-shot"]
+        );
+        assert!(impact.impacted_pages[0]
+            .reasons
+            .iter()
+            .any(|r| r.contains("src/settings.rs")));
+    }
+
+    #[test]
+    fn test_explicit_dependency_rejects_invalid_file_path() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs/guide.md"),
+            "# Guide\n\n<!-- ai:depends file=../outside.rs -->\n",
+        )
+        .unwrap();
+        let error = deps::build_manual_dependency_graph(root, &root.join("docs")).unwrap_err();
+        assert!(error.contains("Invalid ai:depends file"));
     }
 
     #[test]
