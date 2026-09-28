@@ -163,9 +163,14 @@ async function handlePluginCommand(folder, webview, message) {
     case 'manual_action': {
       if (!args.action) throw new Error('マニュアル操作を指定してください');
       const cliArgs = ['--manual', args.action, '--root', root];
-      for (const key of ['docs', 'output', 'brief', 'agent', 'model', 'id', 'page', 'asset', 'format', 'feedback', 'lang', 'body', 'targets', 'template']) {
+      for (const key of ['docs', 'output', 'brief', 'agent', 'model', 'id', 'page', 'asset', 'format', 'feedback', 'lang', 'body', 'targets', 'template', 'input', 'url', 'audience', 'json']) {
         if (args[key] !== undefined && args[key] !== null) {
           cliArgs.push(`--${key}`, String(args[key]));
+        }
+      }
+      for (const key of ['git_ref', 'max_pages']) {
+        if (args[key] !== undefined && args[key] !== null) {
+          cliArgs.push(`--${key.replace('_', '-')}`, String(args[key]));
         }
       }
       if (args.mkdocs_settings !== undefined && args.mkdocs_settings !== null) {
@@ -176,6 +181,9 @@ async function handlePluginCommand(folder, webview, message) {
       }
       if (args.clear === true || args.clear === 'true') {
         cliArgs.push('--clear');
+      }
+      if (args.check === true || args.check === 'true') {
+        cliArgs.push('--check');
       }
       if (args.action === 'generate-task') {
         cliArgs.push('--cli', analyzerExecutable(commandFolder));

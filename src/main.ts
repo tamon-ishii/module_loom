@@ -294,6 +294,14 @@ const manualTasks = document.getElementById("manual-tasks") as HTMLElement;
 const btnManualDiagramAll = document.getElementById("btn-manual-diagram-all") as HTMLButtonElement | null;
 const btnManualTextAll = document.getElementById("btn-manual-text-all") as HTMLButtonElement | null;
 const manualStatus = document.getElementById("manual-status") as HTMLElement;
+const manualWorkflowOutput = document.getElementById("manual-workflow-output") as HTMLElement;
+const manualImpactRef = document.getElementById("manual-impact-ref") as HTMLInputElement;
+const manualExploreUrl = document.getElementById("manual-explore-url") as HTMLInputElement;
+const manualExplorePages = document.getElementById("manual-explore-pages") as HTMLInputElement;
+const manualScenarioPath = document.getElementById("manual-scenario-path") as HTMLInputElement;
+const manualScenarioJson = document.getElementById("manual-scenario-json") as HTMLTextAreaElement;
+const manualAudience = document.getElementById("manual-audience") as HTMLSelectElement;
+const manualAudienceDraft = document.getElementById("manual-audience-draft") as HTMLInputElement;
 const manualPage = document.getElementById("manual-page") as HTMLSelectElement;
 const manualPreview = document.getElementById("manual-preview") as HTMLElement;
 const manualPreviewIframe = document.getElementById("manual-preview-iframe") as HTMLIFrameElement;
@@ -727,6 +735,7 @@ function renderManualMarkdown(source: string): void {
       continue;
     }
     if (fenced) { code.push(line); continue; }
+    if (/^\s*<!--\s*ai:(?:fact|scenario|audience|depends)\b/.test(line)) continue;
     if (!line.trim()) continue;
 
     const heading = /^(#{1,4})\s+(.+)$/.exec(line);
@@ -1231,6 +1240,67 @@ async function runManual(action: string, extras: Record<string, unknown> = {}): 
     await refreshManual();
   }
 }
+
+function formatManualWorkflowResult(action: string, raw: string): string {
+  if (action === "scenario-load") return "シナリオを読み込みました。";
+  let result: any;
+  try { result = JSON.parse(raw); } catch { return raw || "完了しました"; }
+  if (action === "impact-plan") {
+    return [
+      `影響ページ: ${result.impact?.total_impacted_pages ?? 0} 件`,
+      `自動更新: ${(result.generate_tasks || []).join(", ") || "なし"}`,
+      `撮影・手作業: ${(result.manual_tasks || []).join(", ") || "なし"}`,
+      `承認済み: ${(result.approved_tasks || []).join(", ") || "なし"}`,
+      `ページ単位で確認: ${(result.page_only || []).join(", ") || "なし"}`,
+    ].join("\n");
+  }
+  if (action === "generate-impacted") return `更新: ${(result.generated || []).join(", ") || "なし"}\n手作業: ${(result.manual_tasks || []).join(", ") || "なし"}`;
+  if (action === "ui-explore") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面、${result.total_elements ?? 0} 要素`;
+  if (action === "scenario-run" || action === "scenario-test") return `操作 ${result.steps ?? 0} ステップに成功しました。${action === "scenario-run" ? `登録画像: ${(result.captured || []).join(", ") || "なし"}` : "画像は登録していません。"}`;
+  if (action === "e2e") return `マニュアル E2E: ${result.total ?? 0} 件成功\n${(result.passed || []).map((item: any) => `${item.page}: ${item.file} (${item.steps} ステップ)`).join("\n")}`;
+  if (action === "fact-check") return `根拠確認: ${result.passed ?? 0}/${result.checked ?? 0} 件成功\n根拠タグのない文章タスク: ${(result.unreviewed_text_tasks || []).join(", ") || "なし"}`;
+  return JSON.stringify(result, null, 2);
+}
+
+async function runManualWorkflow(action: string, extras: Record<string, unknown> = {}): Promise<void> {
+  if (manualBusy) return;
+  manualBusy = true;
+  manualView.setAttribute("aria-busy", "true");
+  manualWorkflowOutput.textContent = "処理中…";
+  try {
+    const raw = await callManual(action, extras);
+    if (action === "scenario-load") manualScenarioJson.value = raw;
+    if (action === "scenario-run" || action === "generate-impacted") {
+      await callManual("build", { draft: true });
+    }
+    manualWorkflowOutput.textContent = formatManualWorkflowResult(action, raw);
+    manualStatus.textContent = "保守・検証処理が完了しました";
+  } catch (error) {
+    manualWorkflowOutput.textContent = `失敗: ${String(error)}`;
+    manualStatus.textContent = "保守・検証処理に失敗しました";
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+    await refreshManual();
+  }
+}
+
+function bindManualWorkflow(id: string, action: string, options: () => Record<string, unknown> = () => ({})): void {
+  document.getElementById(id)?.addEventListener("click", () => { void runManualWorkflow(action, options()); });
+}
+
+const scenarioInput = () => ({ input: manualScenarioPath.value.trim() });
+bindManualWorkflow("manual-impact-plan", "impact-plan", () => ({ git_ref: manualImpactRef.value.trim() || "HEAD" }));
+bindManualWorkflow("manual-generate-impacted", "generate-impacted", () => ({ git_ref: manualImpactRef.value.trim() || "HEAD" }));
+bindManualWorkflow("manual-ui-explore", "ui-explore", () => ({ url: manualExploreUrl.value.trim(), max_pages: manualExplorePages.value.trim() || "10" }));
+bindManualWorkflow("manual-scenario-load", "scenario-load", scenarioInput);
+bindManualWorkflow("manual-scenario-save", "scenario-save", () => ({ ...scenarioInput(), json: manualScenarioJson.value }));
+bindManualWorkflow("manual-scenario-link", "scenario-link", () => ({ ...scenarioInput(), page: manualPage.value }));
+bindManualWorkflow("manual-scenario-test", "scenario-test", scenarioInput);
+bindManualWorkflow("manual-scenario-run", "scenario-run", scenarioInput);
+bindManualWorkflow("manual-e2e", "e2e");
+bindManualWorkflow("manual-fact-check", "fact-check", () => ({ check: true }));
+bindManualWorkflow("manual-build-audience", "build", () => ({ audience: manualAudience.value, draft: manualAudienceDraft.checked }));
 
 btnPreviewModeHtml?.addEventListener("click", () => {
   manualPreviewMode = "html";

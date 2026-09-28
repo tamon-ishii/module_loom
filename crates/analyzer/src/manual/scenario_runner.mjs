@@ -64,4 +64,4 @@ try {
 } finally {
   await browser.close();
 }
-process.stdout.write(`${JSON.stringify({ captured })}\n`);
+process.stdout.write(`${JSON.stringify({ captured, steps: scenario.steps.length })}\n`);

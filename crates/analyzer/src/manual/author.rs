@@ -61,6 +61,9 @@ pub fn draft(root: &Path) -> Result<(), String> {
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
         - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\
+        - For each page, add an <!-- ai:audience user -->, <!-- ai:audience developer -->, or <!-- ai:audience maintainer --> directive when it serves one reader group; omit the directive for shared pages.\n\
+        - Add <!-- ai:depends task=TASK_ID file=PROJECT_RELATIVE_PATH --> for known source-to-task links. Do not guess file paths.\n\
+        - For workflows suitable for repeatable Web UI testing, describe the steps in the task prompt. A scenario file can later be linked with <!-- ai:scenario file=manual/scenarios/NAME.json -->.\n\
         Do not invent non-existent UI labels. Return at most 8 pages.\n\n\
         {}\n\n\
         Brief:\n{brief}",
@@ -197,6 +200,7 @@ pub fn generate_task(root: &Path, task_id: &str, cli: &str, feedback: &str) -> R
     let mut prompt = format!(
         "Read the project and answer this manual task in concise, professional Japanese Markdown. \
         Verify UI names from source. Return only the pure documentation content. \
+        For concrete UI or source claims, add a compact HTML comment immediately after the claim in the form <!-- ai:fact {{\"claim\":\"...\",\"ui\":\"#actual-id\"}} --> or <!-- ai:fact {{\"claim\":\"...\",\"file\":\"relative/path\",\"contains\":\"actual source text\"}} -->. Use only evidence you verified; omit the comment when there is no evidence. \
         Do not include meta notes, disclaimers, notes about AI generation, or source attributions.\n\
         Task ID: {task_id}\nInstruction: {}",
         task.prompt
@@ -241,6 +245,7 @@ pub fn generate_task(root: &Path, task_id: &str, cli: &str, feedback: &str) -> R
         return Err("AI agent returned an empty answer".to_string());
     }
 
+    super::fact::verify_generated_body(root, body)?;
     update_task_in_docs(&templates, &task, body, None)?;
     save_answer(&generated, &task, body)?;
     Ok(())

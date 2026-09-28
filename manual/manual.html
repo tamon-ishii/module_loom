@@ -376,6 +376,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ui-map_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        実画面から UI Map を更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        生成文の根拠確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        読者別のマニュアル
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -509,6 +542,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ui-map_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        実画面から UI Map を更新
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        生成文の根拠確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        読者別のマニュアル
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -614,6 +680,7 @@
 <p>変更後に更新対象を確認するには <code>--manual impact-plan --root . --ref HEAD</code> を実行します。結果の <code>generate_tasks</code> は自動更新できる文章・図、<code>manual_tasks</code> は撮影などの手作業が必要なタスク、<code>approved_tasks</code> は承認済みで自動更新しないタスクです。<code>page_only</code> は変更の影響があるものの、個別のタスクまで特定できないページです。</p>
 <p><code>--manual generate-impacted --root . --ref HEAD</code> は、同じ計画の <code>generate_tasks</code> だけを順に更新します。実行前に <code>impact-plan</code> で対象を確認してください。途中で生成が失敗した場合はその時点で終了し、それ以前に更新したタスクは残ります。スクリーンショットや承認済みタスク、ページ単位の候補は自動更新しません。</p>
 <h3 id="web">Web 画面の撮影シナリオ</h3>
+<p>デスクトップ版、PyCharm 版、VS Code 版の <strong>ドキュメント生成 → マニュアルの保守と検証</strong> からも、更新候補の確認、Web UI 探索、シナリオの保存・読み込み・実行、E2E、根拠確認、読者別ビルドを操作できます。シナリオを保存した後、プレビューで対象ページを選び <strong>表示中ページに紐づけ</strong> を押すと、そのページへ <code>ai:scenario</code> を追加します。</p>
 <p>Web アプリでは操作を JSON ファイルに記録し、順に実行できます。対象プロジェクトに Node.js、<code>playwright-core</code>、Google Chrome が必要です。<code>npm install --save-dev playwright-core</code> で依存を追加してください。Chrome が標準の場所にない場合は <code>MODULELOOM_CHROME_PATH</code> に実行ファイルのパスを設定します。</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
@@ -627,6 +694,19 @@
 <span class="p">}</span>
 </code></pre></div>
 <p>原稿には <code>settings-shot</code> という <code>kind=screenshot</code> の <code>ai:task</code> を用意します。<code>--manual scenario-run --root . --input scenario.json</code> を実行すると、指定した要素だけを <code>docs/assets/settings-shot.png</code> に撮影し、タスクの <code>ai:generated</code> に画像リンクを登録します。<code>selector</code> を省けば表示中のページ全体を撮影します。操作には <code>goto</code>、<code>click</code>、<code>fill</code>（<code>{"selector":"#name","value":"example"}</code>）、<code>expect_visible</code>、<code>screenshot</code> を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。現在の実行対象は Web ページです。</p>
+<p><code>--manual scenario-test --root . --input scenario.json</code> は同じ操作を実行しますが、撮影画像を原稿へ登録しません。マニュアルの操作手順を CI で確認する場合は、原稿に <code>&lt;!-- ai:scenario file=manual/scenarios/settings.json --&gt;</code> を記載し、<code>--manual e2e --root .</code> を実行します。参照されたシナリオを順に実行し、失敗したページとステップを報告します。シナリオの操作は実際のアプリに作用するため、テスト用のデータと環境を使用してください。</p>
+<h3 id="ui-map_1">実画面から UI Map を更新</h3>
+<p>Web アプリを起動した状態で <code>--manual ui-explore --root . --url http://localhost:3000/ --max-pages 10</code> を実行します。同一オリジンのナビゲーションリンクとタブを巡回し、表示中の ID または <code>data-testid</code> を持つ操作要素を収集して <code>manual/ui_observations.json</code> に保存します。既存の静的 UI Map に統合され、ソースが変わると観測結果は期限切れになります。ログアウトや削除に見えるリンクは巡回対象から除外します。フォーム送信や一般的なボタン操作は自動探索しません。</p>
+<!-- ai:fact {"claim":"Web UI の探索には Playwright を使用する","file":"crates/analyzer/src/manual/explore_runner.mjs","contains":"playwright-core"} -->
+
+<h3 id="_5">生成文の根拠確認</h3>
+<p>文章中の具体的な主張には、確認した根拠を HTML コメントで付けられます。</p>
+<div class="highlight"><pre><span></span><code>設定画面には保存ボタンがあります。
+&lt;!-- ai:fact {"claim":"設定画面に保存ボタンがある","ui":"#save","file":"src/settings.rs","contains":"save_settings"} --&gt;
+</code></pre></div>
+<p><code>--manual fact-check --root .</code> は指定された UI 要素、Python シンボル、ファイル、およびファイル内の文字列を確認します。<code>--check</code> を付けると根拠が見つからない場合にエラーで終了します。AI が新しい文章に <code>ai:fact</code> を付けた場合、生成結果の保存前にも検査します。結果には根拠タグのない生成文章タスクも <code>unreviewed_text_tasks</code> として表示します。この検査は根拠の存在確認であり、自由文の意味全体を保証するものではありません。</p>
+<h3 id="_6">読者別のマニュアル</h3>
+<p>ページの先頭に <code>&lt;!-- ai:audience user, developer --&gt;</code> を付けると、対象読者を指定できます。指定できる値は <code>user</code>、<code>developer</code>、<code>maintainer</code> です。タグのないページは全読者向けです。<code>--manual build --root . --audience developer</code> は対象ページだけを <code>manual/developer/</code> に出力します。<code>--audience user</code> と <code>--audience maintainer</code> も同様です。読者別出力には、その読者向けの <code>index.md</code> が必要です。</p>
 
 
 

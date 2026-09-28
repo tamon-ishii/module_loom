@@ -276,6 +276,60 @@
               <div id="manual-tasks" class="manual-tasks"></div>
             </div>
 
+            <div class="manual-card manual-workflow-card">
+              <h3>マニュアルの保守と検証</h3>
+              <details open>
+                <summary>変更箇所だけ更新</summary>
+                <label>比較する Git 参照
+                  <input id="manual-impact-ref" type="text" value="HEAD" placeholder="HEAD" />
+                </label>
+                <div class="manual-actions">
+                  <button id="manual-impact-plan" class="btn-secondary" type="button">更新候補を確認</button>
+                  <button id="manual-generate-impacted" class="btn-secondary" type="button">対象の文章・図を更新</button>
+                </div>
+              </details>
+              <details>
+                <summary>Web UI を探索</summary>
+                <label>起動中の Web アプリの URL
+                  <input id="manual-explore-url" type="url" placeholder="http://localhost:3000/" />
+                </label>
+                <label>巡回ページ数の上限
+                  <input id="manual-explore-pages" type="number" min="1" max="30" value="10" />
+                </label>
+                <div class="manual-actions"><button id="manual-ui-explore" class="btn-secondary" type="button">UI Map に取り込む</button></div>
+              </details>
+              <details>
+                <summary>Web 操作シナリオ</summary>
+                <label>シナリオファイル（プロジェクト内）
+                  <input id="manual-scenario-path" type="text" value="manual/scenarios/settings.json" />
+                </label>
+                <label>シナリオ JSON
+                  <textarea id="manual-scenario-json" rows="8" spellcheck="false" placeholder='{"version":1,"base_url":"http://localhost:3000/","steps":[{"goto":"/"},{"click":"#settings"},{"expect_visible":"#dialog"},{"screenshot":{"task":"settings-shot","selector":"#dialog"}}]}'></textarea>
+                </label>
+                <div class="manual-actions">
+                  <button id="manual-scenario-load" class="btn-secondary" type="button">読み込み</button>
+                  <button id="manual-scenario-save" class="btn-secondary" type="button">保存</button>
+                  <button id="manual-scenario-link" class="btn-secondary" type="button" title="プレビューで選択中の Markdown ページにシナリオを紐づけます">表示中ページに紐づけ</button>
+                  <button id="manual-scenario-test" class="btn-secondary" type="button">テスト実行</button>
+                  <button id="manual-scenario-run" class="btn-secondary" type="button">実行して画像登録</button>
+                </div>
+                <p>操作は実際の Web アプリに作用します。撮影タスクは原稿の <code>ai:task</code> と同じ ID を指定してください。</p>
+              </details>
+              <details>
+                <summary>検証と読者別出力</summary>
+                <div class="manual-actions">
+                  <button id="manual-e2e" class="btn-secondary" type="button">紐づけた操作を検証</button>
+                  <button id="manual-fact-check" class="btn-secondary" type="button">根拠を確認</button>
+                </div>
+                <label>出力する読者
+                  <select id="manual-audience"><option value="user">利用者</option><option value="developer">開発者</option><option value="maintainer">保守担当者</option></select>
+                </label>
+                <label class="manual-inline-check"><input id="manual-audience-draft" type="checkbox" checked /> 未完了タスクを残して下書きビルド</label>
+                <div class="manual-actions"><button id="manual-build-audience" class="btn-secondary" type="button">読者別サイトをビルド</button></div>
+              </details>
+              <pre id="manual-workflow-output" class="manual-workflow-output" role="status" aria-live="polite">操作結果をここに表示します。</pre>
+            </div>
+
             <p id="manual-status" role="status"></p>
           </div>
           <div class="manual-preview-panel">

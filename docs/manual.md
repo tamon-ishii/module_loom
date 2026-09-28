@@ -116,6 +116,8 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 
 ### Web 画面の撮影シナリオ
 
+デスクトップ版、PyCharm 版、VS Code 版の **ドキュメント生成 → マニュアルの保守と検証** からも、更新候補の確認、Web UI 探索、シナリオの保存・読み込み・実行、E2E、根拠確認、読者別ビルドを操作できます。シナリオを保存した後、プレビューで対象ページを選び **表示中ページに紐づけ** を押すと、そのページへ `ai:scenario` を追加します。
+
 Web アプリでは操作を JSON ファイルに記録し、順に実行できます。対象プロジェクトに Node.js、`playwright-core`、Google Chrome が必要です。`npm install --save-dev playwright-core` で依存を追加してください。Chrome が標準の場所にない場合は `MODULELOOM_CHROME_PATH` に実行ファイルのパスを設定します。
 
 ```json
@@ -132,3 +134,25 @@ Web アプリでは操作を JSON ファイルに記録し、順に実行でき�
 ```
 
 原稿には `settings-shot` という `kind=screenshot` の `ai:task` を用意します。`--manual scenario-run --root . --input scenario.json` を実行すると、指定した要素だけを `docs/assets/settings-shot.png` に撮影し、タスクの `ai:generated` に画像リンクを登録します。`selector` を省けば表示中のページ全体を撮影します。操作には `goto`、`click`、`fill`（`{"selector":"#name","value":"example"}`）、`expect_visible`、`screenshot` を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。現在の実行対象は Web ページです。
+
+`--manual scenario-test --root . --input scenario.json` は同じ操作を実行しますが、撮影画像を原稿へ登録しません。マニュアルの操作手順を CI で確認する場合は、原稿に `<!-- ai:scenario file=manual/scenarios/settings.json -->` を記載し、`--manual e2e --root .` を実行します。参照されたシナリオを順に実行し、失敗したページとステップを報告します。シナリオの操作は実際のアプリに作用するため、テスト用のデータと環境を使用してください。
+
+### 実画面から UI Map を更新
+
+Web アプリを起動した状態で `--manual ui-explore --root . --url http://localhost:3000/ --max-pages 10` を実行します。同一オリジンのナビゲーションリンクとタブを巡回し、表示中の ID または `data-testid` を持つ操作要素を収集して `manual/ui_observations.json` に保存します。既存の静的 UI Map に統合され、ソースが変わると観測結果は期限切れになります。ログアウトや削除に見えるリンクは巡回対象から除外します。フォーム送信や一般的なボタン操作は自動探索しません。
+<!-- ai:fact {"claim":"Web UI の探索には Playwright を使用する","file":"crates/analyzer/src/manual/explore_runner.mjs","contains":"playwright-core"} -->
+
+### 生成文の根拠確認
+
+文章中の具体的な主張には、確認した根拠を HTML コメントで付けられます。
+
+```markdown
+設定画面には保存ボタンがあります。
+<!-- ai:fact {"claim":"設定画面に保存ボタンがある","ui":"#save","file":"src/settings.rs","contains":"save_settings"} -->
+```
+
+`--manual fact-check --root .` は指定された UI 要素、Python シンボル、ファイル、およびファイル内の文字列を確認します。`--check` を付けると根拠が見つからない場合にエラーで終了します。AI が新しい文章に `ai:fact` を付けた場合、生成結果の保存前にも検査します。結果には根拠タグのない生成文章タスクも `unreviewed_text_tasks` として表示します。この検査は根拠の存在確認であり、自由文の意味全体を保証するものではありません。
+
+### 読者別のマニュアル
+
+ページの先頭に `<!-- ai:audience user, developer -->` を付けると、対象読者を指定できます。指定できる値は `user`、`developer`、`maintainer` です。タグのないページは全読者向けです。`--manual build --root . --audience developer` は対象ページだけを `manual/developer/` に出力します。`--audience user` と `--audience maintainer` も同様です。読者別出力には、その読者向けの `index.md` が必要です。

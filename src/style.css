@@ -115,6 +115,13 @@ select { color-scheme: dark; }
 .manual-card select option, .manual-preview-header select option { background-color: var(--panel-bg); color: var(--text-main); }
 .manual-card textarea { resize: vertical; line-height: 1.5; }
 .manual-card p, .manual-task small { color: var(--text-muted); line-height: 1.5; margin: 0; }
+.manual-workflow-card details { border-top: 1px solid var(--border-color); padding-top: 10px; }
+.manual-workflow-card summary { cursor: pointer; font-weight: 600; color: var(--text-main); margin-bottom: 8px; }
+.manual-workflow-card details label { margin: 8px 0; }
+.manual-workflow-card .manual-inline-check { display: flex; align-items: center; gap: 8px; }
+.manual-workflow-card .manual-inline-check input { width: auto; }
+.manual-workflow-card .manual-actions { margin: 10px 0 4px; }
+.manual-workflow-output { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height: 230px; margin: 0; padding: 10px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 5px; font: 0.8rem/1.5 monospace; }
 .manual-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .manual-assets-summary {

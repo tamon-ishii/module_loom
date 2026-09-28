@@ -1,14 +1,17 @@
 pub mod agent;
+pub mod audience;
 pub mod author;
 pub mod builder;
 pub mod config;
 pub mod context;
 pub mod deps;
+pub mod fact;
 pub mod preview;
 pub mod scenario;
 pub mod task;
 pub mod template;
 pub mod uimap;
+pub mod ui_explore;
 pub mod window_capture;
 
 use std::collections::HashSet;
@@ -44,6 +47,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "build",
         "ui-map",
         "ui-map-import",
+        "ui-explore",
         "deps",
         "impact",
         "impact-plan",
@@ -53,6 +57,12 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "list-windows",
         "capture-window",
         "scenario-run",
+        "scenario-save",
+        "scenario-load",
+        "scenario-link",
+        "scenario-test",
+        "e2e",
+        "fact-check",
     ];
     if !allowed.contains(&action) {
         return Err(format!("Unsupported manual action: {action}"));
@@ -87,6 +97,10 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut template_opt: Option<&str> = None;
     let mut clear_flag = false;
     let mut refresh_flag = false;
+    let mut check_flag = false;
+    let mut url_opt: Option<&str> = None;
+    let mut max_pages_opt: Option<&str> = None;
+    let mut audience_opt: Option<&str> = None;
 
     for (key, value) in options {
         match *key {
@@ -96,6 +110,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--template" => template_opt = Some(*value),
             "--clear" => clear_flag = true,
             "--refresh" => refresh_flag = true,
+            "--check" => check_flag = true,
             "--brief" => brief_opt = Some(*value),
             "--agent" => agent_opt = Some(*value),
             "--model" => model_opt = Some(*value),
@@ -115,6 +130,9 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--json" => json_opt = Some(*value),
             "--input" => input_opt = Some(*value),
             "--window" => window_opt = Some(*value),
+            "--url" => url_opt = Some(*value),
+            "--max-pages" => max_pages_opt = Some(*value),
+            "--audience" => audience_opt = Some(*value),
             "--inset" => inset_opt = Some(*value),
             _ => return Err(format!("Unsupported manual option: {key}")),
         }
@@ -128,6 +146,12 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     };
     let output_path = if let Some(o) = output_opt {
         project_path(root, o)?
+    } else if action == "build" {
+        if let Some(audience) = audience_opt {
+            project_path(root, &format!("{}/{audience}", cfg.output))?
+        } else {
+            project_path(root, &cfg.output)?
+        }
     } else {
         project_path(root, &cfg.output)?
     };
@@ -162,6 +186,26 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let input = input_opt.ok_or("scenario-run requires --input")?;
             scenario::run(root, input)
         }
+        "scenario-save" => {
+            let input = input_opt.ok_or("scenario-save requires --input")?;
+            let json = json_opt.ok_or("scenario-save requires --json")?;
+            scenario::save(root, input, json)
+        }
+        "scenario-load" => {
+            let input = input_opt.ok_or("scenario-load requires --input")?;
+            scenario::load(root, input)
+        }
+        "scenario-link" => {
+            let input = input_opt.ok_or("scenario-link requires --input")?;
+            let page = page_opt.ok_or("scenario-link requires --page")?;
+            scenario::link(root, input, page)
+        }
+        "scenario-test" => {
+            let input = input_opt.ok_or("scenario-test requires --input")?;
+            scenario::test(root, input)
+        }
+        "e2e" => scenario::test_manual(root),
+        "fact-check" => fact::verify(root, check_flag),
         "state" => {
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
@@ -321,13 +365,13 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             )?;
             Ok(String::new())
         }
-        "build" => builder::build(
-            &templates_path,
-            &generated_path,
-            &output_path,
-            draft_flag,
-            Some(root),
-        ),
+        "build" => {
+            if let Some(audience) = audience_opt {
+                audience::build(root, &templates_path, &generated_path, &output_path, draft_flag, audience)
+            } else {
+                builder::build(&templates_path, &generated_path, &output_path, draft_flag, Some(root))
+            }
+        },
         "ui-map" => {
             let map = if refresh_flag {
                 uimap::refresh_ui_map(root)
@@ -347,6 +391,14 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             };
             let map = uimap::import_ui_observation(root, &input_path)?;
             serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
+        }
+        "ui-explore" => {
+            let url = url_opt.ok_or("ui-explore requires --url")?;
+            let max_pages = max_pages_opt
+                .unwrap_or("10")
+                .parse::<usize>()
+                .map_err(|_| "Invalid --max-pages value")?;
+            ui_explore::explore(root, url, max_pages)
         }
         "deps" => {
             let graph = deps::build_manual_dependency_graph(root, &templates_path)?;
