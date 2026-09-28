@@ -1,10 +1,14 @@
 # ModuleLoom
 
-<img src="manual/assets/module_loom.png" alt="ModuleLoom ロゴ" width="720">
+<img src="module_loom.png" alt="ModuleLoom の画面" width="720">
 
 Python プロジェクトの依存関係を可視化し、コードを診断するツールです。デスクトップアプリ、PyCharm プラグイン、VS Code 拡張機能、CLI を提供します。
 
-<!-- ai:generated id=readme-overview kind=screenshot created-at=2026-09-28T13:02:18Z source-sha256=9b83605a5d4b86cd31532cbea3acdfccd241b860edf4651ab06c45346456d28d -->
+<!-- ai:task id=readme-overview kind=screenshot
+ModuleLoom の画面と依存関係図が見えるデスクトップ画面を撮影する。
+-->
+
+<!-- ai:generated id=readme-overview kind=screenshot source-sha256=b17f94877f15a89ee72c5dbfc06b8d221ebc237607d1364e483bfee066054301 prompt-b64=TW9kdWxlTG9vbSDjga7nlLvpnaLjgajkvp3lrZjplqLkv4Llm7PjgYzopovjgYjjgovjg4fjgrnjgq/jg4jjg4Pjg5fnlLvpnaLjgpLmkq7lvbHjgZnjgovjgII= -->
 ![ModuleLoom デスクトップ版のモジュール一覧と依存関係図](manual/assets/readme-overview.png)
 <!-- /ai:generated -->
 

@@ -220,6 +220,14 @@ async fn manual_capture_screenshot(
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(base64_str.trim())
             .map_err(|e| format!("Base64 decode error: {e}"))?;
+        if bytes.len() < 24
+            || &bytes[..8] != b"\x89PNG\r\n\x1a\n"
+            || &bytes[12..16] != b"IHDR"
+            || u32::from_be_bytes(bytes[16..20].try_into().unwrap()) == 0
+            || u32::from_be_bytes(bytes[20..24].try_into().unwrap()) == 0
+        {
+            return Err("Screenshot data is not a valid PNG image".to_string());
+        }
         std::fs::write(&image, bytes).map_err(|e| e.to_string())?;
 
         let options = vec![

@@ -920,6 +920,25 @@ async function jumpToAssetInPreview(taskPage: string, taskId: string): Promise<v
 }
 
 async function captureBackgroundScreenshot(taskId: string, annotationHint?: string): Promise<string> {
+  if (taskId === "manual-settings" && manualSettingsModal) {
+    const wasHidden = manualSettingsModal.classList.contains("hidden");
+    if (wasHidden) openManualSettingsModal();
+    try {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const canvas = await html2canvas(manualSettingsModal, {
+        backgroundColor: "#1e1e2e",
+        scale: 1.5,
+        logging: false,
+        useCORS: true,
+      });
+      if (!canvas.width || !canvas.height) throw new Error("設定画面を撮影できませんでした");
+      const dataUrl = canvas.toDataURL("image/png");
+      manualScreenshotCache[taskId] = dataUrl;
+      return dataUrl;
+    } finally {
+      if (wasHidden) closeManualSettingsModal();
+    }
+  }
   const isGraphTask = taskId.includes("graph") || taskId.includes("overview") || taskId.includes("module");
   if (isGraphTask && cy && cy.nodes().length > 0 && !annotationHint) {
     try {
@@ -943,7 +962,7 @@ async function captureBackgroundScreenshot(taskId: string, annotationHint?: stri
   let targetEl: HTMLElement | null = null;
   if (taskId.includes("diagnostic")) {
     targetEl = document.getElementById("complexity-dashboard");
-  } else if (taskId.includes("setting") || taskId.includes("tool-window")) {
+  } else if (taskId.includes("tool-window")) {
     targetEl = document.getElementById("module-view");
   } else if (taskId.includes("manual")) {
     targetEl = document.getElementById("manual-view");

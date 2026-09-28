@@ -479,16 +479,44 @@
 <p><strong>ドキュメント生成</strong>タブでは、Markdown 原稿と画面画像・依存図を管理し、MkDocs の HTML サイトを出力します。スクリーンショットと Mermaid 図は原稿内のタスクに対応します。</p>
 <h2 id="_2">原稿と出力先を確認する</h2>
 <p><strong>設定</strong>で対象プロジェクト、Markdown 原稿のフォルダー、HTML の出力先を確認します。この例では原稿が <code>docs/</code>、出力先が <code>manual/</code> です。</p>
+<!-- ai:task id=manual-settings kind=screenshot
+ドキュメント生成の原稿パスと HTML 出力先の設定画面を撮影する。
+-->
+
+<!-- ai:generated id=manual-settings kind=screenshot prompt-b64=44OJ44Kt44Ol44Oh44Oz44OI55Sf5oiQ44Gu5Y6f56i/44OR44K544GoIEhUTUwg5Ye65Yqb5YWI44Gu6Kit5a6a55S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=33cf046d725fa0756cc07d1ce827a1b14debd940ead1a9786c6f7108cf4504c5 -->
 <p><img alt="ドキュメント生成のパスと MkDocs の設定画面" src="assets/manual-settings.png" /></p>
+<!-- /ai:generated -->
+
 <p>原稿がない場合は <strong>テンプレート生成</strong>から下書きを作れます。既存の原稿がある場合は、その内容を確認してから生成を実行してください。</p>
+<!-- ai:task id=manual-template kind=screenshot
+テンプレート生成で原稿の種類を選ぶ画面を撮影する。
+-->
+
+<!-- ai:generated id=manual-template kind=screenshot prompt-b64=44OG44Oz44OX44Os44O844OI55Sf5oiQ44Gn5Y6f56i/44Gu56iu6aGe44KS6YG444G255S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=fb911cc7ddfb28214133f5c6edf9f8885cc99a84db446ef9ef010c96f442f7f0 -->
 <p><img alt="テンプレート生成で選ぶ原稿の種類" src="assets/manual-screen.png" /></p>
+<!-- /ai:generated -->
+
 <h2 id="_3">画像と図を更新する</h2>
-<p>原稿にスクリーンショットのタスクがある場合、<strong>全スクショ一括撮影</strong>で現在の画面から画像を撮影します。個別の画像を撮り直す場合は、同期アセット一覧の <strong>画面を自動撮影</strong>を使います。操作対象を示したいときは <strong>修正指示</strong>にボタン名や要素 ID と「赤丸で囲む」などを入力して再撮影できます。</p>
+<p>原稿にスクリーンショットのタスクがある場合、<strong>全スクショ一括撮影</strong>で現在の画面から画像を撮影します。個別の画像を撮り直す場合は、更新対象アセットの <strong>画面を自動撮影</strong>を使います。操作対象を示したいときは <strong>修正指示</strong>にボタン名や要素 ID と「赤丸で囲む」などを入力して再撮影できます。</p>
+<!-- ai:task id=manual-capture-control kind=screenshot
+全スクショ一括撮影ボタンの位置が分かる画面を撮影する。
+-->
+
+<!-- ai:generated id=manual-capture-control kind=screenshot prompt-b64=5YWo44K544Kv44K344On5LiA5ous5pKu5b2x44Oc44K/44Oz44Gu5L2N572u44GM5YiG44GL44KL55S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=d41eced2ef16857d557608a52962ce86de512630c776d23017d362a4a5ddca96 -->
 <p><img alt="全スクショ一括撮影ボタンを赤枠で示した画面" src="assets/capture-control.png" /></p>
+<!-- /ai:generated -->
+
 <p>依存図のタスクは <strong>全ダイアグラム更新</strong>で更新します。API リファレンスが必要な場合は <strong>API ドキュメント生成</strong>を使い、docstring と型注釈からモジュール別のページを作ります。</p>
 <h2 id="_4">ビルドして確認する</h2>
 <p><strong>下書きビルド</strong>は未完成のタスクを残したままプレビューを作ります。右側の <strong>HTML</strong> 表示でページを確認し、画像や文章を直した後に <strong>完成版ビルド</strong>を実行します。完成版ビルドでは、未解決のタスクがあるとエラーになります。</p>
+<!-- ai:task id=manual-draft-build kind=screenshot
+下書きビルドボタンと HTML プレビューが見える画面を撮影する。
+-->
+
+<!-- ai:generated id=manual-draft-build kind=screenshot prompt-b64=5LiL5pu444GN44OT44Or44OJ44Oc44K/44Oz44GoIEhUTUwg44OX44Os44OT44Ol44O844GM6KaL44GI44KL55S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=10e402e8ed5ada7d15ca22f89b4423cdc3683603043c9b24db4dc213183d1d88 -->
 <p><img alt="下書きビルドボタンと HTML プレビュー" src="assets/draft-build-control.png" /></p>
+<!-- /ai:generated -->
+
 <h2 id="ai">AI タグの仕様</h2>
 <p>Markdown 原稿では、生成・撮影・更新する箇所を <code>ai:task</code> タグで指定します。タグは HTML コメントなので、生成前の原稿を通常の Markdown 表示にしても指示文は本文に表示されません。</p>
 <div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=quickstart-guide kind=text
@@ -506,7 +534,7 @@
 <p><code>id</code> はタスクを識別する名前です。省略時は種類・ファイル名などから自動生成されます。明示する場合は小文字英字で始め、小文字英数字とハイフンだけを使います（<code>^[a-z][a-z0-9-]*$</code>）。ID はすべての原稿 Markdown ファイルを通じて重複しないようにします。</p>
 <p><code>kind</code> は <code>text</code>（説明文）、<code>screenshot</code>（画面画像）、<code>diagram</code>（Mermaid 図）のいずれかです。省略すると <code>text</code> として扱われます。タグの開始行の後で改行して指示を書き、終了の <code>--&gt;</code> は別の行に置いてください。指示文は空にできません。</p>
 <p>種類ごとに生成内容を分けます。<code>text</code> には説明文、<code>screenshot</code> には画像 Markdown、<code>diagram</code> には Mermaid コードブロックだけを置きます。画像の説明や図の注釈が必要な場合は、別の <code>kind=text</code> タスクを使います。</p>
-<p>生成後は <code>ai:task</code> が <code>ai:generated</code> ブロックに置き換わり、タスクの種類・指示と回答の状態が記録されます。指示や種類が変わると既存の回答は古い状態になります。下書きビルドでは未完了タスクを確認できますが、完成版ビルドには各タスクの最新の回答が必要です。</p>
+<p>生成後も <code>ai:task</code> は更新指示として残し、その直下に同じ <code>id</code> の <code>ai:generated</code> ブロックを置きます。次回の同期では指示を使って回答を更新し、生成ブロックの本文だけを差し替えます。指示や種類が変わると既存の回答は古い状態になります。下書きビルドでは未完了タスクを確認できますが、完成版ビルドには各タスクの最新の回答が必要です。</p>
 <p>CLI から既存の Python コードに基づく MkDocs ページだけを生成する場合は、次のコマンドを使用します。</p>
 <div class="highlight"><pre><span></span><code>moduleloom-analyze<span class="w"> </span>--mkdocs<span class="w"> </span>./moduleloom-docs<span class="w"> </span>./sample_project
 </code></pre></div>

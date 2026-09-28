@@ -1,8 +1,9 @@
+use base64::Engine;
 use chrono::Utc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -17,6 +18,10 @@ pub fn source_hash(kind: &str, prompt: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(format!("{kind}\n{prompt}").as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+pub fn encode_prompt(prompt: &str) -> String {
+    base64::engine::general_purpose::STANDARD.encode(prompt.as_bytes())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -235,6 +240,7 @@ pub fn parse_page_tags(
     let id_re = Regex::new(r#"(?:^|\s)id=(?:"([^"]+)"|'([^']+)'|([^\s>]+))"#).unwrap();
     let kind_re = Regex::new(r#"(?:^|\s)kind=(?:"([^"]+)"|'([^']+)'|([^\s>]+))"#).unwrap();
     let source_hash_re = Regex::new(r#"\bsource-sha256=([a-f0-9]{64})"#).unwrap();
+    let prompt_re = Regex::new(r#"\bprompt-b64=([A-Za-z0-9+/=]+)"#).unwrap();
     let approved_re = Regex::new(r#"\bapproved-at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"#).unwrap();
     let valid_id_re = Regex::new(r#"^[a-z][a-z0-9-]*$"#).unwrap();
 
@@ -277,6 +283,21 @@ pub fn parse_page_tags(
         raw_gens.push(RawGenerated { range, attrs, body });
     }
 
+    // An instruction immediately followed by its answer is one updateable asset.
+    let mut paired_prompts: HashMap<usize, String> = HashMap::new();
+    let mut paired_tasks = HashSet::new();
+    for (gen_index, generated) in raw_gens.iter().enumerate() {
+        let Some(gen_id) = extract_attr(&id_re, &generated.attrs) else { continue };
+        if let Some((task_index, source)) = raw_tasks.iter().enumerate().find(|(_, source)| {
+            extract_attr(&id_re, &source.attrs) == Some(gen_id)
+                && source.range.end <= generated.range.start
+                && content[source.range.end..generated.range.start].trim().is_empty()
+        }) {
+            paired_prompts.insert(gen_index, source.prompt.clone());
+            paired_tasks.insert(task_index);
+        }
+    }
+
     // Pass 1: Validate and register all explicit IDs
     for t in &raw_tasks {
         if let Some(id_str) = extract_attr(&id_re, &t.attrs) {
@@ -289,12 +310,12 @@ pub fn parse_page_tags(
             existing_ids.insert(id_str.to_string());
         }
     }
-    for g in &raw_gens {
+    for (gen_index, g) in raw_gens.iter().enumerate() {
         if let Some(id_str) = extract_attr(&id_re, &g.attrs) {
             if !valid_id_re.is_match(id_str) {
                 return Err(format!("Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)"));
             }
-            if existing_ids.contains(id_str) {
+            if existing_ids.contains(id_str) && !paired_prompts.contains_key(&gen_index) {
                 return Err(format!("Duplicate task ID: {id_str}"));
             }
             existing_ids.insert(id_str.to_string());
@@ -306,7 +327,8 @@ pub fn parse_page_tags(
     let mut tags = Vec::new();
 
     // Pass 2: Build Task objects, assigning auto IDs where omitted
-    for t in raw_tasks {
+    for (task_index, t) in raw_tasks.into_iter().enumerate() {
+        if paired_tasks.contains(&task_index) { continue; }
         let kind = if let Some(k) = extract_attr(&kind_re, &t.attrs) {
             if k != "text" && k != "screenshot" && k != "diagram" {
                 return Err(format!("Invalid task kind: '{k}' (must be text, screenshot, or diagram)"));
@@ -337,7 +359,7 @@ pub fn parse_page_tags(
     }
 
     // Pass 3: Build Generated objects
-    for g in raw_gens {
+    for (gen_index, g) in raw_gens.into_iter().enumerate() {
         let id_str = extract_attr(&id_re, &g.attrs).unwrap().to_string();
         let kind = if let Some(k) = extract_attr(&kind_re, &g.attrs) {
             k.to_string()
@@ -349,18 +371,31 @@ pub fn parse_page_tags(
             .captures(&g.attrs)
             .map(|c| c.get(1).unwrap().as_str().to_string())
             .unwrap_or_default();
+        let prompt = if let Some(source_prompt) = paired_prompts.get(&gen_index) {
+            source_prompt.clone()
+        } else if let Some(encoded) = prompt_re.captures(&g.attrs) {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded.get(1).unwrap().as_str())
+                .map_err(|e| format!("Invalid prompt-b64 in page {page_rel}: {e}"))?;
+            String::from_utf8(bytes).map_err(|e| format!("Invalid prompt-b64 in page {page_rel}: {e}"))?
+        } else {
+            format!("AI生成コンテンツ ({kind})")
+        };
 
+        let status = if !hash.is_empty() && hash != source_hash(&kind, &prompt) {
+            "stale".to_string()
+        } else if approved {
+            "approved".to_string()
+        } else {
+            "current".to_string()
+        };
         let task = Task {
             id: id_str,
             kind: kind.clone(),
             page: page_rel.to_string(),
-            prompt: format!("AI生成コンテンツ ({kind})"),
+            prompt,
             source_sha256: hash,
-            status: if approved {
-                "approved".to_string()
-            } else {
-                "current".to_string()
-            },
+            status,
         };
         tags.push(PageTag::Generated { range: g.range, task, body: g.body });
     }
@@ -511,9 +546,10 @@ pub fn update_task_in_docs(
     } else {
         String::new()
     };
+    let prompt_attr = format!(" prompt-b64={}", encode_prompt(&task.prompt));
 
     let replacement = format!(
-        "<!-- ai:generated id={task_id} kind={kind} created-at={created}{hash_attr}{approved_attr} -->\n{}\n<!-- /ai:generated -->",
+        "<!-- ai:generated id={task_id} kind={kind} created-at={created}{hash_attr}{prompt_attr}{approved_attr} -->\n{}\n<!-- /ai:generated -->",
         body.trim()
     );
 
@@ -521,16 +557,35 @@ pub fn update_task_in_docs(
     let mut ids = HashSet::new();
     let tags = parse_page_tags(&page_rel, &content, &mut ids)?;
 
-    if let Some(target_tag) = tags.iter().find(|t| match t {
-        PageTag::Task { task: t, .. } => t.id == *task_id,
-        PageTag::Generated { task: t, .. } => t.id == *task_id,
-    }) {
+    if let Some(target_tag) = tags.iter().find(|t| matches!(t,
+        PageTag::Generated { task: t, .. } if t.id == *task_id
+    )) {
         let range = match target_tag {
-            PageTag::Task { range, .. } => range,
             PageTag::Generated { range, .. } => range,
+            PageTag::Task { .. } => unreachable!(),
         };
         let mut new_content = String::with_capacity(content.len() + replacement.len());
         new_content.push_str(&content[..range.start]);
+        new_content.push_str(&replacement);
+        new_content.push_str(&content[range.end..]);
+        fs::write(&page_path, new_content.as_bytes()).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    if let Some(PageTag::Task { range, .. }) = tags.iter().find(|t| matches!(t,
+        PageTag::Task { task: t, .. } if t.id == *task_id
+    )) {
+        let source_tag = &content[range.start..range.end];
+        let id_attr_re = Regex::new(r#"(?:^|\s)id=(?:\"[^\"]+\"|'[^']+'|[^\s>]+)"#).unwrap();
+        let task_tag = if id_attr_re.is_match(source_tag) {
+            source_tag.to_string()
+        } else {
+            source_tag.replacen("<!-- ai:task", &format!("<!-- ai:task id={task_id}"), 1)
+        };
+        let mut new_content = String::with_capacity(content.len() + replacement.len() + 2);
+        new_content.push_str(&content[..range.start]);
+        new_content.push_str(&task_tag);
+        new_content.push_str("\n\n");
         new_content.push_str(&replacement);
         new_content.push_str(&content[range.end..]);
         fs::write(&page_path, new_content.as_bytes()).map_err(|e| e.to_string())?;

@@ -814,6 +814,8 @@ mod tests {
 
         let updated = fs::read_to_string(&page1).unwrap();
         assert!(updated.contains("![top-shot](assets/screen.png)"));
+        assert!(updated.contains("<!-- ai:task id=top-shot kind=screenshot"));
+        assert_eq!(task::find_task(&docs, "top-shot").unwrap().prompt, "ツールウィンドウの全体画面");
         // 不要な出典や定型文が一切含まれていないことを検証
         assert!(!updated.contains("実際の PyCharm"));
         assert!(!updated.contains("図の生成元"));
@@ -1002,7 +1004,7 @@ mod tests {
         let updated_content = fs::read_to_string(&page1).unwrap();
         assert!(updated_content.contains(&format!("<!-- ai:generated id={}", auto_task.id)));
         assert!(updated_content.contains("![guide-screenshot](assets/guide.png)"));
-        assert!(!updated_content.contains("<!-- ai:task kind=screenshot"));
+        assert!(updated_content.contains(&format!("<!-- ai:task id={} kind=screenshot", auto_task.id)));
 
         // 再スキャンしてもステータスが維持される
         let scanned = task::scan_entries(&docs, &gen);

@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use super::agent::which_binary;
 use super::config::read_config;
 use super::task::{
-    collect_markdown_files, parse_page_tags, read_answer, source_hash, tasks, utc_now, PageTag,
+    collect_markdown_files, encode_prompt, parse_page_tags, read_answer, source_hash, tasks, utc_now, PageTag,
 };
 
 const SITE_MANIFEST: &str = ".moduleloom-site-files.json";
@@ -224,8 +224,9 @@ fn build_inner(
                         .as_ref()
                         .map(|a| format!(" approved-at={a}"))
                         .unwrap_or_default();
+                    let prompt_attr = format!(" prompt-b64={}", encode_prompt(prompt));
                     rendered.push_str(&format!(
-                        "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
+                        "<!-- ai:generated id={task_id} kind={kind} created-at={created} source-sha256={digest}{prompt_attr}{approved_attr} -->\n{body}\n<!-- /ai:generated -->"
                     ));
                 } else {
                     rendered.push_str(&format!("> **作成待ち:** `{task_id}` ({kind})"));
@@ -253,7 +254,7 @@ fn build_inner(
                 if let Some(parent) = dest.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                let _ = fs::copy(entry.path(), &dest);
+                fs::copy(entry.path(), &dest).map_err(|e| e.to_string())?;
             }
         }
     }
@@ -269,7 +270,9 @@ fn build_inner(
                 if let Some(parent) = dest.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                let _ = fs::copy(entry.path(), &dest);
+                if !dest.exists() {
+                    fs::copy(entry.path(), &dest).map_err(|e| e.to_string())?;
+                }
             }
         }
     }
