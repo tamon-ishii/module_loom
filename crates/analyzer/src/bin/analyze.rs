@@ -91,7 +91,7 @@ fn main() {
             println!("Usage: moduleloom-analyze [OPTIONS] [PROJECT_PATH]");
             println!("  --diagnostics      Run code diagnostics and print AI-ready JSON");
             println!("  --install-skill    Install the bundled skill for detected coding agents");
-            println!("  --manual ACTION   Manage the manual (impact-plan, generate-impacted, state, build, ...)");
+            println!("  --manual ACTION   Manage the manual (impact-plan, generate-impacted, scenario-run, build, ...)");
             println!("  --quality-report   Alias of --diagnostics");
             println!("  --quality --json   Print the full analysis with diagnostics");
             println!("  --max-score N      Exit with status 1 if the score exceeds N");

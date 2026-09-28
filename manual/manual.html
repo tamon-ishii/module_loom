@@ -362,6 +362,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="UI Map と変更影響を確認する">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web 画面の撮影シナリオ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -478,6 +495,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="UI Map と変更影響を確認する">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web 画面の撮影シナリオ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -579,6 +613,20 @@
 <p><code>task</code> を省くとページ全体、指定すると同じページの <code>ai:task</code> に結び付きます。<code>file</code> はプロジェクト内の相対パスで、Python 以外のファイルも指定できます。<code>symbol</code> と <code>ui</code> も指定できます。複数のファイルを結ぶ場合は行を分けてください。宣言は HTML コメントとして扱われ、マニュアル本文には表示されません。<code>--manual deps --root .</code> の <code>evidence</code> には明示した関係を <code>ai:depends</code> として記録します。推測で見つけた関係は <code>text-match</code> として区別します。</p>
 <p>変更後に更新対象を確認するには <code>--manual impact-plan --root . --ref HEAD</code> を実行します。結果の <code>generate_tasks</code> は自動更新できる文章・図、<code>manual_tasks</code> は撮影などの手作業が必要なタスク、<code>approved_tasks</code> は承認済みで自動更新しないタスクです。<code>page_only</code> は変更の影響があるものの、個別のタスクまで特定できないページです。</p>
 <p><code>--manual generate-impacted --root . --ref HEAD</code> は、同じ計画の <code>generate_tasks</code> だけを順に更新します。実行前に <code>impact-plan</code> で対象を確認してください。途中で生成が失敗した場合はその時点で終了し、それ以前に更新したタスクは残ります。スクリーンショットや承認済みタスク、ページ単位の候補は自動更新しません。</p>
+<h3 id="web">Web 画面の撮影シナリオ</h3>
+<p>Web アプリでは操作を JSON ファイルに記録し、順に実行できます。対象プロジェクトに Node.js、<code>playwright-core</code>、Google Chrome が必要です。<code>npm install --save-dev playwright-core</code> で依存を追加してください。Chrome が標準の場所にない場合は <code>MODULELOOM_CHROME_PATH</code> に実行ファイルのパスを設定します。</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"base_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://localhost:3000/"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"goto"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/"</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"click"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#settings-button"</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"expect_visible"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#settings-dialog"</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"screenshot"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"task"</span><span class="p">:</span><span class="w"> </span><span class="s2">"settings-shot"</span><span class="p">,</span><span class="w"> </span><span class="nt">"selector"</span><span class="p">:</span><span class="w"> </span><span class="s2">"#settings-dialog"</span><span class="p">}}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>原稿には <code>settings-shot</code> という <code>kind=screenshot</code> の <code>ai:task</code> を用意します。<code>--manual scenario-run --root . --input scenario.json</code> を実行すると、指定した要素だけを <code>docs/assets/settings-shot.png</code> に撮影し、タスクの <code>ai:generated</code> に画像リンクを登録します。<code>selector</code> を省けば表示中のページ全体を撮影します。操作には <code>goto</code>、<code>click</code>、<code>fill</code>（<code>{"selector":"#name","value":"example"}</code>）、<code>expect_visible</code>、<code>screenshot</code> を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。現在の実行対象は Web ページです。</p>
 
 
 

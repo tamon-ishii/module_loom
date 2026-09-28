@@ -113,3 +113,22 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 変更後に更新対象を確認するには `--manual impact-plan --root . --ref HEAD` を実行します。結果の `generate_tasks` は自動更新できる文章・図、`manual_tasks` は撮影などの手作業が必要なタスク、`approved_tasks` は承認済みで自動更新しないタスクです。`page_only` は変更の影響があるものの、個別のタスクまで特定できないページです。
 
 `--manual generate-impacted --root . --ref HEAD` は、同じ計画の `generate_tasks` だけを順に更新します。実行前に `impact-plan` で対象を確認してください。途中で生成が失敗した場合はその時点で終了し、それ以前に更新したタスクは残ります。スクリーンショットや承認済みタスク、ページ単位の候補は自動更新しません。
+
+### Web 画面の撮影シナリオ
+
+Web アプリでは操作を JSON ファイルに記録し、順に実行できます。対象プロジェクトに Node.js、`playwright-core`、Google Chrome が必要です。`npm install --save-dev playwright-core` で依存を追加してください。Chrome が標準の場所にない場合は `MODULELOOM_CHROME_PATH` に実行ファイルのパスを設定します。
+
+```json
+{
+  "version": 1,
+  "base_url": "http://localhost:3000/",
+  "steps": [
+    {"goto": "/"},
+    {"click": "#settings-button"},
+    {"expect_visible": "#settings-dialog"},
+    {"screenshot": {"task": "settings-shot", "selector": "#settings-dialog"}}
+  ]
+}
+```
+
+原稿には `settings-shot` という `kind=screenshot` の `ai:task` を用意します。`--manual scenario-run --root . --input scenario.json` を実行すると、指定した要素だけを `docs/assets/settings-shot.png` に撮影し、タスクの `ai:generated` に画像リンクを登録します。`selector` を省けば表示中のページ全体を撮影します。操作には `goto`、`click`、`fill`（`{"selector":"#name","value":"example"}`）、`expect_visible`、`screenshot` を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。現在の実行対象は Web ページです。

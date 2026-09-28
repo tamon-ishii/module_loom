@@ -5,6 +5,7 @@ pub mod config;
 pub mod context;
 pub mod deps;
 pub mod preview;
+pub mod scenario;
 pub mod task;
 pub mod template;
 pub mod uimap;
@@ -51,6 +52,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "markits-render",
         "list-windows",
         "capture-window",
+        "scenario-run",
     ];
     if !allowed.contains(&action) {
         return Err(format!("Unsupported manual action: {action}"));
@@ -155,6 +157,10 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             author::record_screenshot(root, task_id, &image)?;
             serde_json::to_string(&serde_json::json!({"window": window, "image": image}))
                 .map_err(|error| error.to_string())
+        }
+        "scenario-run" => {
+            let input = input_opt.ok_or("scenario-run requires --input")?;
+            scenario::run(root, input)
         }
         "state" => {
             let state_val = get_state(root)?;
@@ -1553,6 +1559,26 @@ mod tests {
         assert_eq!(plan.manual_tasks, vec!["capture-guide"]);
         assert_eq!(plan.approved_tasks, vec!["locked-guide"]);
         assert_eq!(plan.page_only, vec!["overview.md"]);
+    }
+
+    #[test]
+    fn test_scenario_rejects_non_screenshot_task_before_browser_launch() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs/index.md"),
+            "<!-- ai:task id=intro kind=text\n説明を書く\n-->\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("scenario.json"),
+            r##"{"version":1,"base_url":"http://localhost:3000","steps":[{"screenshot":{"task":"intro","selector":"#dialog"}}]}"##,
+        )
+        .unwrap();
+        let error = run(root, "scenario-run", &[("--input", "scenario.json")]).unwrap_err();
+        assert!(error.contains("not a screenshot"));
+        assert!(!root.join("docs/assets/intro.png").exists());
     }
 
     #[test]
