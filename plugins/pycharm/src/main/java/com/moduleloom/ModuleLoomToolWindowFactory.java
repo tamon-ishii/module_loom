@@ -35,7 +35,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.event.AWTEventListener;
 import java.awt.event.MouseEvent;
@@ -675,7 +674,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 String action = extractJsonField(request, "action");
                 if (action == null) throw new IllegalArgumentException("マニュアル操作を指定してください");
                 List<String> args = new ArrayList<>(List.of(findAnalyzerBinary(project), "--manual", action, "--root", root.toString()));
-                for (String key : List.of("docs", "output", "brief", "agent", "model", "id", "page", "asset", "format", "feedback", "targets", "template")) {
+                for (String key : List.of("docs", "output", "brief", "agent", "model", "id", "page", "asset", "window", "inset", "format", "feedback", "targets", "template")) {
                     String value = extractJsonField(request, key);
                     if (value != null) args.addAll(List.of("--" + key, value));
                 }
@@ -687,30 +686,6 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 if ("true".equals(extractJsonField(request, "clear"))) args.add("--clear");
                 if ("generate-task".equals(action)) args.addAll(List.of("--cli", findAnalyzerBinary(project)));
                 return jsonString(runProcess(root, args, null, false).trim());
-            }
-            case "manual_capture_screenshot": {
-                String taskId = extractJsonField(request, "id");
-                if (taskId == null || !taskId.matches("[a-z][a-z0-9-]*")) throw new IllegalArgumentException("スクリーンショットのタグIDが不正です");
-                Path assets = root.resolve("docs/assets");
-                Files.createDirectories(assets);
-                Path image = assets.resolve(taskId + ".png");
-
-                String dataUrl = extractJsonField(request, "data");
-                if (dataUrl != null && !dataUrl.isEmpty()) {
-                    String base64 = dataUrl.contains(",") ? dataUrl.substring(dataUrl.indexOf(",") + 1) : dataUrl;
-                    byte[] bytes = java.util.Base64.getDecoder().decode(base64.trim());
-                    Files.write(image, bytes);
-                } else {
-                    ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ModuleLoom");
-                    if (toolWindow == null || !toolWindow.isVisible()) throw new IllegalStateException("ModuleLoom ツールウィンドウを表示してください");
-                    Component component = toolWindow.getComponent();
-                    if (!component.isShowing()) throw new IllegalStateException("撮影する画面が表示されていません");
-                    Point location = component.getLocationOnScreen();
-                    Rectangle bounds = new Rectangle(location.x, location.y, component.getWidth(), component.getHeight());
-                    ImageIO.write(new Robot().createScreenCapture(bounds), "png", image.toFile());
-                }
-                runProcess(root, List.of(findAnalyzerBinary(project), "--manual", "record-screenshot", "--root", root.toString(), "--id", taskId, "--image", image.toString()), null, false);
-                return jsonString(image.toString());
             }
             case "export_report": {
                 String jsonData = extractJsonField(request, "json");

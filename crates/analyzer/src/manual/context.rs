@@ -98,7 +98,9 @@ pub fn build_application_context(root: &Path) -> ApplicationContext {
     if !description.is_empty() {
         p.push_str(&format!("- 概要: {description}\n"));
     }
-    p.push_str(&format!("- 総モジュール数: {modules_count} 件, 循環インポート: {cycles_count} 件\n\n"));
+    p.push_str(&format!(
+        "- 総モジュール数: {modules_count} 件, 循環インポート: {cycles_count} 件\n\n"
+    ));
 
     if !readme_summary.is_empty() {
         p.push_str("## README 抜粋\n");
@@ -128,7 +130,15 @@ pub fn build_application_context(root: &Path) -> ApplicationContext {
     if !ui_map.views.is_empty() {
         p.push_str("## 検出された UI 画面・要素 (UI Map)\n");
         for v in &ui_map.views {
-            p.push_str(&format!("### 画面: {} (`#{}`)\n", v.name, v.id));
+            let evidence = v
+                .observed_from
+                .as_deref()
+                .map(|source| format!("実画面観測: {source}"))
+                .unwrap_or_else(|| "静的解析".to_string());
+            p.push_str(&format!(
+                "### 画面: {} (`#{}`; {})\n",
+                v.name, v.id, evidence
+            ));
             for el in v.elements.iter().take(10) {
                 p.push_str(&format!(
                     "- [{}] {} (`{}`)\n",

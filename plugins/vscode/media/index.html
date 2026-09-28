@@ -160,11 +160,10 @@
         <div class="manual-header">
           <div class="manual-header-title">
             <h2>ドキュメント生成</h2>
-            <span class="manual-header-sub">スクショ・ダイアグラム・AIテキストを自動同期</span>
+            <span class="manual-header-sub">画像タスク・ダイアグラム・AIテキストを管理</span>
           </div>
           <div class="manual-header-actions">
             <button id="btn-manual-open-templates" class="btn-secondary" type="button" title="マニュアルやAPIドキュメントの初期原稿テンプレートを生成・初期化します">📑 テンプレート生成</button>
-            <button id="btn-manual-capture-all" class="btn-secondary" type="button" title="すべてのスクリーンショットを現在の画面から自動で一括再撮影して差し替えます">📸 全スクショ一括撮影</button>
             <button id="btn-manual-diagram-all" class="btn-secondary" type="button" title="プロジェクトの最新モジュール依存図（Mermaid）を一括生成・更新します">📊 全ダイアグラム更新</button>
             <button id="btn-manual-text-all" class="btn-secondary" type="button" title="原稿内のすべてのAIテキストタスク（ai:task）をAIで一括生成・最新化します">✍️ 全AIテキスト更新</button>
             <button id="btn-manual-open-settings" class="btn-secondary" type="button" title="HTML出力先、Markdown原稿パス、AI設定を開きます">⚙️ 設定</button>
@@ -228,7 +227,7 @@
                   <strong style="font-size: 1.1rem; color: var(--accent-color);">マニュアル (利用・操作ガイド)</strong>
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 12px; line-height: 1.5;">
-                  <strong>機能面と操作方法</strong>をユーザー視点で解説します。プロジェクトのコードとUIを解析し、実画面スクリーンショット自動撮影（<code>ai:task kind=screenshot</code>）やMarkIts注釈、操作手順文（<code>ai:task kind=text</code>）を含むたたき台をLLMが自動生成します。
+                  <strong>機能面と操作方法</strong>をユーザー視点で解説します。プロジェクトのコードとUIを解析し、対象アプリの撮影タスク（<code>ai:task kind=screenshot</code>）や操作手順文（<code>ai:task kind=text</code>）を含むたたき台をLLMが自動生成します。
                 </p>
                 <ul style="font-size: 0.8rem; color: var(--secondary-text); padding-left: 18px; margin-bottom: 16px; line-height: 1.5;">
                   <li><code>index.md</code>: 全体概要とメイン画面スクリーンショット</li>
@@ -517,7 +516,7 @@ def example_function():
         <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; max-height: 75vh;">
           
           <!-- パス設定セクション -->
-          <div class="settings-group" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
+          <div id="manual-path-settings" class="settings-group" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px 14px;">
             <div style="font-weight: bold; margin-bottom: 8px; color: var(--accent-color); font-size: 0.88rem;">📁 パス設定（原稿と出力先）</div>
             <div style="display: grid; gap: 10px;">
               <label style="font-size: 0.82rem;">対象プロジェクト

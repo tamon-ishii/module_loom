@@ -10,8 +10,8 @@
 ドキュメント生成の原稿パスと HTML 出力先の設定画面を撮影する。
 -->
 
-<!-- ai:generated id=manual-settings kind=screenshot prompt-b64=44OJ44Kt44Ol44Oh44Oz44OI55Sf5oiQ44Gu5Y6f56i/44OR44K544GoIEhUTUwg5Ye65Yqb5YWI44Gu6Kit5a6a55S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=33cf046d725fa0756cc07d1ce827a1b14debd940ead1a9786c6f7108cf4504c5 -->
-![ドキュメント生成のパスと MkDocs の設定画面](assets/manual-settings.png)
+<!-- ai:generated id=manual-settings kind=screenshot created-at=2026-09-28T17:50:49Z source-sha256=33cf046d725fa0756cc07d1ce827a1b14debd940ead1a9786c6f7108cf4504c5 prompt-b64=44OJ44Kt44Ol44Oh44Oz44OI55Sf5oiQ44Gu5Y6f56i/44OR44K544GoIEhUTUwg5Ye65Yqb5YWI44Gu6Kit5a6a55S76Z2i44KS5pKu5b2x44GZ44KL44CC -->
+![manual-settings](assets/manual-settings.png)
 <!-- /ai:generated -->
 
 原稿がない場合は **テンプレート生成**から下書きを作れます。既存の原稿がある場合は、その内容を確認してから生成を実行してください。
@@ -26,15 +26,7 @@
 
 ## 画像と図を更新する
 
-原稿にスクリーンショットのタスクがある場合、**全スクショ一括撮影**で現在の画面から画像を撮影します。個別の画像を撮り直す場合は、更新対象アセットの **画面を自動撮影**を使います。操作対象を示したいときは **修正指示**にボタン名や要素 ID と「赤丸で囲む」などを入力して再撮影できます。
-
-<!-- ai:task id=manual-capture-control kind=screenshot
-全スクショ一括撮影ボタンの位置が分かる画面を撮影する。
--->
-
-<!-- ai:generated id=manual-capture-control kind=screenshot prompt-b64=5YWo44K544Kv44K344On5LiA5ous5pKu5b2x44Oc44K/44Oz44Gu5L2N572u44GM5YiG44GL44KL55S76Z2i44KS5pKu5b2x44GZ44KL44CC source-sha256=d41eced2ef16857d557608a52962ce86de512630c776d23017d362a4a5ddca96 -->
-![全スクショ一括撮影ボタンを赤枠で示した画面](assets/capture-control.png)
-<!-- /ai:generated -->
+原稿にスクリーンショットのタスクがある場合、更新対象アセットの **撮影指示をコピー**で `ai:task` の指示と保存先をコピーできます。対象アプリを開いて必要な画面を表示した後、Linux/X11では **ウィンドウを撮影**から対象ウィンドウを選択し、必要なら外枠の余白を除いてPNGを登録できます。Wayland、macOS、Windowsでは現在ウィンドウ撮影に対応していません。撮影対象のアプリを操作できるAIエージェントやOSの撮影機能でPNGを作り、**PNGを登録**でファイルを指定してください。登録すると原稿の `ai:generated` に画像リンクが入ります。
 
 依存図のタスクは **全ダイアグラム更新**で更新します。API リファレンスが必要な場合は **API ドキュメント生成**を使い、docstring と型注釈からモジュール別のページを作ります。
 
@@ -74,10 +66,34 @@ Markdown 原稿では、生成・撮影・更新する箇所を `ai:task` タグ
 
 種類ごとに生成内容を分けます。`text` には説明文、`screenshot` には画像 Markdown、`diagram` には Mermaid コードブロックだけを置きます。画像の説明や図の注釈が必要な場合は、別の `kind=text` タスクを使います。
 
-生成後も `ai:task` は更新指示として残し、その直下に同じ `id` の `ai:generated` ブロックを置きます。次回の同期では指示を使って回答を更新し、生成ブロックの本文だけを差し替えます。指示や種類が変わると既存の回答は古い状態になります。下書きビルドでは未完了タスクを確認できますが、完成版ビルドには各タスクの最新の回答が必要です。
+生成後も `ai:task` は更新指示として残し、その直下に同じ `id` の `ai:generated` ブロックを置きます。更新対象アセットの **タスク指示を編集**から本文を変更して保存すると、原稿の `ai:task` に反映されます。画像タスクでは保存した指示をコピーして撮影担当のエージェントに渡し、出来上がったPNGを登録します。テキストと図は次回の生成で指示を使って回答を更新します。指示や種類が変わると既存の回答は古い状態になります。下書きビルドでは未完了タスクを確認できますが、完成版ビルドには各タスクの最新の回答が必要です。
 
 CLI から既存の Python コードに基づく MkDocs ページだけを生成する場合は、次のコマンドを使用します。
 
 ```sh
 moduleloom-analyze --mkdocs ./moduleloom-docs ./sample_project
 ```
+
+## UI Map と変更影響を確認する
+
+CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaScript から UI Map を作り、`manual/ui_map.json` に保存します。生成された Map は参照元のファイルが変わると再解析されます。以前のバージョンで作った Map を再生成するには `--manual ui-map --root . --refresh` を実行します。手動で管理する場合は JSON の `source_hash` フィールドを削除してください。`manual/` と `docs/` の生成物は解析対象に含めません。
+
+対象アプリを実際に操作できる AI や自動化ツールで画面を調べた場合、その観測結果を JSON に保存して `--manual ui-map-import --root . --input observation.json` で取り込めます。例:
+
+```json
+{
+  "source": "http://127.0.0.1:3000/settings",
+  "platform": "web",
+  "views": [{
+    "id": "settings",
+    "name": "Settings",
+    "elements": [
+      {"id": "model", "selector": "#model", "name": "AI model", "role": "combobox"}
+    ]
+  }]
+}
+```
+
+`source` には確認した URL または画面名を入れます。デスクトップアプリでは `platform` に `linux-x11` などを、`selector` にアクセシビリティ識別子などを記録できます。ModuleLoom は観測元と取り込み時刻を保存し、静的解析の要素と統合します。対象プロジェクトの UI ソースが変わると、古い観測結果は Map から外れます。外部アプリのコード変更は検知できないため、その場合は再探索して取り込み直してください。
+
+`--manual impact --root . --ref HEAD` は、Git の変更と原稿の関連付けから更新候補ページを表示します。実行時に依存関係グラフを作り直します。現状、コードの変更判定は主に Python モジュール、UI の変更判定はソース中に現れる要素 ID に基づくため、結果は確認候補として扱ってください。操作シナリオの実行や文章の事実検証は行いません。

@@ -2,7 +2,6 @@ import "./style.css";
 import cytoscape, { Core, EventObject } from "cytoscape";
 // @ts-ignore
 import dagre from "cytoscape-dagre";
-import html2canvas from "html2canvas";
 import { escapeHtml } from "./utils";
 import { currentUiLocale, initUiLocale, setUiLocale, translateUiText, type UiLocale } from "./i18n";
 import { cycleGuidance, cyclePath, cycleSuggestion } from "./cycle-insights";
@@ -252,7 +251,9 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
 }
 
 interface ManualTask { id: string; kind: "text" | "diagram" | "screenshot"; page: string; prompt: string; status: "missing" | "current" | "approved" | "stale" }
+interface CaptureWindow { id: string; title: string; width: number; height: number }
 interface ManualState {
+  image_assets?: Record<string, string>;
   has_config?: boolean;
   config: {
     docs: string;
@@ -290,7 +291,6 @@ const manualMkdocsTheme = document.getElementById("manual-mkdocs-theme") as HTML
 const manualMkdocsLanguage = document.getElementById("manual-mkdocs-language") as HTMLSelectElement | null;
 const manualMkdocsDirUrls = document.getElementById("manual-mkdocs-dir-urls") as HTMLInputElement | null;
 const manualTasks = document.getElementById("manual-tasks") as HTMLElement;
-const btnManualCaptureAll = document.getElementById("btn-manual-capture-all") as HTMLButtonElement | null;
 const btnManualDiagramAll = document.getElementById("btn-manual-diagram-all") as HTMLButtonElement | null;
 const btnManualTextAll = document.getElementById("btn-manual-text-all") as HTMLButtonElement | null;
 const manualStatus = document.getElementById("manual-status") as HTMLElement;
@@ -919,265 +919,7 @@ async function jumpToAssetInPreview(taskPage: string, taskId: string): Promise<v
   setTimeout(() => attemptJump(pageChanged ? 8 : 2), pageChanged ? 300 : 50);
 }
 
-async function captureBackgroundScreenshot(taskId: string, annotationHint?: string): Promise<string> {
-  if (taskId === "manual-settings" && manualSettingsModal) {
-    const wasHidden = manualSettingsModal.classList.contains("hidden");
-    if (wasHidden) openManualSettingsModal();
-    try {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const canvas = await html2canvas(manualSettingsModal, {
-        backgroundColor: "#1e1e2e",
-        scale: 1.5,
-        logging: false,
-        useCORS: true,
-      });
-      if (!canvas.width || !canvas.height) throw new Error("設定画面を撮影できませんでした");
-      const dataUrl = canvas.toDataURL("image/png");
-      manualScreenshotCache[taskId] = dataUrl;
-      return dataUrl;
-    } finally {
-      if (wasHidden) closeManualSettingsModal();
-    }
-  }
-  const isGraphTask = taskId.includes("graph") || taskId.includes("overview") || taskId.includes("module");
-  if (isGraphTask && cy && cy.nodes().length > 0 && !annotationHint) {
-    try {
-      cy.resize();
-      const visible = cy.elements().not(".hidden");
-      if (visible.length) cy.fit(visible, 30);
-      const dataUrl = cy.png({
-        full: false,
-        bg: "#1e1e2e",
-        scale: 1.5,
-      });
-      if (dataUrl && dataUrl.startsWith("data:image/png")) {
-        manualScreenshotCache[taskId] = dataUrl;
-        return dataUrl;
-      }
-    } catch {
-      // フォールバック
-    }
-  }
-
-  let targetEl: HTMLElement | null = null;
-  if (taskId.includes("diagnostic")) {
-    targetEl = document.getElementById("complexity-dashboard");
-  } else if (taskId.includes("tool-window")) {
-    targetEl = document.getElementById("module-view");
-  } else if (taskId.includes("manual")) {
-    targetEl = document.getElementById("manual-view");
-  } else {
-    targetEl = document.getElementById("module-view") || document.body;
-  }
-
-  if (!targetEl) targetEl = document.body;
-
-function drawSvgOnCanvas(canvas: HTMLCanvasElement, svgString: string): Promise<void> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    img.onload = () => {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      }
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    img.onerror = (err) => {
-      console.warn("MarkIts SVG render error on canvas:", err);
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    img.src = url;
-  });
-}
-
-  // キャプチャ実行
-  const canvas = await html2canvas(targetEl, {
-    backgroundColor: "#1e1e2e",
-    scale: 1.5,
-    logging: false,
-    useCORS: true,
-  });
-
-  // MarkIts（crates/markits）による高品質ベクターアノテーションの合成
-  if (annotationHint) {
-    const hint = annotationHint.trim();
-    let selector = "";
-    const idMatch = hint.match(/#([a-zA-Z0-9_-]+)/);
-    const classMatch = hint.match(/\.([a-zA-Z0-9_-]+)/);
-    if (idMatch) selector = idMatch[0];
-    else if (classMatch) selector = classMatch[0];
-
-    let foundEl: HTMLElement | null = null;
-    if (selector) {
-      try {
-        foundEl = document.querySelector<HTMLElement>(selector);
-      } catch {}
-    }
-
-    if (!foundEl) {
-      const candidates = Array.from(document.querySelectorAll<HTMLElement>("button, .tab, label, select, input, h2, h3, a"));
-      const keywords = ["全スクショ", "ダイアグラム", "API", "ビルド", "保存", "解析", "診断", "マニュアル", "修正", "承認", "設定"];
-      for (const kw of keywords) {
-        if (hint.includes(kw)) {
-          foundEl = candidates.find((c) => c.textContent?.includes(kw)) || null;
-          if (foundEl) break;
-        }
-      }
-    }
-
-    if (foundEl && targetEl.contains(foundEl)) {
-      const targetRect = targetEl.getBoundingClientRect();
-      const elRect = foundEl.getBoundingClientRect();
-      const isCircle = hint.includes("丸") || hint.includes("円") || hint.includes("circle");
-      const hasArrow = hint.includes("矢印") || hint.includes("arrow");
-
-      let labelText = "";
-      const quoteMatch = hint.match(/[「『"']([^「『"']+)["'」』]/);
-      if (quoteMatch) {
-        labelText = quoteMatch[1];
-      } else {
-        const descMatch = hint.match(/(?:説明|ラベル|注記|テキスト)[:：]\s*([^\s,、。]+)/);
-        if (descMatch) labelText = descMatch[1];
-      }
-
-      const x = Math.max(0, elRect.left - targetRect.left + targetEl.scrollLeft);
-      const y = Math.max(0, elRect.top - targetRect.top + targetEl.scrollTop);
-      const width = Math.max(10, elRect.width);
-      const height = Math.max(10, elRect.height);
-
-      const annotations: any[] = [];
-      if (isCircle) {
-        annotations.push({
-          type: "circle",
-          target: { x, y, width, height },
-          style: "danger",
-          shadow: true,
-        });
-      } else {
-        annotations.push({
-          type: "rounded-rect",
-          target: { x, y, width, height },
-          rx: 8,
-          ry: 8,
-          style: "danger",
-          shadow: true,
-        });
-      }
-
-      if (labelText) {
-        if (hint.includes("ピン") || hint.includes("pin")) {
-          annotations.push({
-            type: "pin",
-            target: { x, y, width, height },
-            text: labelText,
-            style: "danger",
-            position: "auto",
-            shadow: true,
-          });
-        } else {
-          annotations.push({
-            type: "callout",
-            target: { x, y, width, height },
-            text: labelText,
-            style: "danger",
-            position: "auto",
-            shadow: true,
-            outline: true,
-          });
-        }
-      } else if (hasArrow) {
-        annotations.push({
-          type: "arrow",
-          target: { x, y, width, height },
-          style: "danger",
-          position: "auto",
-          shadow: true,
-        });
-      }
-
-      const scene = {
-        canvas: {
-          width: Math.round(targetRect.width),
-          height: Math.round(targetRect.height),
-        },
-        shadow: true,
-        annotations,
-      };
-
-      try {
-        const svg = await callManual("markits-render", { json: JSON.stringify(scene) });
-        if (svg && svg.includes("<svg")) {
-          await drawSvgOnCanvas(canvas, svg);
-        }
-      } catch (err) {
-        console.warn("MarkIts rendering fallback:", err);
-      }
-    }
-  }
-
-  const dataUrl = canvas.toDataURL("image/png");
-  manualScreenshotCache[taskId] = dataUrl;
-  return dataUrl;
-}
-
-async function captureAllScreenshots(): Promise<void> {
-  const project = manualRoot();
-  if (!project) {
-    manualStatus.textContent = "先に解析対象のプロジェクトを選択してください";
-    return;
-  }
-  const state = JSON.parse(await callManual("state")) as ManualState;
-  const screenshotTasks = state.tasks.filter((t: ManualTask) => t.kind === "screenshot");
-  if (!screenshotTasks.length) {
-    manualStatus.textContent = "スクリーンショットのタスクはありません";
-    return;
-  }
-
-  if (btnManualCaptureAll) btnManualCaptureAll.disabled = true;
-  const prevTab = activeWorkspaceTab;
-  manualStatus.textContent = `全 ${screenshotTasks.length} 件のスクリーンショットを一括自動撮影中…`;
-
-  try {
-    for (let i = 0; i < screenshotTasks.length; i++) {
-      const task = screenshotTasks[i];
-      manualStatus.textContent = `自動撮影中 (${i + 1}/${screenshotTasks.length}): ${task.id}…`;
-
-      let targetTab: "modules" | "diagnostics" | "manual" = "modules";
-      if (task.id.includes("diagnostic")) {
-        targetTab = "diagnostics";
-      } else if (task.id.includes("manual")) {
-        targetTab = "manual";
-      }
-      selectWorkspaceTab(targetTab);
-
-      // DOM描画の安定待機
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const dataUrl = await captureBackgroundScreenshot(task.id, task.prompt);
-      await invokeCommand("manual_capture_screenshot", {
-        path: manualRoot(),
-        id: task.id,
-        data: dataUrl,
-      });
-    }
-
-    manualStatus.textContent = "全スクショの自動撮影完了。最新サイトをビルド中…";
-    await callManual("build", { draft: true });
-    manualStatus.textContent = `全 ${screenshotTasks.length} 件のスクリーンショットを自動更新し、プレビューを最新化しました！`;
-    await refreshManual();
-  } catch (error) {
-    manualStatus.textContent = `一括自動撮影エラー: ${String(error)}`;
-  } finally {
-    selectWorkspaceTab(prevTab);
-    if (btnManualCaptureAll) btnManualCaptureAll.disabled = false;
-  }
-}
-
-function renderManualTasks(tasks: ManualTask[]): void {
+function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, string> = {}): void {
   const summaryEl = document.getElementById("manual-assets-summary");
   if (!tasks.length) {
     manualTasks.innerHTML = "<p>更新対象の <code>ai:task</code> タグはまだありません。</p>";
@@ -1198,11 +940,10 @@ function renderManualTasks(tasks: ManualTask[]): void {
     const typeLabel = isScreenshot ? "📸 スクショ" : isDiagram ? "📊 ダイアグラム" : "📝 テキスト";
     const typeBadgeClass = isScreenshot ? "manual-task-badge-screenshot" : isDiagram ? "manual-task-badge-diagram" : "manual-task-badge-text";
 
-    const hasCachedImage = Boolean(manualScreenshotCache[task.id]);
-    const isReady = task.status === "approved" || task.status === "current" || hasCachedImage;
+    const isReady = task.status === "approved" || task.status === "current";
     const statusBadge = isReady
       ? `<span class="manual-task-badge manual-task-badge-status-ready">✅ 準備完了</span>`
-      : `<span class="manual-task-badge manual-task-badge-status-missing">📷 未撮影</span>`;
+      : `<span class="manual-task-badge manual-task-badge-status-missing">${task.status === "stale" ? "🔄 更新待ち" : isScreenshot ? "📁 PNG未登録" : "未作成"}</span>`;
 
     let thumbHtml = "";
     if (isScreenshot) {
@@ -1215,7 +956,7 @@ function renderManualTasks(tasks: ManualTask[]): void {
         thumbHtml = `
           <div class="manual-task-thumb-container" id="manual-thumb-wrap-${escapeHtml(task.id)}">
             <div class="manual-task-placeholder-thumb">
-              📷 画像読込中…（未撮影の場合は「📸 画面を自動撮影」）
+              📷 画像読込中…（未登録の場合は「📁 PNGを登録」）
             </div>
           </div>`;
       }
@@ -1224,9 +965,9 @@ function renderManualTasks(tasks: ManualTask[]): void {
     let actions = "";
     if (isScreenshot) {
       actions = `
-        <button type="button" data-manual-capture="${escapeHtml(task.id)}" class="btn-secondary" title="現在のUI画面を自動撮影します">📸 画面を自動撮影</button>
-        <button type="button" data-manual-feedback-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="赤枠・赤丸囲みや対象要素の指定など修正指示を出します">💬 修正指示</button>
-        <button type="button" data-manual-image-toggle="${escapeHtml(task.id)}" class="btn-secondary">📁 画像ファイルを指定</button>
+        <button type="button" data-manual-window-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="別アプリの表示中のウィンドウを選んで撮影します">📸 ウィンドウを撮影</button>
+        <button type="button" data-manual-copy-shot="${escapeHtml(task.id)}" class="btn-secondary" title="外部アプリを撮影するためのタスク指示をコピーします">📋 撮影指示をコピー</button>
+        <button type="button" data-manual-image-toggle="${escapeHtml(task.id)}" class="btn-secondary">📁 PNGを登録</button>
       `;
     } else if (isDiagram) {
       actions = `
@@ -1258,19 +999,37 @@ function renderManualTasks(tasks: ManualTask[]): void {
       </div>
       <p>${escapeHtml(task.prompt)}</p>
       ${thumbHtml}
-      <div class="manual-actions">${actions}</div>
-      <div id="manual-feedback-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
+      <div class="manual-actions">${actions}<button type="button" data-manual-edit-toggle="${escapeHtml(task.id)}" class="btn-secondary">✏️ タスク指示を編集</button></div>
+      <div id="manual-edit-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
+        <label for="manual-edit-input-${escapeHtml(task.id)}">${isScreenshot ? "外部アプリの撮影依頼に使う指示" : "次回以降の生成に使う指示"}（ai:task）</label>
+        <textarea id="manual-edit-input-${escapeHtml(task.id)}" class="manual-feedback-input manual-task-editor" rows="4">${escapeHtml(task.prompt)}</textarea>
+        <div class="manual-feedback-row"><button type="button" data-manual-edit-save="${escapeHtml(task.id)}" class="btn-primary">指示を保存</button></div>
+      </div>
+      ${isScreenshot ? "" : `<div id="manual-feedback-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
         <div class="manual-feedback-row">
-          <input type="text" id="manual-feedback-input-${escapeHtml(task.id)}" class="manual-feedback-input" placeholder="${isScreenshot ? '修正指示（例: #btn-manual-capture を赤枠で囲んで / 診断画面を撮影）' : '修正指示（例: 箇条書きで手順を追加して）'}" />
+          <input type="text" id="manual-feedback-input-${escapeHtml(task.id)}" class="manual-feedback-input" placeholder="修正指示（例: 箇条書きで手順を追加して）" />
           <button type="button" data-manual-feedback-submit="${escapeHtml(task.id)}" class="btn-primary">指示実行</button>
         </div>
-      </div>
+      </div>`}
       <div id="manual-image-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
         <div class="manual-feedback-row">
           <input type="text" id="manual-image-input-${escapeHtml(task.id)}" class="manual-feedback-input" placeholder="画像パス（例: docs/assets/screen.png）" />
           <button type="button" data-manual-image-submit="${escapeHtml(task.id)}" class="btn-primary">登録実行</button>
         </div>
       </div>
+      ${isScreenshot ? `<div id="manual-window-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
+        <label for="manual-window-select-${escapeHtml(task.id)}">撮影するアプリのウィンドウ</label>
+        <div class="manual-feedback-row">
+          <select id="manual-window-select-${escapeHtml(task.id)}" class="manual-feedback-input"></select>
+          <button type="button" data-manual-window-refresh="${escapeHtml(task.id)}" class="btn-secondary">一覧を更新</button>
+        </div>
+        <div class="manual-feedback-row">
+          <label for="manual-window-inset-${escapeHtml(task.id)}">外枠を除く</label>
+          <input id="manual-window-inset-${escapeHtml(task.id)}" class="manual-feedback-input" type="number" min="0" max="64" value="0" style="max-width: 70px" />
+          <span>px</span>
+          <button type="button" data-manual-window-capture="${escapeHtml(task.id)}" class="btn-primary">選択したウィンドウを撮影</button>
+        </div>
+      </div>` : ""}
     </div>`;
   }).join("");
 
@@ -1278,7 +1037,7 @@ function renderManualTasks(tasks: ManualTask[]): void {
     if (task.kind === "screenshot" && !manualScreenshotCache[task.id]) {
       void (async () => {
         try {
-          const res = await callManual("preview-asset", { asset: `assets/${task.id}.png` });
+          const res = await callManual("preview-asset", { page: task.page, asset: imageAssets[task.id] || `assets/${task.id}.png` });
           if (res && res.startsWith("data:image/")) {
             manualScreenshotCache[task.id] = res;
             const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
@@ -1288,13 +1047,13 @@ function renderManualTasks(tasks: ManualTask[]): void {
           } else {
             const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
             if (wrap) {
-              wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未撮影（「📸 画面を自動撮影」を押すと現在のUIを撮影します）</div>`;
+              wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未登録（「📁 PNGを登録」から外部アプリの画像を指定してください）</div>`;
             }
           }
         } catch {
           const wrap = document.getElementById(`manual-thumb-wrap-${task.id}`);
           if (wrap) {
-            wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未撮影（「📸 画面を自動撮影」を押すと現在のUIを撮影します）</div>`;
+            wrap.innerHTML = `<div class="manual-task-placeholder-thumb">📷 未登録（「📁 PNGを登録」から外部アプリの画像を指定してください）</div>`;
           }
         }
       })();
@@ -1402,7 +1161,7 @@ async function refreshManual(force = false): Promise<void> {
     const currentPage = manualPage.value;
     manualPage.innerHTML = (state.pages.length ? state.pages : ["index.md"]).map((page) => `<option value="${escapeHtml(page)}">${escapeHtml(page)}</option>`).join("");
     manualPage.value = state.pages.includes(currentPage) ? currentPage : (state.pages[0] || "index.md");
-    renderManualTasks(state.tasks);
+    renderManualTasks(state.tasks, state.image_assets);
     await renderManualPreview(state);
     updateManualNavButtons();
   } catch (error) {
@@ -1505,55 +1264,7 @@ async function executeInitTemplate(templateType: "manual" | "api", clear: boolea
   try {
     await callManual("init-template", { template: templateType, clear, docs, output, agent, model });
 
-    // 自動で全スクリーンショットを撮影して配置する
-    const state = JSON.parse(await callManual("state")) as ManualState;
-    const screenshotTasks = state.tasks.filter((t: ManualTask) => t.kind === "screenshot");
-    if (screenshotTasks.length > 0) {
-      setStepState(stepManualVerify, "done");
-      setStepState(stepManualAi, "done");
-      setStepState(stepManualStaged, "done");
-      setStepState(stepManualBuild, "active");
-      if (manualProgressBarFill) manualProgressBarFill.style.width = "90%";
-      if (manualProgressPhase) {
-        manualProgressPhase.textContent = `スクリーンショットを自動撮影中 (0/${screenshotTasks.length})...`;
-      }
-      if (manualProgressLog) {
-        manualProgressLog.textContent += `\n[自動撮影] ${screenshotTasks.length} 件のスクリーンショットを自動撮影しています...`;
-        manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
-      }
-      const prevTab = activeWorkspaceTab;
-      for (let i = 0; i < screenshotTasks.length; i++) {
-        const task = screenshotTasks[i];
-        if (manualProgressPhase) {
-          manualProgressPhase.textContent = `スクリーンショット自動撮影中 (${i + 1}/${screenshotTasks.length}): ${task.id}...`;
-        }
-        let targetTab: "modules" | "diagnostics" | "manual" = "modules";
-        if (task.id.includes("diagnostic")) targetTab = "diagnostics";
-        else if (task.id.includes("manual")) targetTab = "manual";
-        selectWorkspaceTab(targetTab);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        try {
-          const dataUrl = await captureBackgroundScreenshot(task.id, task.prompt);
-          await invokeCommand("manual_capture_screenshot", {
-            path: manualRoot(),
-            id: task.id,
-            data: dataUrl,
-          });
-          if (manualProgressLog) {
-            manualProgressLog.textContent += `\n[自動撮影] ✓ ${task.id} を撮影・注釈付けしました (${i + 1}/${screenshotTasks.length})`;
-            manualProgressLog.scrollTop = manualProgressLog.scrollHeight;
-          }
-        } catch (e) {
-          console.warn(`Auto capture failed for ${task.id}:`, e);
-        }
-      }
-      selectWorkspaceTab(prevTab);
-      if (manualProgressPhase) manualProgressPhase.textContent = "最新プレビューHTMLをビルド中...";
-      await callManual("build", { draft: true });
-    }
-
-    completeManualProgress(`✓ ${typeLabel}のたたき台を生成しました`, `Markdown原稿（${docs}）の配置、スクリーンショット自動撮影、初期ビルドが完了しました。`);
+    completeManualProgress(`✓ ${typeLabel}のたたき台を生成しました`, `Markdown原稿（${docs}）を配置しました。画像タスクは撮影指示を確認し、PNGを登録してください。`);
     manualStatus.textContent = `✓ ${typeLabel}のたたき台を生成しました（${docs} / ${agent}）`;
     closeManualTemplateModal();
     closeManualTemplateConfirmModal();
@@ -1757,6 +1468,30 @@ manualTasks.addEventListener("click", (event) => {
   const button = target.closest<HTMLButtonElement>("button");
   if (!button) return;
   if (button.dataset.manualGenerate) void runManual("generate-task", { id: button.dataset.manualGenerate });
+  if (button.dataset.manualEditToggle) {
+    const id = button.dataset.manualEditToggle;
+    const box = document.getElementById(`manual-edit-box-${id}`);
+    if (box) {
+      box.hidden = !box.hidden;
+      if (!box.hidden) document.getElementById(`manual-edit-input-${id}`)?.focus();
+    }
+  }
+  if (button.dataset.manualEditSave) {
+    const id = button.dataset.manualEditSave;
+    const input = document.getElementById(`manual-edit-input-${id}`) as HTMLTextAreaElement | null;
+    const prompt = input?.value.trim() || "";
+    if (!prompt) { input?.focus(); return; }
+    void (async () => {
+      try {
+        manualStatus.textContent = `タスク指示を保存中: ${id}…`;
+        await callManual("update-task", { id, feedback: prompt });
+        await refreshManual();
+        manualStatus.textContent = `タスク指示を保存しました: ${id}`;
+      } catch (error) {
+        manualStatus.textContent = `タスク指示の保存に失敗しました: ${String(error)}`;
+      }
+    })();
+  }
   if (button.dataset.manualFeedbackToggle) {
     const id = button.dataset.manualFeedbackToggle;
     const box = document.getElementById(`manual-feedback-box-${id}`);
@@ -1777,32 +1512,78 @@ manualTasks.addEventListener("click", (event) => {
       return;
     }
 
-    const isScreenshotTask = document.querySelector<HTMLElement>(`#manual-task-card-${id} .manual-task-badge-screenshot`) !== null;
-    if (isScreenshotTask) {
-      void (async () => {
-        manualStatus.textContent = `リテイク指示を反映して再撮影中: ${id}…`;
-        const prevTab = activeWorkspaceTab;
-        try {
-          let targetTab: "modules" | "diagnostics" | "manual" = "modules";
-          if (id.includes("diagnostic")) targetTab = "diagnostics";
-          else if (id.includes("manual")) targetTab = "manual";
-          selectWorkspaceTab(targetTab);
-          await new Promise((resolve) => setTimeout(resolve, 300));
-
-          const dataUrl = await captureBackgroundScreenshot(id, feedback);
-          await invokeCommand("manual_capture_screenshot", { path: manualRoot(), id, data: dataUrl });
-          await callManual("build", { draft: true });
-          manualStatus.textContent = "リテイク撮影・保存が完了しました（アノテーション反映）";
-          await refreshManual();
-        } catch (error) {
-          manualStatus.textContent = `リテイク撮影に失敗しました: ${String(error)}`;
-        } finally {
-          selectWorkspaceTab(prevTab);
+    void runManual("generate-task", { id, feedback });
+  }
+  if (button.dataset.manualCopyShot) {
+    const id = button.dataset.manualCopyShot;
+    void (async () => {
+      try {
+        const state = JSON.parse(await callManual("state")) as ManualState;
+        const task = state.tasks.find((item) => item.id === id);
+        if (!task) throw new Error(`撮影タスクが見つかりません: ${id}`);
+        const docs = state.config.docs || "docs";
+        const request = `対象プロジェクト: ${manualRoot()}\nスクリーンショットのタスク ID: ${id}\n撮影指示:\n${task.prompt}\n\n対象アプリの実画面を撮影し、必要なら画像の余白を切り取って、PNGを ${docs}/assets/${id}.png に保存してください。ModuleLoomの画面は撮影しないでください。保存後、ModuleLoomの「PNGを登録」でそのファイルのパスを指定してください。`;
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(request);
+            copied = true;
+          } catch { /* JCEF の file: ページではクリップボード API が拒否される場合がある */ }
         }
-      })();
-    } else {
-      void runManual("generate-task", { id, feedback });
-    }
+        if (!copied) {
+          const fallback = document.createElement("textarea");
+          fallback.value = request;
+          fallback.style.position = "fixed";
+          fallback.style.opacity = "0";
+          document.body.appendChild(fallback);
+          fallback.select();
+          copied = document.execCommand("copy");
+          fallback.remove();
+          if (!copied) throw new Error("クリップボードへの書き込みが許可されていません");
+        }
+        manualStatus.textContent = `外部アプリの撮影指示をコピーしました: ${id}`;
+      } catch (error) {
+        manualStatus.textContent = `撮影指示をコピーできませんでした: ${String(error)}`;
+      }
+    })();
+  }
+  if (button.dataset.manualWindowToggle || button.dataset.manualWindowRefresh) {
+    const id = button.dataset.manualWindowToggle || button.dataset.manualWindowRefresh;
+    const box = document.getElementById(`manual-window-box-${id}`);
+    if (box && button.dataset.manualWindowToggle) box.hidden = !box.hidden;
+    if (box && !box.hidden) void (async () => {
+      const select = document.getElementById(`manual-window-select-${id}`) as HTMLSelectElement | null;
+      if (!select) return;
+      select.innerHTML = '<option value="">ウィンドウを検索中…</option>';
+      try {
+        const windows = JSON.parse(await callManual("list-windows")) as CaptureWindow[];
+        select.innerHTML = windows.length
+          ? '<option value="">撮影対象を選択</option>' + windows.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)} (${item.width}×${item.height})</option>`).join("")
+          : '<option value="">表示中のウィンドウがありません</option>';
+      } catch (error) {
+        select.innerHTML = '<option value="">この環境ではウィンドウ撮影を利用できません</option>';
+        manualStatus.textContent = String(error);
+      }
+    })();
+  }
+  if (button.dataset.manualWindowCapture) {
+    const id = button.dataset.manualWindowCapture;
+    const select = document.getElementById(`manual-window-select-${id}`) as HTMLSelectElement | null;
+    const window = select?.value;
+    if (!window) { select?.focus(); return; }
+    const inset = (document.getElementById(`manual-window-inset-${id}`) as HTMLInputElement | null)?.value || "0";
+    void (async () => {
+      try {
+        manualStatus.textContent = `ウィンドウを撮影中: ${id}…`;
+        await callManual("capture-window", { id, window, inset });
+        await callManual("build", { draft: true });
+        delete manualScreenshotCache[id];
+        await refreshManual();
+        manualStatus.textContent = `外部アプリのウィンドウを撮影・登録しました: ${id}`;
+      } catch (error) {
+        manualStatus.textContent = `ウィンドウ撮影に失敗しました: ${String(error)}`;
+      }
+    })();
   }
   if (button.dataset.manualImageToggle) {
     const id = button.dataset.manualImageToggle;
@@ -1828,6 +1609,7 @@ manualTasks.addEventListener("click", (event) => {
         manualStatus.textContent = "画像を登録中…";
         await callManual("record-screenshot", { id, image: imagePath });
         await callManual("build", { draft: true });
+        delete manualScreenshotCache[id];
         manualStatus.textContent = "画像を登録しました";
         await refreshManual();
       } catch (err) {
@@ -1836,32 +1618,7 @@ manualTasks.addEventListener("click", (event) => {
     })();
   }
   if (button.dataset.manualApprove) void runManual("approve", { id: button.dataset.manualApprove });
-  if (button.dataset.manualCapture) void (async () => {
-    const id = button.dataset.manualCapture;
-    if (!id) return;
-    manualStatus.textContent = `画面を自動撮影中: ${id}…`;
-    const prevTab = activeWorkspaceTab;
-    try {
-      let targetTab: "modules" | "diagnostics" | "manual" = "modules";
-      if (id.includes("diagnostic")) targetTab = "diagnostics";
-      else if (id.includes("manual")) targetTab = "manual";
-      selectWorkspaceTab(targetTab);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const dataUrl = await captureBackgroundScreenshot(id);
-      await invokeCommand("manual_capture_screenshot", { path: manualRoot(), id, data: dataUrl });
-      await callManual("build", { draft: true });
-      manualStatus.textContent = "自動撮影・保存が完了しました";
-      await refreshManual();
-    } catch (error) {
-      manualStatus.textContent = `撮影に失敗しました: ${String(error)}`;
-    } finally {
-      selectWorkspaceTab(prevTab);
-    }
-  })();
 });
-
-btnManualCaptureAll?.addEventListener("click", () => void captureAllScreenshots());
 
 btnManualDiagramAll?.addEventListener("click", async () => {
   if (manualBusy) return;

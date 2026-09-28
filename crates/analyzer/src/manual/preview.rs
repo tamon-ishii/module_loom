@@ -365,6 +365,21 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
 
     let has_cfg = has_config(root);
     let tasks = scan_entries(&templates, &generated);
+    let image_link = Regex::new(r"!\[[^\]]*\]\((?P<path>[^)]+)\)").unwrap();
+    let mut image_assets = HashMap::new();
+    for (page, path) in collect_target_markdown_files(root, &config) {
+        let Ok(content) = fs::read_to_string(&path) else { continue };
+        let Ok(tags) = parse_page_tags(&page, &content, &mut Default::default()) else { continue };
+        for tag in tags {
+            if let PageTag::Generated { task, body, .. } = tag {
+                if task.kind == "screenshot" {
+                    if let Some(asset) = image_link.captures(&body).and_then(|found| found.name("path")) {
+                        image_assets.insert(task.id, asset.as_str().to_string());
+                    }
+                }
+            }
+        }
+    }
     let has_html = !preview_html_content.is_empty();
 
     Ok(json!({
@@ -373,6 +388,7 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
         "agents": get_agents(),
         "brief": brief,
         "tasks": tasks,
+        "image_assets": image_assets,
         "pages": pages,
         "preview": preview,
         "preview_html": preview_html_content,

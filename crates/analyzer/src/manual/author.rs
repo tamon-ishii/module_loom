@@ -56,8 +56,8 @@ pub fn draft(root: &Path) -> Result<(), String> {
         Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI, real screenshots, or Mermaid diagrams.\n\
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
         - You MUST include at least one kind=screenshot ai:task in index.md. Do not omit it or replace it with a static image link. Put it immediately after the short introduction and before navigation.\n\
-        - The task prompt must describe a real overview screen and relevant controls from the UI Map, with useful MarkIts annotation instructions. It appears in ModuleLoom's 「更新対象アセット」 list for screenshot capture and refresh.\n\
-        - kind=screenshot tasks must ONLY request capturing the raw UI image, referencing real UI elements and views from the UI Map (e.g. #btn-id or button label), using MarkIts (crates/markits) semantic annotation instructions (e.g. markits callout: '説明文', pin: '?', badge: 1, spotlight, rounded-rect, style: primary|danger|warning|info|pink) to keep all manual screenshots visually unified and professional.\n\
+        - The screenshot task prompt must describe a real screen of the TARGET application and the controls that should be visible. It appears in ModuleLoom's 「更新対象アセット」 list, where the instruction can be copied for an agent with access to the target application and the resulting PNG can be registered.\n\
+        - kind=screenshot tasks must describe only real screens of the target application. ModuleLoom can capture a selected visible window on Linux/X11, but it does not navigate the target application; do not request a screenshot of ModuleLoom or assume a DOM selector from ModuleLoom refers to the target application.\n\
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
         - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\

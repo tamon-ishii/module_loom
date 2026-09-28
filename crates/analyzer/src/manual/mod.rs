@@ -8,6 +8,7 @@ pub mod preview;
 pub mod task;
 pub mod template;
 pub mod uimap;
+pub mod window_capture;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,6 +29,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "draft",
         "init-template",
         "generate-task",
+        "update-task",
         "generate-text-all",
         "generate-diagram-all",
         "generate-api",
@@ -37,10 +39,13 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "record-diagram",
         "build",
         "ui-map",
+        "ui-map-import",
         "deps",
         "impact",
         "context",
         "markits-render",
+        "list-windows",
+        "capture-window",
     ];
     if !allowed.contains(&action) {
         return Err(format!("Unsupported manual action: {action}"));
@@ -69,9 +74,12 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut ref_opt: Option<&str> = None;
     let mut json_opt: Option<&str> = None;
     let mut input_opt: Option<&str> = None;
+    let mut window_opt: Option<&str> = None;
+    let mut inset_opt: Option<&str> = None;
     let mut targets_opt: Option<&str> = None;
     let mut template_opt: Option<&str> = None;
     let mut clear_flag = false;
+    let mut refresh_flag = false;
 
     for (key, value) in options {
         match *key {
@@ -80,6 +88,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--targets" => targets_opt = Some(*value),
             "--template" => template_opt = Some(*value),
             "--clear" => clear_flag = true,
+            "--refresh" => refresh_flag = true,
             "--brief" => brief_opt = Some(*value),
             "--agent" => agent_opt = Some(*value),
             "--model" => model_opt = Some(*value),
@@ -98,6 +107,8 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--git-ref" | "--ref" => ref_opt = Some(*value),
             "--json" => json_opt = Some(*value),
             "--input" => input_opt = Some(*value),
+            "--window" => window_opt = Some(*value),
+            "--inset" => inset_opt = Some(*value),
             _ => return Err(format!("Unsupported manual option: {key}")),
         }
     }
@@ -116,6 +127,30 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let generated_path = root.join("manual").join("ai");
 
     match action {
+        "list-windows" => serde_json::to_string(&window_capture::list_windows()?)
+            .map_err(|error| error.to_string()),
+        "capture-window" => {
+            let task_id = id_opt.ok_or("capture-window requires --id")?;
+            let window_id = window_opt.ok_or("capture-window requires --window")?;
+            let inset = inset_opt
+                .unwrap_or("0")
+                .parse::<u32>()
+                .map_err(|_| "Invalid --inset value")?;
+            if inset > 64 {
+                return Err("Inset cannot exceed 64 pixels".into());
+            }
+            let task = task::find_task(&templates_path, task_id)?;
+            if task.kind != "screenshot" {
+                return Err(format!("Task is not a screenshot: {task_id}"));
+            }
+            let assets = templates_path.join("assets");
+            fs::create_dir_all(&assets).map_err(|error| error.to_string())?;
+            let image = assets.join(format!("{task_id}.png"));
+            let window = window_capture::capture_window(window_id, inset, &image)?;
+            author::record_screenshot(root, task_id, &image)?;
+            serde_json::to_string(&serde_json::json!({"window": window, "image": image}))
+                .map_err(|error| error.to_string())
+        }
         "state" => {
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
@@ -177,7 +212,9 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "init-template" => {
             let tmpl_type = template_opt.unwrap_or("manual");
-            template::init_template(root, tmpl_type, clear_flag, docs_opt, output_opt, agent_opt, model_opt)?;
+            template::init_template(
+                root, tmpl_type, clear_flag, docs_opt, output_opt, agent_opt, model_opt,
+            )?;
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())
         }
@@ -186,6 +223,12 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let cli = cli_opt.unwrap_or("target/debug/analyze");
             let feedback = feedback_opt.unwrap_or("");
             author::generate_task(root, task_id, cli, feedback)?;
+            Ok(String::new())
+        }
+        "update-task" => {
+            let task_id = id_opt.ok_or("update-task requires --id")?;
+            let prompt = feedback_opt.ok_or("update-task requires --feedback")?;
+            task::update_task_prompt(&templates_path, task_id, prompt)?;
             Ok(String::new())
         }
         "generate-text-all" => {
@@ -258,15 +301,40 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let cli = cli_opt.unwrap_or("target/debug/analyze");
             let proj = project_opt.unwrap_or("manual/fixtures/diagram_project");
             let project_path = root.join(proj);
-            author::record_diagram(&templates_path, &generated_path, task_id, cli, &project_path)?;
+            author::record_diagram(
+                &templates_path,
+                &generated_path,
+                task_id,
+                cli,
+                &project_path,
+            )?;
             Ok(String::new())
         }
-        "build" => {
-            builder::build(&templates_path, &generated_path, &output_path, draft_flag, Some(root))
-        }
+        "build" => builder::build(
+            &templates_path,
+            &generated_path,
+            &output_path,
+            draft_flag,
+            Some(root),
+        ),
         "ui-map" => {
-            let map = uimap::extract_ui_map(root);
+            let map = if refresh_flag {
+                uimap::refresh_ui_map(root)
+            } else {
+                uimap::extract_ui_map(root)
+            };
             let _ = uimap::save_ui_map(root, &map);
+            serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
+        }
+        "ui-map-import" => {
+            let input = input_opt.ok_or("ui-map-import requires --input")?;
+            let input_path = Path::new(input);
+            let input_path = if input_path.is_absolute() {
+                input_path.to_path_buf()
+            } else {
+                root.join(input_path)
+            };
+            let map = uimap::import_ui_observation(root, &input_path)?;
             serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
         }
         "deps" => {
@@ -290,7 +358,8 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
                 } else {
                     root.join(inp)
                 };
-                fs::read_to_string(&p).map_err(|e| format!("Failed to read {}: {e}", p.display()))?
+                fs::read_to_string(&p)
+                    .map_err(|e| format!("Failed to read {}: {e}", p.display()))?
             } else {
                 return Err("markits-render requires --json or --input".to_string());
             };
@@ -384,7 +453,13 @@ mod tests {
         // update_task_in_docs for README.md
         let readme_task = task::find_task(&docs, "readme-intro").unwrap();
         assert_eq!(readme_task.page, "README.md");
-        update_task_in_docs(&docs, &readme_task, "これは素晴らしいプロジェクトです。", None).unwrap();
+        update_task_in_docs(
+            &docs,
+            &readme_task,
+            "これは素晴らしいプロジェクトです。",
+            None,
+        )
+        .unwrap();
 
         let updated_readme = fs::read_to_string(&readme).unwrap();
         assert!(updated_readme.contains("<!-- ai:generated id=readme-intro"));
@@ -438,7 +513,11 @@ mod tests {
         assert_eq!(state["config"]["agent"], "claude");
         assert_eq!(state["config"]["model"], "test-model");
         assert!(root.join("guide/index.md").is_file());
-        assert!(state["tasks"].as_array().unwrap().iter().any(|task| task["kind"] == "screenshot"));
+        assert!(state["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|task| task["kind"] == "screenshot"));
     }
 
     #[test]
@@ -453,8 +532,14 @@ mod tests {
         let err = run(root, "init-template", &[("--template", "manual")]).unwrap_err();
 
         assert_eq!(err, "EXISTING_DOCS_CONFIRM_REQUIRED");
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Handwritten guide");
-        assert_eq!(fs::read_to_string(root.join("README.md")).unwrap(), "Project readme");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Handwritten guide"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("README.md")).unwrap(),
+            "Project readme"
+        );
         assert!(!root.join("manual_setting.json").exists());
     }
 
@@ -467,10 +552,28 @@ mod tests {
             ("manual/docs", "manual"),
             ("docs", "docs/site"),
         ] {
-            let err = template::init_template(root, "manual", false, Some(docs), Some(output), None, None).unwrap_err();
+            let err = template::init_template(
+                root,
+                "manual",
+                false,
+                Some(docs),
+                Some(output),
+                None,
+                None,
+            )
+            .unwrap_err();
             assert!(err.contains("directories must be separate"));
         }
-        let err = template::init_template(root, "manual", false, Some("missing/../../outside"), None, None, None).unwrap_err();
+        let err = template::init_template(
+            root,
+            "manual",
+            false,
+            Some("missing/../../outside"),
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
         assert!(err.contains("stay inside the project"));
         assert!(!root.join("manual_setting.json").exists());
     }
@@ -487,10 +590,15 @@ mod tests {
         fs::write(real_docs.join("index.md"), "Original guide").unwrap();
         symlink(&real_docs, root.join("linked_docs")).unwrap();
 
-        let err = template::init_template(root, "manual", true, Some("linked_docs"), None, None, None).unwrap_err();
+        let err =
+            template::init_template(root, "manual", true, Some("linked_docs"), None, None, None)
+                .unwrap_err();
 
         assert!(err.contains("symbolic link"));
-        assert_eq!(fs::read_to_string(real_docs.join("index.md")).unwrap(), "Original guide");
+        assert_eq!(
+            fs::read_to_string(real_docs.join("index.md")).unwrap(),
+            "Original guide"
+        );
     }
 
     #[test]
@@ -541,20 +649,49 @@ mod tests {
         fs::write(root.join("manual/ai/answers/custom.md"), "Saved answer").unwrap();
         fs::write(root.join("manual/stale.html"), "Old site page").unwrap();
 
-        run(root, "init-template", &[("--template", "api"), ("--clear", "true")]).unwrap();
+        run(
+            root,
+            "init-template",
+            &[("--template", "api"), ("--clear", "true")],
+        )
+        .unwrap();
 
         let backup_root = root.join("manual/.backup");
-        let backups: Vec<_> = fs::read_dir(backup_root).unwrap().map(|entry| entry.unwrap().path()).collect();
+        let backups: Vec<_> = fs::read_dir(backup_root)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
         assert_eq!(backups.len(), 1);
-        assert_eq!(fs::read_to_string(backups[0].join("index.md")).unwrap(), "Original index");
-        assert_eq!(fs::read_to_string(backups[0].join("chapters/usage.md")).unwrap(), "Original usage");
+        assert_eq!(
+            fs::read_to_string(backups[0].join("index.md")).unwrap(),
+            "Original index"
+        );
+        assert_eq!(
+            fs::read_to_string(backups[0].join("chapters/usage.md")).unwrap(),
+            "Original usage"
+        );
         assert!(!docs.join("chapters/usage.md").exists());
         assert!(docs.join("api.md").is_file());
-        assert_eq!(fs::read(docs.join("assets/figure.png")).unwrap(), b"image bytes");
-        assert_eq!(fs::read_to_string(root.join("README.md")).unwrap(), "Project readme");
-        assert_eq!(fs::read_to_string(root.join("manual/brief.md")).unwrap(), "Custom brief");
-        assert_eq!(fs::read_to_string(root.join("manual/ai/answers/custom.md")).unwrap(), "Saved answer");
-        assert_eq!(fs::read_to_string(root.join("manual/stale.html")).unwrap(), "Old site page");
+        assert_eq!(
+            fs::read(docs.join("assets/figure.png")).unwrap(),
+            b"image bytes"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("README.md")).unwrap(),
+            "Project readme"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("manual/brief.md")).unwrap(),
+            "Custom brief"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("manual/ai/answers/custom.md")).unwrap(),
+            "Saved answer"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("manual/stale.html")).unwrap(),
+            "Old site page"
+        );
     }
 
     #[test]
@@ -566,19 +703,15 @@ mod tests {
         fs::write(docs.join("index.md"), "Original content").unwrap();
         fs::write(root.join("blocked_output"), "This is a file").unwrap();
 
-        let err = template::init_template(
-            root,
-            "api",
-            true,
-            None,
-            Some("blocked_output"),
-            None,
-            None,
-        )
-        .unwrap_err();
+        let err =
+            template::init_template(root, "api", true, None, Some("blocked_output"), None, None)
+                .unwrap_err();
 
         assert!(err.contains("Failed to create backup directory"));
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original content");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Original content"
+        );
         assert!(!root.join("manual_setting.json").exists());
     }
 
@@ -590,13 +723,14 @@ mod tests {
         fs::create_dir_all(&docs).unwrap();
         fs::write(docs.join("index.md"), "Original content").unwrap();
 
-        let err = template::init_template(
-            root, "api", true, None, None, Some("unsupported"), None,
-        )
-        .unwrap_err();
+        let err = template::init_template(root, "api", true, None, None, Some("unsupported"), None)
+            .unwrap_err();
 
         assert!(err.contains("Unsupported AI agent"));
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original content");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Original content"
+        );
         assert!(!root.join("manual_setting.json").exists());
     }
 
@@ -618,8 +752,14 @@ mod tests {
         .unwrap_err();
 
         assert!(err.contains("must include index.md"));
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
-        assert_eq!(fs::read_to_string(root.join("manual_setting.json")).unwrap(), "Existing settings");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Original guide"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("manual_setting.json")).unwrap(),
+            "Existing settings"
+        );
         assert!(!root.join("outside.md").exists());
     }
 
@@ -632,12 +772,18 @@ mod tests {
         fs::write(docs.join("index.md"), "Original guide").unwrap();
 
         let err = template::init_template_with_response(
-            root, "manual", true, Err("AI CLI failed".to_string()),
+            root,
+            "manual",
+            true,
+            Err("AI CLI failed".to_string()),
         )
         .unwrap_err();
 
         assert_eq!(err, "AI CLI failed");
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Original guide"
+        );
         assert!(!root.join("manual_setting.json").exists());
     }
 
@@ -660,8 +806,13 @@ mod tests {
         )
         .unwrap();
 
-        assert!(fs::read_to_string(docs.join("index.md")).unwrap().contains("ai:task id=overview-screenshot kind=screenshot"));
-        assert_eq!(fs::read_to_string(docs.join("chapters/start.md")).unwrap(), "# Getting started\n");
+        assert!(fs::read_to_string(docs.join("index.md"))
+            .unwrap()
+            .contains("ai:task id=overview-screenshot kind=screenshot"));
+        assert_eq!(
+            fs::read_to_string(docs.join("chapters/start.md")).unwrap(),
+            "# Getting started\n"
+        );
         assert!(root.join("manual/.backup").is_dir());
     }
 
@@ -685,7 +836,10 @@ mod tests {
         .unwrap_err();
 
         assert!(err.contains("index.md screenshot ai:task"));
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
+        assert_eq!(
+            fs::read_to_string(docs.join("index.md")).unwrap(),
+            "Original guide"
+        );
         assert!(!root.join("manual_setting.json").exists());
     }
 
@@ -704,8 +858,14 @@ mod tests {
         let result = builder::build_without_mkdocs(&docs, &output.join("ai"), &output).unwrap();
 
         assert!(result.contains("MkDocs site build skipped"));
-        assert_eq!(fs::read_to_string(output.join("index.html")).unwrap(), "Existing preview");
-        assert_eq!(fs::read_to_string(output.join("notes.txt")).unwrap(), "User note");
+        assert_eq!(
+            fs::read_to_string(output.join("index.html")).unwrap(),
+            "Existing preview"
+        );
+        assert_eq!(
+            fs::read_to_string(output.join("notes.txt")).unwrap(),
+            "User note"
+        );
     }
 
     #[test]
@@ -815,7 +975,14 @@ mod tests {
         let updated = fs::read_to_string(&page1).unwrap();
         assert!(updated.contains("![top-shot](assets/screen.png)"));
         assert!(updated.contains("<!-- ai:task id=top-shot kind=screenshot"));
-        assert_eq!(task::find_task(&docs, "top-shot").unwrap().prompt, "ツールウィンドウの全体画面");
+        assert_eq!(
+            task::find_task(&docs, "top-shot").unwrap().prompt,
+            "ツールウィンドウの全体画面"
+        );
+        assert_eq!(
+            preview::get_state(root).unwrap()["image_assets"]["top-shot"],
+            "assets/screen.png"
+        );
         // 不要な出典や定型文が一切含まれていないことを検証
         assert!(!updated.contains("実際の PyCharm"));
         assert!(!updated.contains("図の生成元"));
@@ -871,6 +1038,174 @@ mod tests {
         assert!(all_elements.iter().any(|e| e.id == "btn-start"));
         assert!(all_elements.iter().any(|e| e.id == "query-input"));
         assert!(all_elements.iter().any(|e| e.id == "results-panel"));
+    }
+
+    #[test]
+    fn test_generated_uimap_refreshes_when_source_changes() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"old-button\">Old</button>",
+        )
+        .unwrap();
+        let first = uimap::extract_ui_map(root);
+        uimap::save_ui_map(root, &first).unwrap();
+
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"new-button\">New</button>",
+        )
+        .unwrap();
+        let refreshed = uimap::extract_ui_map(root);
+        let ids: Vec<_> = refreshed
+            .views
+            .iter()
+            .flat_map(|view| &view.elements)
+            .map(|element| element.id.as_str())
+            .collect();
+        assert!(ids.contains(&"new-button"));
+        assert!(!ids.contains(&"old-button"));
+        assert_ne!(first.source_hash, refreshed.source_hash);
+    }
+
+    #[test]
+    fn test_manual_uimap_override_is_preserved() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"source-button\">Source</button>",
+        )
+        .unwrap();
+        let mut manual_map = uimap::extract_ui_map(root);
+        manual_map.project_name = "custom".to_string();
+        manual_map.source_hash = None;
+        uimap::save_ui_map(root, &manual_map).unwrap();
+
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"new-button\">New</button>",
+        )
+        .unwrap();
+        assert_eq!(uimap::extract_ui_map(root).project_name, "custom");
+        let refreshed = run(root, "ui-map", &[("--refresh", "")]).unwrap();
+        assert!(refreshed.contains("new-button"));
+        assert!(!refreshed.contains("source-button"));
+    }
+
+    #[test]
+    fn test_uimap_ignores_generated_manual_and_scans_each_app_html() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("manual")).unwrap();
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"first\">First</button>",
+        )
+        .unwrap();
+        fs::write(
+            root.join("settings.html"),
+            "<button id=\"second\">Second</button>",
+        )
+        .unwrap();
+        fs::write(
+            root.join("manual/index.html"),
+            "<button id=\"docs-only\">Docs</button>",
+        )
+        .unwrap();
+
+        let map = uimap::extract_ui_map(root);
+        let ids: Vec<_> = map
+            .views
+            .iter()
+            .flat_map(|view| &view.elements)
+            .map(|element| element.id.as_str())
+            .collect();
+        assert!(ids.contains(&"first"));
+        assert!(ids.contains(&"second"));
+        assert!(!ids.contains(&"docs-only"));
+    }
+
+    #[test]
+    fn test_ui_observation_import_merges_runtime_elements() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"settings\">Settings</button>",
+        )
+        .unwrap();
+        let observation = serde_json::json!({
+            "source": "http://127.0.0.1:3000/settings",
+            "platform": "web",
+            "views": [{
+                "id": "main-view",
+                "name": "Settings dialog",
+                "elements": [
+                    {"id": "settings", "selector": "#settings", "name": "Open Settings", "role": "button"},
+                    {"id": "model", "selector": "#model", "name": "AI model", "role": "combobox"}
+                ]
+            }]
+        });
+        fs::write(root.join("observation.json"), observation.to_string()).unwrap();
+
+        run(root, "ui-map-import", &[("--input", "observation.json")]).unwrap();
+        let map = uimap::extract_ui_map(root);
+        let view = map
+            .views
+            .iter()
+            .find(|view| view.id == "main-view")
+            .unwrap();
+        assert_eq!(view.name, "Settings dialog");
+        assert_eq!(
+            view.observed_from.as_deref(),
+            Some("http://127.0.0.1:3000/settings")
+        );
+        assert_eq!(view.elements.len(), 2);
+        assert!(view
+            .elements
+            .iter()
+            .any(|element| element.name == "AI model"));
+        assert!(root.join("manual/ui_observations.json").is_file());
+
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"changed\">Changed</button>",
+        )
+        .unwrap();
+        let updated = uimap::extract_ui_map(root);
+        assert!(updated
+            .views
+            .iter()
+            .flat_map(|view| &view.elements)
+            .any(|element| element.id == "changed"));
+        assert!(!updated
+            .views
+            .iter()
+            .flat_map(|view| &view.elements)
+            .any(|element| element.id == "model"));
+    }
+
+    #[test]
+    fn test_ui_observation_rejects_duplicate_selectors() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let observation = serde_json::json!({
+            "source": "PyCharm Settings",
+            "platform": "linux-x11",
+            "views": [{
+                "id": "settings",
+                "name": "Settings",
+                "elements": [
+                    {"id": "one", "selector": "accessibility:Settings", "name": "First", "role": "button"},
+                    {"id": "two", "selector": "accessibility:Settings", "name": "Second", "role": "button"}
+                ]
+            }]
+        });
+        fs::write(root.join("observation.json"), observation.to_string()).unwrap();
+        assert!(run(root, "ui-map-import", &[("--input", "observation.json")]).is_err());
+        assert!(!root.join("manual/ui_observations.json").exists());
     }
 
     #[test]
@@ -939,11 +1274,71 @@ mod tests {
         let page_dep = graph.pages.get("guide.md").unwrap();
         assert_eq!(page_dep.title, "User Guide");
         assert!(page_dep.symbols.contains(&"myapp.engine".to_string()));
-        assert!(page_dep.ui_elements.iter().any(|u| u.contains("btn-engine")));
+        assert!(page_dep
+            .ui_elements
+            .iter()
+            .any(|u| u.contains("btn-engine")));
         assert!(page_dep.tasks.contains(&"shot-engine".to_string()));
 
         assert!(graph.symbol_to_pages.contains_key("myapp.engine"));
         assert!(graph.task_dependencies.contains_key("shot-engine"));
+    }
+
+    #[test]
+    fn test_impact_rebuilds_graph_after_docs_change() {
+        use std::process::Command;
+
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(root.join("app.py"), "def run():\n    return 1\n").unwrap();
+        fs::write(root.join("docs/guide.md"), "# Guide\n\nNo code links.\n").unwrap();
+        fs::write(
+            root.join("index.html"),
+            "<button id=\"run-button\">Run</button>",
+        )
+        .unwrap();
+
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(root)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["init", "-q"]);
+        git(&["add", "."]);
+        git(&[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "initial",
+        ]);
+
+        let stale = deps::build_manual_dependency_graph(root, &root.join("docs"));
+        assert!(!stale.symbol_to_pages.contains_key("app"));
+        fs::write(root.join("docs/guide.md"), "# Guide\n\nCall `app.run`.\n").unwrap();
+        fs::write(root.join("app.py"), "def run():\n    return 2\n").unwrap();
+        fs::create_dir_all(root.join("manual")).unwrap();
+        fs::write(
+            root.join("manual/index.html"),
+            "<button id=\"run-button\">Run</button>",
+        )
+        .unwrap();
+
+        let impact = deps::analyze_git_impact(root, Some("HEAD")).unwrap();
+        assert_eq!(impact.total_impacted_pages, 1);
+        assert_eq!(impact.impacted_pages[0].path, "guide.md");
+        assert!(impact.affected_symbols.contains(&"app".to_string()));
+        assert!(impact.affected_ui_elements.is_empty());
     }
 
     #[test]
@@ -1004,7 +1399,9 @@ mod tests {
         let updated_content = fs::read_to_string(&page1).unwrap();
         assert!(updated_content.contains(&format!("<!-- ai:generated id={}", auto_task.id)));
         assert!(updated_content.contains("![guide-screenshot](assets/guide.png)"));
-        assert!(updated_content.contains(&format!("<!-- ai:task id={} kind=screenshot", auto_task.id)));
+        assert!(
+            updated_content.contains(&format!("<!-- ai:task id={} kind=screenshot", auto_task.id))
+        );
 
         // 再スキャンしてもステータスが維持される
         let scanned = task::scan_entries(&docs, &gen);
@@ -1041,5 +1438,50 @@ mod tests {
         let t = task::tasks(&docs).unwrap();
         assert_eq!(t.len(), 1);
         assert_eq!(t[0].id, "real-task");
+    }
+
+    #[test]
+    fn test_update_task_instruction_keeps_generated_result_and_marks_it_stale() {
+        let tmp = tempdir().unwrap();
+        let docs = tmp.path().join("docs");
+        let gen = tmp.path().join("manual/ai");
+        fs::create_dir_all(&docs).unwrap();
+        let page = docs.join("index.md");
+        fs::write(&page, "<!-- ai:task id=intro kind=text\n古い指示\n-->\n").unwrap();
+        let original = task::find_task(&docs, "intro").unwrap();
+        task::save_answer(&gen, &original, "既存の本文").unwrap();
+        task::update_task_in_docs(&docs, &original, "既存の本文", None).unwrap();
+
+        task::update_task_prompt(&docs, "intro", "新しい指示\n二行目").unwrap();
+        let content = fs::read_to_string(&page).unwrap();
+        assert!(content.contains("<!-- ai:task id=intro kind=text\n新しい指示\n二行目\n-->"));
+        assert!(content.contains("既存の本文"));
+        let changed = task::find_task(&docs, "intro").unwrap();
+        assert_eq!(changed.status, "stale");
+        assert_eq!(
+            changed.source_sha256,
+            task::source_hash("text", "新しい指示\n二行目")
+        );
+        assert_eq!(task::scan_entries(&docs, &gen)[0].status, "stale");
+
+        task::update_task_in_docs(&docs, &changed, "更新した本文", None).unwrap();
+        assert_eq!(task::scan_entries(&docs, &gen)[0].status, "current");
+    }
+
+    #[test]
+    fn test_update_task_instruction_assigns_stable_id_to_implicit_task() {
+        let tmp = tempdir().unwrap();
+        let docs = tmp.path().join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        let page = docs.join("index.md");
+        fs::write(&page, "<!-- ai:task kind=text\n元の指示\n-->\n").unwrap();
+        let original = task::tasks(&docs).unwrap().remove(0);
+        task::update_task_prompt(&docs, &original.id, "変更後の指示").unwrap();
+        let updated = task::tasks(&docs).unwrap().remove(0);
+        assert_eq!(updated.id, original.id);
+        assert_eq!(updated.prompt, "変更後の指示");
+        assert!(fs::read_to_string(&page)
+            .unwrap()
+            .contains(&format!("id={}", original.id)));
     }
 }

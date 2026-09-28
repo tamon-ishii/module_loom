@@ -9,7 +9,7 @@
   "agent": "codex",
   "model": "",
   "mkdocs": {
-    "site_name": "ModuleLoom 利用マニュアル",
+    "site_name": "ModuleLoom マニュアル",
     "theme": "material",
     "language": "ja",
     "use_directory_urls": false

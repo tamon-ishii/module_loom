@@ -312,6 +312,12 @@ select { color-scheme: dark; }
   outline: none;
   border-color: var(--accent-color);
 }
+.manual-task-editor {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  line-height: 1.5;
+}
 
 .engine-settings-details {
   border: 1px solid var(--border-color);

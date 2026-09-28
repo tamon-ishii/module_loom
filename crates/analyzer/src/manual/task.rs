@@ -382,7 +382,8 @@ pub fn parse_page_tags(
             format!("AI生成コンテンツ ({kind})")
         };
 
-        let status = if !hash.is_empty() && hash != source_hash(&kind, &prompt) {
+        let current_hash = source_hash(&kind, &prompt);
+        let status = if !hash.is_empty() && hash != current_hash {
             "stale".to_string()
         } else if approved {
             "approved".to_string()
@@ -394,7 +395,7 @@ pub fn parse_page_tags(
             kind: kind.clone(),
             page: page_rel.to_string(),
             prompt,
-            source_sha256: hash,
+            source_sha256: current_hash,
             status,
         };
         tags.push(PageTag::Generated { range: g.range, task, body: g.body });
@@ -493,7 +494,9 @@ pub fn scan_entries(templates: &Path, generated: &Path) -> Vec<Task> {
         }
         let answer_path = generated.join("answers").join(format!("{}.md", task.id));
         if !answer_path.exists() {
-            task.status = "missing".to_string();
+            if task.status != "stale" {
+                task.status = "missing".to_string();
+            }
         } else {
             match read_answer(&answer_path, task) {
                 Ok((_, _, approved)) => {
@@ -513,6 +516,50 @@ pub fn find_task(templates: &Path, task_id: &str) -> Result<Task, String> {
     all.into_iter()
         .find(|t| t.id == task_id)
         .ok_or_else(|| format!("Unknown task ID: {task_id}"))
+}
+
+pub fn update_task_prompt(templates: &Path, task_id: &str, prompt: &str) -> Result<(), String> {
+    let prompt = prompt.trim();
+    if prompt.is_empty() || prompt.contains("<!--") || prompt.contains("-->") {
+        return Err("Task instruction must be nonempty and cannot contain HTML comment markers".to_string());
+    }
+    let task = find_task(templates, task_id)?;
+    let page_path = if templates.join(&task.page).is_file() {
+        templates.join(&task.page)
+    } else {
+        templates.parent().unwrap_or(templates).join(&task.page)
+    };
+    let content = fs::read_to_string(&page_path).map_err(|e| e.to_string())?;
+    let code_blocks = get_code_block_ranges(&content);
+    let id_re = Regex::new(r#"(?:^|\s)id=(?:"([^"]+)"|'([^']+)'|([^\s>]+))"#).unwrap();
+    let mut matches = Vec::new();
+    for cap in task_regex().captures_iter(&content) {
+        let whole = cap.get(0).unwrap();
+        if is_inside_ranges(&(whole.start()..whole.end()), &code_blocks) {
+            continue;
+        }
+        let attrs = cap.name("attrs").unwrap().as_str();
+        let explicit_id = extract_attr(&id_re, attrs);
+        let old_prompt = cap.name("prompt").unwrap().as_str().trim();
+        if explicit_id == Some(task_id) || (explicit_id.is_none() && old_prompt == task.prompt) {
+            matches.push((whole.start(), whole.end(), attrs.to_string()));
+        }
+    }
+    if matches.len() != 1 {
+        return Err(format!("Expected one ai:task instruction for {task_id}; found {}", matches.len()));
+    }
+    let (start, end, attrs) = matches.pop().unwrap();
+    let attrs = if extract_attr(&id_re, &attrs).is_some() {
+        attrs
+    } else {
+        format!(" id={task_id}{attrs}")
+    };
+    let replacement = format!("<!-- ai:task{attrs}\n{prompt}\n-->");
+    let mut updated = String::with_capacity(content.len() + replacement.len());
+    updated.push_str(&content[..start]);
+    updated.push_str(&replacement);
+    updated.push_str(&content[end..]);
+    fs::write(&page_path, updated).map_err(|e| e.to_string())
 }
 
 pub fn update_task_in_docs(

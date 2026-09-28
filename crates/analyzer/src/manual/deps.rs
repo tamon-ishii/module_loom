@@ -257,10 +257,9 @@ pub fn build_manual_dependency_graph(root: &Path, _docs_path: &Path) -> ManualDe
 pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<ImpactReport, String> {
     let cfg = read_config(root);
     let docs_path = project_path(root, &cfg.docs)?;
-    let graph = match read_dependency_graph(root) {
-        Some(g) => g,
-        None => build_manual_dependency_graph(root, &docs_path),
-    };
+    // The saved graph is a report, not a cache: source, docs and the UI map
+    // may all have changed since it was written.
+    let graph = build_manual_dependency_graph(root, &docs_path);
 
     let git_ref = git_ref_opt.unwrap_or("HEAD~1").to_string();
 
@@ -336,19 +335,32 @@ pub fn analyze_git_impact(root: &Path, git_ref_opt: Option<&str>) -> Result<Impa
         }
 
         // HTML / UI changed
-        if file.ends_with(".html") || file.ends_with(".ts") || file.ends_with(".vue") {
-            // Check which UI selectors exist in this file or might be affected
+        if (file.ends_with(".html") || file.ends_with(".ts") || file.ends_with(".vue"))
+            && !file.starts_with("manual/")
+            && !file.starts_with("docs/")
+        {
+            let mut source = fs::read_to_string(root.join(file)).unwrap_or_default();
+            // Also consider selectors removed by the change.
+            if let Ok(previous) = Command::new("git")
+                .current_dir(root)
+                .args(["show", &format!("{git_ref}:{file}")])
+                .output()
+            {
+                if previous.status.success() {
+                    source.push_str(&String::from_utf8_lossy(&previous.stdout));
+                }
+            }
             for (ui_sel, pages) in &graph.ui_to_pages {
                 let clean_id = ui_sel.trim_start_matches('#');
-                if file.contains("index.html") || file.contains("manual") || file.contains(clean_id) {
+                if source.contains(clean_id) {
                     affected_ui_elements.insert(ui_sel.clone());
                     for p in pages {
                         let entry = page_impact_map
                             .entry(p.clone())
                             .or_insert_with(|| (Vec::new(), HashSet::new()));
-                        entry
-                            .0
-                            .push(format!("UI 変更: 要素 `{ui_sel}` が {file} で更新されました"));
+                        entry.0.push(format!(
+                            "UI 変更: 要素 `{ui_sel}` が {file} で更新されました"
+                        ));
                     }
                 }
             }

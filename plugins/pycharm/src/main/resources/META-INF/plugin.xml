@@ -14,7 +14,7 @@
     <h4>🌟 Key Features</h4>
     <ul>
       <li><b>🔍 Real-time Dependency & Cycle Detection:</b> Visualize complex package structures, trace circular import paths, and navigate directly to source files with one click.</li>
-      <li><b>📖 3-Asset Automated Documentation Engine (Core Highlight):</b> 1-click sync for in-draft Screenshots (with automatic red-circle, bounding box, arrow, and label annotations), Mermaid architecture diagrams from AST, and Docstring API references into MkDocs static sites.</li>
+      <li><b>📖 Documentation Engine:</b> Manage screenshot instructions and register PNG images of the target application, generate Mermaid architecture diagrams from AST, and publish Markdown and API references as MkDocs sites.</li>
       <li><b>🚨 Code Quality & Architecture Diagnostics:</b> Multi-angle inspection of bloat, duplicate code (bundled jscpd v5), cyclomatic complexity (Lizard/AST), and missing type annotations. Automatically installs diagnostics skills to detected coding agents (Codex, Claude Code, Cursor).</li>
       <li><b>🤖 Local AI Integration:</b> Connects to Codex, Claude Code, Grok, or Agy CLI using your local authentication without requiring extra API keys.</li>
       <li><b>⚙️ Centralized Settings:</b> Easy configuration popup for HTML output destination, Markdown source directory, and AI CLI/model selection.</li>
@@ -24,7 +24,7 @@
     <h4>🇯🇵 日本語での特徴</h4>
     <ul>
       <li><b>🔍 依存関係 & 循環インポートのリアルタイム可視化:</b> 複雑なモジュール関係や循環インポート経路を可視化し、エディタと連携して即座に修正可能。</li>
-      <li><b>📖 アセット自動同期ドキュメント生成エンジン（目玉機能）:</b> 原稿内のスクリーンショット（赤丸・角丸赤枠・矢印・説明文吹き出し自動合成）、Mermaid依存図、DocstringからのAPIリファレンスをボタン1発で自動同期し、MkDocsサイトをビルド。</li>
+      <li><b>📖 ドキュメント生成エンジン:</b> 対象アプリの撮影指示とPNGの登録、Mermaid依存図、DocstringからのAPIリファレンスを原稿で管理し、MkDocsサイトをビルド。</li>
       <li><b>🚨 コード品質 & アーキテクチャ診断:</b> 肥大化、重複コード（jscpd同梱）、循環、型チェックを多角的に診断し、コーディングエージェントへ診断スキルを自動導入。</li>
       <li><b>🤖 ローカル認証済み AI CLI 連携:</b> Codex、Claude Code、Grok、Agy とAPIキー不要で連携。</li>
     </ul>

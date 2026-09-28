@@ -27,7 +27,7 @@ fn main() {
         let mut position = 3;
         while position < args.len() {
             let key = args[position].as_str();
-            if key == "--draft" || key == "--clear" {
+            if key == "--draft" || key == "--clear" || key == "--refresh" {
                 options.push((key, ""));
                 position += 1;
                 continue;
@@ -91,7 +91,7 @@ fn main() {
             println!("Usage: moduleloom-analyze [OPTIONS] [PROJECT_PATH]");
             println!("  --diagnostics      Run code diagnostics and print AI-ready JSON");
             println!("  --install-skill    Install the bundled skill for detected coding agents");
-            println!("  --manual ACTION   Manage the MkDocs manual (state, save, draft, generate-task, build)");
+            println!("  --manual ACTION   Manage the manual (state, update-task, list-windows, capture-window, build)");
             println!("  --quality-report   Alias of --diagnostics");
             println!("  --quality --json   Print the full analysis with diagnostics");
             println!("  --max-score N      Exit with status 1 if the score exceeds N");

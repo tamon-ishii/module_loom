@@ -160,6 +160,8 @@ async fn manual_action(
     id: Option<String>,
     page: Option<String>,
     asset: Option<String>,
+    window: Option<String>,
+    inset: Option<String>,
     feedback: Option<String>,
     draft: Option<bool>,
     json: Option<String>,
@@ -182,6 +184,8 @@ async fn manual_action(
         if let Some(ref value) = id { options.push(("--id", value)); }
         if let Some(ref value) = page { options.push(("--page", value)); }
         if let Some(ref value) = asset { options.push(("--asset", value)); }
+        if let Some(ref value) = window { options.push(("--window", value)); }
+        if let Some(ref value) = inset { options.push(("--inset", value)); }
         if let Some(ref value) = feedback { options.push(("--feedback", value)); }
         if let Some(ref value) = json { options.push(("--json", value)); }
         if let Some(ref value) = git_ref { options.push(("--git-ref", value)); }
@@ -196,45 +200,6 @@ async fn manual_action(
             }
         }
         moduleloom_analyzer::manual::run(&root, &action, &options)
-    }).await.map_err(|error| error.to_string())?
-}
-
-#[tauri::command]
-async fn manual_capture_screenshot(
-    path: String,
-    id: String,
-    data: String,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let root = PathBuf::from(&path);
-        let assets = root.join("docs/assets");
-        std::fs::create_dir_all(&assets).map_err(|e| e.to_string())?;
-        let image = assets.join(format!("{id}.png"));
-
-        let base64_str = if let Some(pos) = data.find(',') {
-            &data[pos + 1..]
-        } else {
-            &data
-        };
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(base64_str.trim())
-            .map_err(|e| format!("Base64 decode error: {e}"))?;
-        if bytes.len() < 24
-            || &bytes[..8] != b"\x89PNG\r\n\x1a\n"
-            || &bytes[12..16] != b"IHDR"
-            || u32::from_be_bytes(bytes[16..20].try_into().unwrap()) == 0
-            || u32::from_be_bytes(bytes[20..24].try_into().unwrap()) == 0
-        {
-            return Err("Screenshot data is not a valid PNG image".to_string());
-        }
-        std::fs::write(&image, bytes).map_err(|e| e.to_string())?;
-
-        let options = vec![
-            ("--id", id.as_str()),
-            ("--image", image.to_str().unwrap_or("")),
-        ];
-        moduleloom_analyzer::manual::run(&root, "record-screenshot", &options)
     }).await.map_err(|error| error.to_string())?
 }
 
@@ -465,7 +430,6 @@ fn main() {
             analyze_project,
             generate_mkdocs,
             manual_action,
-            manual_capture_screenshot,
             list_fix_tools,
             preview_cycle_fix,
             apply_cycle_fix,
