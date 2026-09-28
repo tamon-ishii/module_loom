@@ -689,7 +689,7 @@ public class ModuleLoomToolWindowFactory implements ToolWindowFactory, DumbAware
                 if ("true".equals(extractJsonField(request, "draft"))) args.add("--draft");
                 if ("true".equals(extractJsonField(request, "clear"))) args.add("--clear");
                 if ("true".equals(extractJsonField(request, "check"))) args.add("--check");
-                if ("generate-task".equals(action)) args.addAll(List.of("--cli", findAnalyzerBinary(project)));
+                if (List.of("generate-task", "generate-text-all", "generate-impacted").contains(action)) args.addAll(List.of("--cli", findAnalyzerBinary(project)));
                 return jsonString(runProcess(root, args, null, false).trim());
             }
             case "export_report": {

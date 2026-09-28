@@ -204,7 +204,7 @@ async fn manual_action(
         let bundled = app.path().resolve(format!("binaries/{binary_name}"), BaseDirectory::Resource).ok();
         let local = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../target/debug").join(binary_name);
         let binary = bundled.filter(|path| path.is_file()).or_else(|| local.is_file().then_some(local));
-        if action == "generate-task" {
+        if matches!(action.as_str(), "generate-task" | "generate-text-all" | "generate-impacted") {
             if let Some(ref executable) = binary {
                 options.push(("--cli", executable.to_str().ok_or("Invalid analyzer path")?));
             }

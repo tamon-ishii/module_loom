@@ -298,6 +298,15 @@
                 <div class="manual-actions"><button id="manual-ui-explore" class="btn-secondary" type="button">UI Map に取り込む</button></div>
               </details>
               <details>
+                <summary>UI Map を更新・取り込む</summary>
+                <p>プロジェクトの画面定義から UI Map を作るか、外部アプリを調べた観測 JSON を取り込みます。</p>
+                <div class="manual-actions"><button id="manual-ui-map" class="btn-secondary" type="button">コードから UI Map を更新</button></div>
+                <label>観測 JSON のパス（プロジェクトからの相対パス、または絶対パス）
+                  <input id="manual-observation-path" type="text" placeholder="manual/observations/settings.json" />
+                </label>
+                <div class="manual-actions"><button id="manual-ui-map-import" class="btn-secondary" type="button">観測結果を取り込む</button></div>
+              </details>
+              <details>
                 <summary>Web 操作シナリオ</summary>
                 <label>シナリオファイル（プロジェクト内）
                   <input id="manual-scenario-path" type="text" value="manual/scenarios/settings.json" />

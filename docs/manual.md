@@ -116,7 +116,7 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 
 ### Web 画面の撮影シナリオ
 
-デスクトップ版、PyCharm 版、VS Code 版の **ドキュメント生成 → マニュアルの保守と検証** からも、更新候補の確認、Web UI 探索、シナリオの保存・読み込み・実行、E2E、根拠確認、読者別ビルドを操作できます。シナリオを保存した後、プレビューで対象ページを選び **表示中ページに紐づけ** を押すと、そのページへ `ai:scenario` を追加します。
+デスクトップ版、PyCharm 版、VS Code 版の **ドキュメント生成 → マニュアルの保守と検証** からも、更新候補の確認、Web UI 探索、UI Map の更新と観測 JSON の取り込み、シナリオの保存・読み込み・実行、E2E、根拠確認、読者別ビルドを操作できます。外部アプリの画面を調べた観測 JSON は **UI Map を更新・取り込む** にパスを指定します。シナリオを保存した後、プレビューで対象ページを選び **表示中ページに紐づけ** を押すと、そのページへ `ai:scenario` を追加します。
 
 Web アプリでは操作を JSON ファイルに記録し、順に実行できます。対象プロジェクトに Node.js、`playwright-core`、Google Chrome が必要です。`npm install --save-dev playwright-core` で依存を追加してください。Chrome が標準の場所にない場合は `MODULELOOM_CHROME_PATH` に実行ファイルのパスを設定します。
 

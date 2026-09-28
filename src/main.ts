@@ -72,7 +72,6 @@ const btnShowOverview = document.getElementById("btn-show-overview") as HTMLButt
 let currentViewMode: "overview" | "file" = "file";
 const editorSelect = document.getElementById("editor-select") as HTMLSelectElement | null;
 const hostEditor = (window as any).__MODULELOOM_EDITOR__;
-if (hostEditor === "vscode") tabManual.hidden = true;
 if (hostEditor === "pycharm" || hostEditor === "vscode") {
   document.querySelector(".editor-select-area")?.remove();
   pathInput.hidden = true;
@@ -298,6 +297,7 @@ const manualWorkflowOutput = document.getElementById("manual-workflow-output") a
 const manualImpactRef = document.getElementById("manual-impact-ref") as HTMLInputElement;
 const manualExploreUrl = document.getElementById("manual-explore-url") as HTMLInputElement;
 const manualExplorePages = document.getElementById("manual-explore-pages") as HTMLInputElement;
+const manualObservationPath = document.getElementById("manual-observation-path") as HTMLInputElement;
 const manualScenarioPath = document.getElementById("manual-scenario-path") as HTMLInputElement;
 const manualScenarioJson = document.getElementById("manual-scenario-json") as HTMLTextAreaElement;
 const manualAudience = document.getElementById("manual-audience") as HTMLSelectElement;
@@ -1178,8 +1178,8 @@ async function refreshManual(force = false): Promise<void> {
   }
 }
 
-async function runManual(action: string, extras: Record<string, unknown> = {}): Promise<void> {
-  if (manualBusy) return;
+async function runManual(action: string, extras: Record<string, unknown> = {}): Promise<boolean> {
+  if (manualBusy) return false;
   manualBusy = true;
   const isAiTask = action === "draft" || action === "generate-task";
   manualStatus.textContent = isAiTask ? "AIを実行中…" : "処理中…";
@@ -1229,11 +1229,13 @@ async function runManual(action: string, extras: Record<string, unknown> = {}): 
         completeManualProgress(msg, "プレビューを更新しました。");
       }
     }
+    return true;
   } catch (error) {
     manualStatus.textContent = `失敗: ${String(error)}`;
     if (isAiTask) {
       failManualProgress(String(error));
     }
+    return false;
   } finally {
     manualBusy = false;
     manualView.removeAttribute("aria-busy");
@@ -1256,6 +1258,7 @@ function formatManualWorkflowResult(action: string, raw: string): string {
   }
   if (action === "generate-impacted") return `更新: ${(result.generated || []).join(", ") || "なし"}\n手作業: ${(result.manual_tasks || []).join(", ") || "なし"}`;
   if (action === "ui-explore") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面、${result.total_elements ?? 0} 要素`;
+  if (action === "ui-map" || action === "ui-map-import") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面`;
   if (action === "scenario-run" || action === "scenario-test") return `操作 ${result.steps ?? 0} ステップに成功しました。${action === "scenario-run" ? `登録画像: ${(result.captured || []).join(", ") || "なし"}` : "画像は登録していません。"}`;
   if (action === "e2e") return `マニュアル E2E: ${result.total ?? 0} 件成功\n${(result.passed || []).map((item: any) => `${item.page}: ${item.file} (${item.steps} ステップ)`).join("\n")}`;
   if (action === "fact-check") return `根拠確認: ${result.passed ?? 0}/${result.checked ?? 0} 件成功\n根拠タグのない文章タスク: ${(result.unreviewed_text_tasks || []).join(", ") || "なし"}`;
@@ -1293,6 +1296,8 @@ const scenarioInput = () => ({ input: manualScenarioPath.value.trim() });
 bindManualWorkflow("manual-impact-plan", "impact-plan", () => ({ git_ref: manualImpactRef.value.trim() || "HEAD" }));
 bindManualWorkflow("manual-generate-impacted", "generate-impacted", () => ({ git_ref: manualImpactRef.value.trim() || "HEAD" }));
 bindManualWorkflow("manual-ui-explore", "ui-explore", () => ({ url: manualExploreUrl.value.trim(), max_pages: manualExplorePages.value.trim() || "10" }));
+bindManualWorkflow("manual-ui-map", "ui-map");
+bindManualWorkflow("manual-ui-map-import", "ui-map-import", () => ({ input: manualObservationPath.value.trim() }));
 bindManualWorkflow("manual-scenario-load", "scenario-load", scenarioInput);
 bindManualWorkflow("manual-scenario-save", "scenario-save", () => ({ ...scenarioInput(), json: manualScenarioJson.value }));
 bindManualWorkflow("manual-scenario-link", "scenario-link", () => ({ ...scenarioInput(), page: manualPage.value }));
@@ -1403,14 +1408,14 @@ manualSettingsModal?.addEventListener("click", (e) => {
 manualRootInput.addEventListener("change", () => { void refreshManual(); });
 document.getElementById("manual-save")?.addEventListener("click", async () => {
   if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "保存中…";
-  try {
-    await runManual("save");
+  const saved = await runManual("save");
+  if (saved) {
     if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = "✓ 設定を保存しました";
     setTimeout(() => {
       closeManualSettingsModal();
     }, 400);
-  } catch (err) {
-    if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = `保存失敗: ${String(err)}`;
+  } else {
+    if (manualSettingsSaveStatus) manualSettingsSaveStatus.textContent = manualStatus.textContent || "保存失敗";
   }
 });
 document.getElementById("manual-list-models")?.addEventListener("click", async () => {
