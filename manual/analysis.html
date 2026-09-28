@@ -9,10 +9,8 @@
       
       
       
-        <link rel="prev" href="analysis.html">
       
-      
-        <link rel="next" href="manual.html">
+        <link rel="next" href="index.html">
       
       
         
@@ -23,7 +21,7 @@
     
     
       
-        <title>ModuleLoom 利用マニュアル</title>
+        <title>analysis - ModuleLoom 利用マニュアル</title>
       
     
     
@@ -64,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#moduleloom" class="md-skip">
+        <a href="#_1" class="md-skip">
           コンテンツにスキップ
         </a>
       
@@ -100,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              index
+              analysis
             
           </span>
         </div>
@@ -193,33 +191,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="analysis.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    analysis
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -239,7 +210,7 @@
   <span class="md-ellipsis">
     
   
-    index
+    analysis
   
 
     
@@ -250,14 +221,14 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+      <a href="analysis.html" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    index
+    analysis
   
 
     
@@ -283,10 +254,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        操作ガイド
+        循環インポートを確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コード診断を実行する
       
     </span>
   </a>
@@ -297,6 +279,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -382,10 +391,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        操作ガイド
+        循環インポートを確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コード診断を実行する
       
     </span>
   </a>
@@ -409,16 +429,19 @@
 
 
 
-<h1 id="moduleloom">ModuleLoom ユーザーマニュアル</h1>
-<p>ModuleLoom は Python モジュールの依存関係を図で表示し、循環インポートやコード上の問題を調べるツールです。ここでは <code>sample_project</code>（19 モジュール）を例に、解析からマニュアル出力までの操作を説明します。画面はデスクトップ版を基にしています。</p>
-<p><img alt="sample_project を解析したモジュール一覧と依存図" src="assets/getting-started.png" /></p>
-<h2 id="_1">操作ガイド</h2>
-<ol>
-<li><a href="quickstart.html">解析を始める</a> — プロジェクトの指定、依存図とモジュール詳細の見方</li>
-<li><a href="analysis.html">循環インポートとコード診断</a> — 循環経路の確認、診断結果の絞り込み</li>
-<li><a href="manual.html">ドキュメントを生成する</a> — 原稿と画像の更新、MkDocs サイトの作成</li>
-</ol>
-<p>解析対象に別の Python プロジェクトを指定しても、基本操作は同じです。診断件数や総合複雑度は対象コードと解析環境によって変わります。</p>
+<h1 id="_1">循環インポートとコード診断</h1>
+<h2 id="_2">循環インポートを確認する</h2>
+<p><code>sample_project</code> には <code>app.order.payment</code> と <code>app.order.processor</code> の循環インポートがあります。依存図では該当ノードと矢印が赤く表示されます。<code>payment.py</code> を選ぶと、右側の import 一覧に <code>processor</code> への参照と行番号が表示されます。</p>
+<p><img alt="payment と processor の循環を表示した依存図" src="assets/getting-started.png" /></p>
+<p>循環の片方の import だけを変更しても、別の経路が残る場合があります。両ファイルの import 文と実行時の参照を確認し、変更後に再解析してください。</p>
+<h2 id="_3">コード診断を実行する</h2>
+<p><strong>コード診断</strong>タブを開き、<strong>診断実行</strong>を押します。結果には循環、肥大化、重複コード、型チェックなどの指摘が表示されます。外部の診断ツールが利用できない項目は、画面の警告を確認してください。</p>
+<p><img alt="診断実行ボタンの位置" src="assets/run-diagnostics.png" /></p>
+<p>問題一覧の上部には、種類別のフィルターとキーワード欄があります。指摘を選ぶと関連するモジュールの依存図へ移動できます。総合複雑度は修正の優先順位を考えるための目安です。</p>
+<p><img alt="コード診断の結果と優先して確認するモジュール" src="assets/diagnostics-results.png" /></p>
+<p><strong>循環</strong>を選ぶと、循環に関係する指摘だけを表示できます。画像の例では <code>payment</code> と <code>processor</code> の 2 件が表示されています。</p>
+<p><img alt="循環フィルターで問題を絞った画面" src="assets/cycle-filter.png" /></p>
+<p>修正候補が表示される場合は差分を確認してから適用します。診断結果は候補なので、変更の妥当性はコードとテストで判断してください。修正後は <strong>診断実行</strong>を再度押して結果を確認します。</p>
 
 
 

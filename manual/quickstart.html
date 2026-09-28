@@ -9,10 +9,8 @@
       
       
       
-        <link rel="prev" href="analysis.html">
+        <link rel="prev" href="manual.html">
       
-      
-        <link rel="next" href="manual.html">
       
       
         
@@ -23,7 +21,7 @@
     
     
       
-        <title>ModuleLoom 利用マニュアル</title>
+        <title>quickstart - ModuleLoom 利用マニュアル</title>
       
     
     
@@ -64,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#moduleloom" class="md-skip">
+        <a href="#_1" class="md-skip">
           コンテンツにスキップ
         </a>
       
@@ -100,7 +98,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              index
+              quickstart
             
           </span>
         </div>
@@ -220,37 +218,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    index
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -266,37 +237,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="目次">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      目次
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        操作ガイド
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -332,10 +272,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="quickstart.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    quickstart
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="quickstart.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -351,6 +318,48 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロジェクトを指定する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存図を読む
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -382,10 +391,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        操作ガイド
+        プロジェクトを指定する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存図を読む
       
     </span>
   </a>
@@ -409,16 +429,17 @@
 
 
 
-<h1 id="moduleloom">ModuleLoom ユーザーマニュアル</h1>
-<p>ModuleLoom は Python モジュールの依存関係を図で表示し、循環インポートやコード上の問題を調べるツールです。ここでは <code>sample_project</code>（19 モジュール）を例に、解析からマニュアル出力までの操作を説明します。画面はデスクトップ版を基にしています。</p>
-<p><img alt="sample_project を解析したモジュール一覧と依存図" src="assets/getting-started.png" /></p>
-<h2 id="_1">操作ガイド</h2>
-<ol>
-<li><a href="quickstart.html">解析を始める</a> — プロジェクトの指定、依存図とモジュール詳細の見方</li>
-<li><a href="analysis.html">循環インポートとコード診断</a> — 循環経路の確認、診断結果の絞り込み</li>
-<li><a href="manual.html">ドキュメントを生成する</a> — 原稿と画像の更新、MkDocs サイトの作成</li>
-</ol>
-<p>解析対象に別の Python プロジェクトを指定しても、基本操作は同じです。診断件数や総合複雑度は対象コードと解析環境によって変わります。</p>
+<h1 id="_1">解析を始める</h1>
+<h2 id="_2">プロジェクトを指定する</h2>
+<p>デスクトップ版では上部のパス欄に Python プロジェクトのルートを入力し、<strong>解析実行</strong>を押します。PyCharm 版と VS Code 版では、開いているプロジェクトを対象に解析します。</p>
+<p>解析が終わると、左に <code>.py</code> ファイルのツリー、中央に import の依存図、右に選択したモジュールの詳細が表示されます。</p>
+<p><img alt="左からソースツリー、依存図、モジュール詳細が並ぶ解析画面" src="assets/getting-started.png" /></p>
+<h2 id="_3">依存図を読む</h2>
+<p>ノードはモジュール、矢印は import の向きを表します。左のツリーで <code>app/order/payment.py</code> を選ぶと、右側に行数、関数、import 先と import 元が表示されます。import の行番号から該当コードを確認できます。</p>
+<p><img alt="全体図ボタンの位置" src="assets/overview-button.png" /></p>
+<p><strong>全体図を見る</strong>を押すと、プロジェクト内のモジュールをまとめて表示します。全体図でノードを選ぶと詳細が表示され、ダブルクリックするとそのモジュールを中心とした依存図に切り替わります。</p>
+<p><img alt="sample_project の全体依存図" src="assets/full-graph.png" /></p>
+<p>大きいプロジェクトでは、上部の検索欄や <strong>表示</strong> メニューの表示範囲・集約を使って図を絞り込めます。2 モジュール間の import 経路は <strong>分析</strong> メニューの「import 経路検索」で調べられます。</p>
 
 
 

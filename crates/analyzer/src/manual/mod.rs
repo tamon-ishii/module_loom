@@ -654,15 +654,39 @@ mod tests {
             "manual",
             true,
             Ok(serde_json::json!({"pages": [
-                {"path": "index.md", "content": "# New guide"},
+                {"path": "index.md", "content": "# New guide\n\n<!-- ai:task id=overview-screenshot kind=screenshot\nトップページの概要画面を撮影\n-->"},
                 {"path": "chapters/start.md", "content": "# Getting started"}
             ]})),
         )
         .unwrap();
 
-        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "# New guide\n");
+        assert!(fs::read_to_string(docs.join("index.md")).unwrap().contains("ai:task id=overview-screenshot kind=screenshot"));
         assert_eq!(fs::read_to_string(docs.join("chapters/start.md")).unwrap(), "# Getting started\n");
         assert!(root.join("manual/.backup").is_dir());
+    }
+
+    #[test]
+    fn test_ai_manual_draft_requires_overview_screenshot_task() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("index.md"), "Original guide").unwrap();
+
+        let err = template::init_template_with_response(
+            root,
+            "manual",
+            true,
+            Ok(serde_json::json!({"pages": [
+                {"path": "index.md", "content": "# New guide"},
+                {"path": "quickstart.md", "content": "# Quickstart"}
+            ]})),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("index.md screenshot ai:task"));
+        assert_eq!(fs::read_to_string(docs.join("index.md")).unwrap(), "Original guide");
+        assert!(!root.join("manual_setting.json").exists());
     }
 
     #[test]
@@ -793,6 +817,31 @@ mod tests {
         // 不要な出典や定型文が一切含まれていないことを検証
         assert!(!updated.contains("実際の PyCharm"));
         assert!(!updated.contains("図の生成元"));
+    }
+
+    #[test]
+    fn test_record_screenshot_in_readme_links_to_manual_output() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("manual_setting.json"),
+            r#"{"docs":"docs","output":"manual","targets":["docs","README.md"]}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("README.md"),
+            "# Project\n\n<!-- ai:task id=readme-shot kind=screenshot\nプロジェクトの画面を撮影\n-->\n",
+        )
+        .unwrap();
+        let image = root.join("screen.png");
+        fs::write(&image, b"fake png data").unwrap();
+
+        author::record_screenshot(root, "readme-shot", &image).unwrap();
+
+        let readme = fs::read_to_string(root.join("README.md")).unwrap();
+        assert!(readme.contains("![readme-shot](manual/assets/screen.png)"));
+        assert!(root.join("docs/assets/screen.png").is_file());
     }
 
     #[test]

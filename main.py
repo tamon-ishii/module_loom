@@ -42,8 +42,8 @@ def main() -> int:
     parser.add_argument(
         "project_path",
         nargs="?",
-        default="sample_project",
-        help="最初に解析する Python プロジェクト（既定: sample_project）",
+        default=str(PROJECT_ROOT),
+        help="最初に解析する Python プロジェクト（既定: ModuleLoom リポジトリ）",
     )
     args = parser.parse_args()
     project_path = Path(args.project_path).expanduser()

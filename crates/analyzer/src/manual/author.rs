@@ -55,7 +55,8 @@ pub fn draft(root: &Path) -> Result<(), String> {
         Use Markdown files, with index.md required. \
         Insert unique <!-- ai:task id=... kind=text|screenshot|diagram\\n...\\n--> tags for work requiring AI, real screenshots, or Mermaid diagrams.\n\
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
-        - In the top page (index.md), place the overview/key-visual screenshot prominently near the top (immediately following the introduction paragraph), so readers see what the product looks like first. Place table of contents and page navigation links BELOW the overview.\n\
+        - You MUST include at least one kind=screenshot ai:task in index.md. Do not omit it or replace it with a static image link. Put it immediately after the short introduction and before navigation.\n\
+        - The task prompt must describe a real overview screen and relevant controls from the UI Map, with useful MarkIts annotation instructions. It appears in ModuleLoom's 「更新対象アセット」 list for screenshot capture and refresh.\n\
         - kind=screenshot tasks must ONLY request capturing the raw UI image, referencing real UI elements and views from the UI Map (e.g. #btn-id or button label), using MarkIts (crates/markits) semantic annotation instructions (e.g. markits callout: '説明文', pin: '?', badge: 1, spotlight, rounded-rect, style: primary|danger|warning|info|pink) to keep all manual screenshots visually unified and professional.\n\
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
@@ -142,7 +143,16 @@ pub fn draft(root: &Path) -> Result<(), String> {
     }
 
     // 書式チェック
-    super::task::tasks(tmp.path())?;
+    let generated_tasks = super::task::tasks(tmp.path())?;
+    if !generated_tasks
+        .iter()
+        .any(|task| task.page == "index.md" && task.kind == "screenshot")
+    {
+        return Err(format!(
+            "{} manual draft must include an index.md screenshot ai:task for the 更新対象アセット list",
+            config.agent
+        ));
+    }
 
     for (rel_path, _) in &validated {
         let src = tmp.path().join(rel_path);
@@ -282,7 +292,12 @@ pub fn record_screenshot(root: &Path, task_id: &str, image: &Path) -> Result<(),
     let page_parts = Path::new(&task.page).components().count();
     let depth = if page_parts > 1 { page_parts - 1 } else { 0 };
     let prefix = "../".repeat(depth);
-    let asset_path = format!("{prefix}assets/{file_name}");
+    let asset_path = if templates.join(&task.page).is_file() {
+        format!("{prefix}assets/{file_name}")
+    } else {
+        let output = config.output.replace('\\', "/");
+        format!("{prefix}{output}/assets/{file_name}")
+    };
     let alt_text = &task.id;
     let body = format!("![{alt_text}]({asset_path})");
 

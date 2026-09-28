@@ -4,7 +4,7 @@ use tempfile::tempdir_in;
 use walkdir::WalkDir;
 
 use super::config::{config_path, project_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF};
-use super::task::{collect_markdown_files, utc_now};
+use super::task::{collect_markdown_files, parse_page_tags, utc_now, PageTag};
 use crate::analyze_directory;
 
 pub fn init_template(
@@ -240,10 +240,12 @@ fn generate_template_with_llm(
             Create a concise, focused Japanese MkDocs user manual outline (たたき台) as JSON pages for this specific application.\n\
             The manual must explain features, workflows, and step-by-step user operations.\n\
             IMPORTANT RULES FOR TASKS & LAYOUT:\n\
-            - index.md is required. Place an overview/key-visual screenshot task (kind=screenshot) prominently near the top of index.md so readers see what the product looks like first. Place table of contents and navigation links BELOW the overview.\n\
+            - index.md is required. You MUST add at least one screenshot update task with kind=screenshot to index.md; this is mandatory and must not be omitted or replaced with a static image link.\n\
+            - Put the task immediately after the short introduction and before navigation. Use <!-- ai:task id=overview-screenshot kind=screenshot\\nDescribe the real overview screen from the UI Map and useful MarkIts annotations\\n--> . This task appears in ModuleLoom's 「更新対象アセット」 list so the user can capture and refresh the image.\n\
+            - The screenshot prompt must name a real UI view and relevant controls from the UI Map; do not invent controls or give a generic instruction.\n\
             - Divide into 2 to 3 core chapters matching the application's actual workflows (e.g. quickstart.md for initial setup, features.md for main operations).\n\
             - Write detailed explanatory text, feature overviews, and step-by-step guides DIRECTLY as markdown body text (DO NOT use kind=text tasks, write the actual Japanese text directly into the markdown body).\n\
-            - Only for UI screenshots that require app screen capture, insert <!-- ai:task id=... kind=screenshot\\n...MarkIts annotations instruction...--> (at most 1-2 per page).\n\
+            - Add more screenshot or diagram tasks only when they help explain a real operation or dependency.\n\
             - Return exactly 3 to 4 pages total. Keep the draft concise, clean, and fast to generate.\n\n\
             {}\n\n\
             Brief:\n{}",
@@ -298,6 +300,23 @@ fn generate_template_with_llm(
 
     if !has_index || valid_pages.is_empty() {
         return Err(format!("{agent} draft must include index.md"));
+    }
+
+    if template_type == "manual" {
+        let index_content = valid_pages
+            .iter()
+            .find(|(path, _)| path == "index.md")
+            .map(|(_, content)| content.as_str())
+            .unwrap_or_default();
+        let mut ids = std::collections::HashSet::new();
+        let tags = parse_page_tags("index.md", index_content, &mut ids)?;
+        if !tags.iter().any(|tag| {
+            matches!(tag, PageTag::Task { task, .. } if task.kind == "screenshot")
+        }) {
+            return Err(format!(
+                "{agent} manual draft must include an index.md screenshot ai:task for the 更新対象アセット list"
+            ));
+        }
     }
 
     fs::create_dir_all(templates).map_err(|e| e.to_string())?;

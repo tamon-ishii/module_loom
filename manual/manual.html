@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="analysis.html">
+        <link rel="prev" href="index.html">
       
       
-        <link rel="next" href="manual.html">
+        <link rel="next" href="quickstart.html">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>ModuleLoom 利用マニュアル</title>
+        <title>manual - ModuleLoom 利用マニュアル</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#moduleloom" class="md-skip">
+        <a href="#_1" class="md-skip">
           コンテンツにスキップ
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              index
+              manual
             
           </span>
         </div>
@@ -220,6 +220,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -239,7 +266,7 @@
   <span class="md-ellipsis">
     
   
-    index
+    manual
   
 
     
@@ -250,14 +277,14 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+      <a href="manual.html" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    index
+    manual
   
 
     
@@ -283,10 +310,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        操作ガイド
+        原稿と出力先を確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        画像と図を更新する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビルドして確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI タグの仕様
       
     </span>
   </a>
@@ -297,33 +357,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="manual.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    manual
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -382,10 +415,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#_1" class="md-nav__link">
+  <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        操作ガイド
+        原稿と出力先を確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        画像と図を更新する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ビルドして確認する
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI タグの仕様
       
     </span>
   </a>
@@ -409,16 +475,41 @@
 
 
 
-<h1 id="moduleloom">ModuleLoom ユーザーマニュアル</h1>
-<p>ModuleLoom は Python モジュールの依存関係を図で表示し、循環インポートやコード上の問題を調べるツールです。ここでは <code>sample_project</code>（19 モジュール）を例に、解析からマニュアル出力までの操作を説明します。画面はデスクトップ版を基にしています。</p>
-<p><img alt="sample_project を解析したモジュール一覧と依存図" src="assets/getting-started.png" /></p>
-<h2 id="_1">操作ガイド</h2>
-<ol>
-<li><a href="quickstart.html">解析を始める</a> — プロジェクトの指定、依存図とモジュール詳細の見方</li>
-<li><a href="analysis.html">循環インポートとコード診断</a> — 循環経路の確認、診断結果の絞り込み</li>
-<li><a href="manual.html">ドキュメントを生成する</a> — 原稿と画像の更新、MkDocs サイトの作成</li>
-</ol>
-<p>解析対象に別の Python プロジェクトを指定しても、基本操作は同じです。診断件数や総合複雑度は対象コードと解析環境によって変わります。</p>
+<h1 id="_1">ドキュメントを生成する</h1>
+<p><strong>ドキュメント生成</strong>タブでは、Markdown 原稿と画面画像・依存図を管理し、MkDocs の HTML サイトを出力します。スクリーンショットと Mermaid 図は原稿内のタスクに対応します。</p>
+<h2 id="_2">原稿と出力先を確認する</h2>
+<p><strong>設定</strong>で対象プロジェクト、Markdown 原稿のフォルダー、HTML の出力先を確認します。この例では原稿が <code>docs/</code>、出力先が <code>manual/</code> です。</p>
+<p><img alt="ドキュメント生成のパスと MkDocs の設定画面" src="assets/manual-settings.png" /></p>
+<p>原稿がない場合は <strong>テンプレート生成</strong>から下書きを作れます。既存の原稿がある場合は、その内容を確認してから生成を実行してください。</p>
+<p><img alt="テンプレート生成で選ぶ原稿の種類" src="assets/manual-screen.png" /></p>
+<h2 id="_3">画像と図を更新する</h2>
+<p>原稿にスクリーンショットのタスクがある場合、<strong>全スクショ一括撮影</strong>で現在の画面から画像を撮影します。個別の画像を撮り直す場合は、同期アセット一覧の <strong>画面を自動撮影</strong>を使います。操作対象を示したいときは <strong>修正指示</strong>にボタン名や要素 ID と「赤丸で囲む」などを入力して再撮影できます。</p>
+<p><img alt="全スクショ一括撮影ボタンを赤枠で示した画面" src="assets/capture-control.png" /></p>
+<p>依存図のタスクは <strong>全ダイアグラム更新</strong>で更新します。API リファレンスが必要な場合は <strong>API ドキュメント生成</strong>を使い、docstring と型注釈からモジュール別のページを作ります。</p>
+<h2 id="_4">ビルドして確認する</h2>
+<p><strong>下書きビルド</strong>は未完成のタスクを残したままプレビューを作ります。右側の <strong>HTML</strong> 表示でページを確認し、画像や文章を直した後に <strong>完成版ビルド</strong>を実行します。完成版ビルドでは、未解決のタスクがあるとエラーになります。</p>
+<p><img alt="下書きビルドボタンと HTML プレビュー" src="assets/draft-build-control.png" /></p>
+<h2 id="ai">AI タグの仕様</h2>
+<p>Markdown 原稿では、生成・撮影・更新する箇所を <code>ai:task</code> タグで指定します。タグは HTML コメントなので、生成前の原稿を通常の Markdown 表示にしても指示文は本文に表示されません。</p>
+<div class="highlight"><pre><span></span><code>&lt;!-- ai:task id=quickstart-guide kind=text
+初めて使う人向けに、プロジェクトの指定手順を説明してください。
+--&gt;
+
+&lt;!-- ai:task id=overview-shot kind=screenshot
+メイン画面を撮影してください。
+--&gt;
+
+&lt;!-- ai:task id=module-map kind=diagram
+モジュール間の依存関係を図にしてください。
+--&gt;
+</code></pre></div>
+<p><code>id</code> はタスクを識別する名前です。省略時は種類・ファイル名などから自動生成されます。明示する場合は小文字英字で始め、小文字英数字とハイフンだけを使います（<code>^[a-z][a-z0-9-]*$</code>）。ID はすべての原稿 Markdown ファイルを通じて重複しないようにします。</p>
+<p><code>kind</code> は <code>text</code>（説明文）、<code>screenshot</code>（画面画像）、<code>diagram</code>（Mermaid 図）のいずれかです。省略すると <code>text</code> として扱われます。タグの開始行の後で改行して指示を書き、終了の <code>--&gt;</code> は別の行に置いてください。指示文は空にできません。</p>
+<p>種類ごとに生成内容を分けます。<code>text</code> には説明文、<code>screenshot</code> には画像 Markdown、<code>diagram</code> には Mermaid コードブロックだけを置きます。画像の説明や図の注釈が必要な場合は、別の <code>kind=text</code> タスクを使います。</p>
+<p>生成後は <code>ai:task</code> が <code>ai:generated</code> ブロックに置き換わり、タスクの種類・指示と回答の状態が記録されます。指示や種類が変わると既存の回答は古い状態になります。下書きビルドでは未完了タスクを確認できますが、完成版ビルドには各タスクの最新の回答が必要です。</p>
+<p>CLI から既存の Python コードに基づく MkDocs ページだけを生成する場合は、次のコマンドを使用します。</p>
+<div class="highlight"><pre><span></span><code>moduleloom-analyze<span class="w"> </span>--mkdocs<span class="w"> </span>./moduleloom-docs<span class="w"> </span>./sample_project
+</code></pre></div>
 
 
 

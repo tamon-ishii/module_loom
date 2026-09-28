@@ -1161,7 +1161,7 @@ async function captureAllScreenshots(): Promise<void> {
 function renderManualTasks(tasks: ManualTask[]): void {
   const summaryEl = document.getElementById("manual-assets-summary");
   if (!tasks.length) {
-    manualTasks.innerHTML = "<p>同期対象のアセット指示タグ（<code>ai:task</code>）はまだありません。</p>";
+    manualTasks.innerHTML = "<p>更新対象の <code>ai:task</code> タグはまだありません。</p>";
     if (summaryEl) summaryEl.textContent = "0 件のアセット";
     return;
   }
