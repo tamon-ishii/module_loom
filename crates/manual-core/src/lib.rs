@@ -1,11 +1,16 @@
+//! Documentation authoring, capture, scenarios, and publication shared by independent hosts.
+pub use moduleloom_analysis::{analyze_directory, mkdocs};
+
 pub mod agent;
 pub mod audience;
 pub mod author;
 pub mod builder;
+pub mod capture_source;
 pub mod config;
 pub mod context;
 pub mod deps;
 mod desktop_scenario;
+pub mod editor;
 pub mod fact;
 pub mod preview;
 pub mod scenario;
@@ -60,6 +65,11 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "inspect-window",
         "activate-window",
         "capture-window",
+        "recapture",
+        "capture-source-save",
+        "editor-read",
+        "editor-save",
+        "editor-preview",
         "scenario-run",
         "scenario-save",
         "scenario-load",
@@ -164,6 +174,33 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let generated_path = root.join("manual").join("ai");
 
     match action {
+        "editor-read" => serde_json::to_string(&editor::read(
+            root,
+            page_opt.ok_or("editor-read requires --page")?,
+        )?)
+        .map_err(|error| error.to_string()),
+        "editor-save" => {
+            let value: serde_json::Value =
+                serde_json::from_str(json_opt.ok_or("editor-save requires --json")?)
+                    .map_err(|error| error.to_string())?;
+            let content = value
+                .get("content")
+                .and_then(serde_json::Value::as_str)
+                .ok_or("editor-save requires content")?;
+            let revision = value.get("revision").and_then(serde_json::Value::as_str);
+            serde_json::to_string(&editor::save(
+                root,
+                page_opt.ok_or("editor-save requires --page")?,
+                content,
+                revision,
+            )?)
+            .map_err(|error| error.to_string())
+        }
+        "editor-preview" => editor::render_html(
+            root,
+            page_opt.ok_or("editor-preview requires --page")?,
+            body_opt.ok_or("editor-preview requires --body")?,
+        ),
         "list-windows" => serde_json::to_string(&window_capture::list_windows()?)
             .map_err(|error| error.to_string()),
         "list-accessible-windows" => desktop_scenario::list_accessible_windows(),
@@ -185,18 +222,14 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             if inset > 64 {
                 return Err("Inset cannot exceed 64 pixels".into());
             }
-            let task = task::find_task(&templates_path, task_id)?;
-            if task.kind != "screenshot" {
-                return Err(format!("Task is not a screenshot: {task_id}"));
-            }
-            let assets = templates_path.join("assets");
-            fs::create_dir_all(&assets).map_err(|error| error.to_string())?;
-            let image = assets.join(format!("{task_id}.png"));
-            let window = window_capture::capture_window(window_id, inset, &image)?;
-            author::record_screenshot(root, task_id, &image)?;
-            serde_json::to_string(&serde_json::json!({"window": window, "image": image}))
-                .map_err(|error| error.to_string())
+            capture_source::capture(root, task_id, window_id, inset)
         }
+        "recapture" => capture_source::recapture(root, id_opt.ok_or("recapture requires --id")?),
+        "capture-source-save" => capture_source::save_scenario(
+            root,
+            id_opt.ok_or("capture-source-save requires --id")?,
+            input_opt.ok_or("capture-source-save requires --input")?,
+        ),
         "scenario-run" => {
             let input = input_opt.ok_or("scenario-run requires --input")?;
             scenario::run(root, input)
@@ -290,7 +323,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "generate-task" => {
             let task_id = id_opt.ok_or("generate-task requires --id")?;
-            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let cli = cli_opt.unwrap_or("");
             let feedback = feedback_opt.unwrap_or("");
             author::generate_task(root, task_id, cli, feedback)?;
             Ok(String::new())
@@ -302,7 +335,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             Ok(String::new())
         }
         "generate-text-all" => {
-            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let cli = cli_opt.unwrap_or("");
             let task_list = task::tasks(&templates_path)?;
             let mut updated = 0;
             for t in task_list {
@@ -318,7 +351,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             Ok(res.to_string())
         }
         "generate-diagram-all" => {
-            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let cli = cli_opt.unwrap_or("");
             let task_list = task::tasks(&templates_path)?;
             let mut updated = 0;
             for t in task_list {
@@ -368,7 +401,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "record-diagram" => {
             let task_id = id_opt.ok_or("record-diagram requires --id")?;
-            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let cli = cli_opt.unwrap_or("");
             let proj = project_opt.unwrap_or("manual/fixtures/diagram_project");
             let project_path = root.join(proj);
             author::record_diagram(
@@ -443,7 +476,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             if action == "impact-plan" {
                 return serde_json::to_string_pretty(&plan).map_err(|e| e.to_string());
             }
-            let cli = cli_opt.unwrap_or("target/debug/analyze");
+            let cli = cli_opt.unwrap_or("");
             let mut generated = Vec::new();
             for task_id in &plan.generate_tasks {
                 author::generate_task(root, task_id, cli, "").map_err(|error| {
@@ -481,6 +514,41 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         _ => unreachable!(),
     }
+}
+
+/// JSON request shared by the independent desktop app and its development bridge.
+pub fn request(request: serde_json::Value) -> Result<String, String> {
+    let root = request
+        .get("root")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("Project root is required")?;
+    let action = request
+        .get("action")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("Action is required")?;
+    let mut owned = Vec::new();
+    if let Some(options) = request
+        .get("options")
+        .and_then(serde_json::Value::as_object)
+    {
+        for (key, value) in options {
+            if value == &serde_json::Value::Bool(false) || value.is_null() {
+                continue;
+            }
+            let key = format!("--{}", key.replace('_', "-"));
+            let value = match value {
+                serde_json::Value::String(text) => text.clone(),
+                serde_json::Value::Bool(true) => String::new(),
+                _ => value.to_string(),
+            };
+            owned.push((key, value));
+        }
+    }
+    let options: Vec<_> = owned
+        .iter()
+        .map(|(key, value)| (key.as_str(), value.as_str()))
+        .collect();
+    run(Path::new(root), action, &options)
 }
 
 #[derive(Serialize)]

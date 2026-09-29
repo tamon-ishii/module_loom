@@ -272,6 +272,7 @@
                 <span id="manual-assets-summary" class="manual-assets-summary">0 件のアセット</span>
               </div>
               <p>Markdown 原稿内の <code>ai:task</code> タグで指定したスクリーンショット、Mermaid 図、解説文を表示します。通常の画像リンクは対象に含まれません。</p>
+              <p>画像は最初に「撮影元を選ぶ」から撮影すると、撮影元と外枠の設定をプロジェクトに保存します。次回は「同じ撮影元で更新」を使えます。画面を開く操作も繰り返す場合は、操作シナリオを画像の撮影手順として保存してください。</p>
               <div id="manual-tasks" class="manual-tasks"></div>
             </div>
 
@@ -298,9 +299,11 @@
                 <div class="manual-actions"><button id="manual-ui-explore" class="btn-secondary" type="button">UI Map に取り込む</button></div>
               </details>
               <details>
-                <summary>UI Map を更新・取り込む</summary>
-                <p>プロジェクトの画面定義から UI Map を作るか、外部アプリを調べた観測 JSON を取り込みます。</p>
-                <div class="manual-actions"><button id="manual-ui-map" class="btn-secondary" type="button">コードから UI Map を更新</button></div>
+                <summary>画面・操作の一覧（UI Map）</summary>
+                <p>アプリのどの画面に、どんなボタンや入力欄があるかを整理します。AIの原稿生成と、コード変更後の更新候補の判定に使います。画像の撮影元は上の画像カードで、操作手順は下のシナリオで保存します。</p>
+                <ol><li>「コードから画面一覧を作る」を押す。</li><li>画面名を開いて、検出されたボタンや入力欄を確認する。</li><li>不足する画面はWeb探索や観測JSONの取り込みで補う。</li></ol>
+                <div class="manual-actions"><button id="manual-ui-map" class="btn-secondary" type="button">コードから画面一覧を作る</button></div>
+                <div id="manual-uimap-content"></div>
                 <label>観測 JSON のパス（プロジェクトからの相対パス、または絶対パス）
                   <input id="manual-observation-path" type="text" placeholder="manual/observations/settings.json" />
                 </label>

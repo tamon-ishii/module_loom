@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const DEFAULT_BRIEF: &str = "# マニュアル作成の指示\n\n## 対象読者\n\n## 目的\n\n## 含める操作\n\n## 追加の指示\n";
+pub const DEFAULT_BRIEF: &str =
+    "# マニュアル作成の指示\n\n## 対象読者\n\n## 目的\n\n## 含める操作\n\n## 追加の指示\n";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MkDocsConfig {
@@ -131,7 +132,11 @@ pub fn read_config(root: &Path) -> ManualConfig {
 
 pub fn project_path(root: &Path, value: &str) -> Result<PathBuf, String> {
     let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    if value.trim().is_empty() || Path::new(value).components().any(|part| matches!(part, std::path::Component::ParentDir)) {
+    if value.trim().is_empty()
+        || Path::new(value)
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
         return Err(format!("Manual path must stay inside the project: {value}"));
     }
     let target = root.join(value);
@@ -140,7 +145,9 @@ pub fn project_path(root: &Path, value: &str) -> Result<PathBuf, String> {
         if fs::symlink_metadata(candidate).is_ok_and(|meta| meta.file_type().is_symlink()) {
             return Err(format!("Manual path contains a symbolic link: {value}"));
         }
-        let parent = candidate.parent().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+        let parent = candidate
+            .parent()
+            .ok_or_else(|| format!("Invalid manual path: {value}"))?;
         if parent == candidate {
             break;
         }
@@ -152,9 +159,13 @@ pub fn project_path(root: &Path, value: &str) -> Result<PathBuf, String> {
         if fs::symlink_metadata(nearest).is_ok_and(|meta| meta.file_type().is_symlink()) {
             return Err(format!("Manual path contains a symbolic link: {value}"));
         }
-        let name = nearest.file_name().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+        let name = nearest
+            .file_name()
+            .ok_or_else(|| format!("Invalid manual path: {value}"))?;
         missing.push(name.to_os_string());
-        nearest = nearest.parent().ok_or_else(|| format!("Invalid manual path: {value}"))?;
+        nearest = nearest
+            .parent()
+            .ok_or_else(|| format!("Invalid manual path: {value}"))?;
     }
     let mut abs_target = nearest.canonicalize().map_err(|e| e.to_string())?;
     for part in missing.iter().rev() {
@@ -181,7 +192,10 @@ pub fn save_settings(
     let docs_path = project_path(root, docs)?;
     let output_path = project_path(root, output)?;
 
-    if docs_path == output_path || docs_path.starts_with(&output_path) || output_path.starts_with(&docs_path) {
+    if docs_path == output_path
+        || docs_path.starts_with(&output_path)
+        || output_path.starts_with(&docs_path)
+    {
         return Err("Template and output directories must be separate".to_string());
     }
     let final_brief = if brief.trim().is_empty() {
@@ -222,8 +236,16 @@ pub fn save_settings(
     }
 
     let abs_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let rel_docs = docs_path.strip_prefix(&abs_root).unwrap_or(&docs_path).to_string_lossy().into_owned();
-    let rel_output = output_path.strip_prefix(&abs_root).unwrap_or(&output_path).to_string_lossy().into_owned();
+    let rel_docs = docs_path
+        .strip_prefix(&abs_root)
+        .unwrap_or(&docs_path)
+        .to_string_lossy()
+        .into_owned();
+    let rel_output = output_path
+        .strip_prefix(&abs_root)
+        .unwrap_or(&output_path)
+        .to_string_lossy()
+        .into_owned();
 
     let final_targets: Vec<String> = if let Some(t_list) = targets {
         let list: Vec<String> = t_list

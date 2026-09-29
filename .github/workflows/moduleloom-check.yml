@@ -29,7 +29,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --locked -p moduleloom-analyzer --bin analyze
       - name: Test desktop scenario validation
-        run: cargo test --locked -p moduleloom-analyzer --lib manual::desktop_scenario::tests
+        run: cargo test --locked -p manual-core --lib desktop_scenario::tests
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run manual:build
+      - name: Build Manual Studio
+        run: cargo build --locked -p manual-studio
 
   analyze:
     runs-on: ubuntu-22.04
@@ -48,6 +56,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxkbcommon-dev xvfb xauth zenity at-spi2-core openbox
       - run: npm ci
       - run: npm run build
+      - run: npm run manual:build
       - name: Stage jscpd for Tauri tests
         run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
       - name: Build and stage analyzer for Tauri tests

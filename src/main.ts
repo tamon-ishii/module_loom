@@ -251,8 +251,16 @@ async function invokeCommand<T>(cmd: string, args: any = {}): Promise<T> {
 
 interface ManualTask { id: string; kind: "text" | "diagram" | "screenshot"; page: string; prompt: string; status: "missing" | "current" | "approved" | "stale" }
 interface CaptureWindow { id: string; title: string; width: number; height: number }
+type ManualCaptureSource = { kind: "window"; title: string; inset: number } | { kind: "scenario"; input: string };
+interface ManualUIMap {
+  views: Array<{ id: string; name: string; description?: string; observed_from?: string; elements: Array<{ name: string; role: string; selector: string }> }>;
+  total_elements: number;
+}
+let manualCaptureSources: Record<string, ManualCaptureSource> = {};
 interface ManualState {
   image_assets?: Record<string, string>;
+  capture_sources?: Record<string, ManualCaptureSource>;
+  ui_map?: ManualUIMap | null;
   has_config?: boolean;
   config: {
     docs: string;
@@ -929,6 +937,45 @@ async function jumpToAssetInPreview(taskPage: string, taskId: string): Promise<v
   setTimeout(() => attemptJump(pageChanged ? 8 : 2), pageChanged ? 300 : 50);
 }
 
+function renderManualUIMap(map?: ManualUIMap | null): void {
+  const content = document.getElementById("manual-uimap-content");
+  if (!content) return;
+  if (!map || !map.views.length) {
+    content.innerHTML = '<p>画面一覧はまだありません。「コードから画面一覧を作る」を押してください。検出できない画面はWeb探索や観測結果の取り込みで追加できます。</p>';
+    return;
+  }
+  content.innerHTML = `<p><strong>${map.views.length} 画面・${map.total_elements} 要素</strong>を登録しています。画面名を開くと、検出したボタンや入力欄を確認できます。</p>` + map.views.map((view) => `
+    <details><summary>${escapeHtml(view.name)}（${view.elements.length} 要素）</summary>
+      ${view.description ? `<p>${escapeHtml(view.description)}</p>` : ""}
+      <p>確認元: ${view.observed_from ? escapeHtml(view.observed_from) : "プロジェクトの画面定義"}</p>
+      <ul>${view.elements.map((element) => `<li>${escapeHtml(element.name)} <small>(${escapeHtml(element.role)})</small> · <code>${escapeHtml(element.selector)}</code></li>`).join("")}</ul>
+    </details>`).join("");
+}
+
+async function captureManualTask(action: "capture-window" | "recapture" | "capture-source-save", id: string, extras: Record<string, unknown> = {}): Promise<void> {
+  if (manualBusy) return;
+  manualBusy = true;
+  manualView.setAttribute("aria-busy", "true");
+  try {
+    manualStatus.textContent = action === "capture-source-save" ? "撮影手順を保存中…" : `撮影中: ${id}…`;
+    await callManual(action, { id, ...extras });
+    if (action !== "capture-source-save") {
+      // A saved scenario can update several images.
+      for (const taskId of Object.keys(manualScreenshotCache)) delete manualScreenshotCache[taskId];
+      await callManual("build", { draft: true });
+    }
+    await refreshManual();
+    manualStatus.textContent = action === "capture-source-save"
+      ? `撮影手順を保存しました: ${id}。次回は画像カードから更新できます。`
+      : `画像を更新しました: ${id}。撮影元は次回も使えます。`;
+  } catch (error) {
+    manualStatus.textContent = `撮影元の処理に失敗しました: ${String(error)}`;
+  } finally {
+    manualBusy = false;
+    manualView.removeAttribute("aria-busy");
+  }
+}
+
 function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, string> = {}): void {
   const summaryEl = document.getElementById("manual-assets-summary");
   if (!tasks.length) {
@@ -946,6 +993,7 @@ function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, stri
 
   manualTasks.innerHTML = tasks.map((task) => {
     const isScreenshot = task.kind === "screenshot";
+    const captureSource = manualCaptureSources[task.id];
     const isDiagram = task.kind === "diagram";
     const typeLabel = isScreenshot ? "📸 スクショ" : isDiagram ? "📊 ダイアグラム" : "📝 テキスト";
     const typeBadgeClass = isScreenshot ? "manual-task-badge-screenshot" : isDiagram ? "manual-task-badge-diagram" : "manual-task-badge-text";
@@ -975,7 +1023,8 @@ function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, stri
     let actions = "";
     if (isScreenshot) {
       actions = `
-        <button type="button" data-manual-window-toggle="${escapeHtml(task.id)}" class="btn-secondary" title="別アプリの表示中のウィンドウを選んで撮影します">📸 ウィンドウを撮影</button>
+        ${captureSource ? `<button type="button" data-manual-recapture="${escapeHtml(task.id)}" class="btn-primary">📸 ${captureSource.kind === "scenario" ? "保存した手順で更新" : "同じ撮影元で更新"}</button>` : ""}
+        <button type="button" data-manual-window-toggle="${escapeHtml(task.id)}" class="btn-secondary">${captureSource ? "撮影元を変更" : "📸 撮影元を選ぶ"}</button>
         <button type="button" data-manual-copy-shot="${escapeHtml(task.id)}" class="btn-secondary" title="外部アプリを撮影するためのタスク指示をコピーします">📋 撮影指示をコピー</button>
         <button type="button" data-manual-image-toggle="${escapeHtml(task.id)}" class="btn-secondary">📁 PNGを登録</button>
       `;
@@ -1008,6 +1057,7 @@ function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, stri
         </div>
       </div>
       <p>${escapeHtml(task.prompt)}</p>
+      ${isScreenshot ? `<p class="manual-capture-source">${captureSource ? captureSource.kind === "window" ? `保存した撮影元: <strong>${escapeHtml(captureSource.title)}</strong> · 外枠 ${captureSource.inset}px<br><small>対象画面を表示して「同じ撮影元で更新」。Waylandでは毎回OSの撮影ダイアログで対象を選びます。</small>` : `保存した撮影手順: <code>${escapeHtml(captureSource.input)}</code><br><small>更新すると、このシナリオ内の撮影タスクをまとめて実行します。</small>` : "最初に撮影元を選んでください。撮影すると、この画像の撮影元と外枠の設定をプロジェクトに保存します。"}</p>` : ""}
       ${thumbHtml}
       <div class="manual-actions">${actions}<button type="button" data-manual-edit-toggle="${escapeHtml(task.id)}" class="btn-secondary">✏️ タスク指示を編集</button></div>
       <div id="manual-edit-box-${escapeHtml(task.id)}" class="manual-feedback-container" hidden>
@@ -1035,10 +1085,17 @@ function renderManualTasks(tasks: ManualTask[], imageAssets: Record<string, stri
         </div>
         <div class="manual-feedback-row">
           <label for="manual-window-inset-${escapeHtml(task.id)}">外枠を除く</label>
-          <input id="manual-window-inset-${escapeHtml(task.id)}" class="manual-feedback-input" type="number" min="0" max="64" value="0" style="max-width: 70px" />
+          <input id="manual-window-inset-${escapeHtml(task.id)}" class="manual-feedback-input" type="number" min="0" max="64" value="${captureSource?.kind === "window" ? captureSource.inset : 0}" style="max-width: 70px" />
           <span>px</span>
-          <button type="button" data-manual-window-capture="${escapeHtml(task.id)}" class="btn-primary">選択したウィンドウを撮影</button>
+          <button type="button" data-manual-window-capture="${escapeHtml(task.id)}" class="btn-primary">撮影元を保存して撮影</button>
         </div>
+        <details>
+          <summary>画面を開く操作も繰り返す場合</summary>
+          <p>下の「操作シナリオ」で作成・保存した手順をこの画像に結び付けると、「保存した手順で更新」から実行できます。</p>
+          <label for="manual-capture-scenario-${escapeHtml(task.id)}">保存済みシナリオのパス</label>
+          <input id="manual-capture-scenario-${escapeHtml(task.id)}" class="manual-feedback-input" type="text" placeholder="manual/scenarios/settings.json" value="${captureSource?.kind === "scenario" ? escapeHtml(captureSource.input) : ""}" />
+          <button type="button" data-manual-capture-scenario="${escapeHtml(task.id)}" class="btn-secondary">この画像の撮影手順として保存</button>
+        </details>
       </div>` : ""}
     </div>`;
   }).join("");
@@ -1171,7 +1228,9 @@ async function refreshManual(force = false): Promise<void> {
     const currentPage = manualPage.value;
     manualPage.innerHTML = (state.pages.length ? state.pages : ["index.md"]).map((page) => `<option value="${escapeHtml(page)}">${escapeHtml(page)}</option>`).join("");
     manualPage.value = state.pages.includes(currentPage) ? currentPage : (state.pages[0] || "index.md");
+    manualCaptureSources = state.capture_sources || {};
     renderManualTasks(state.tasks, state.image_assets);
+    renderManualUIMap(state.ui_map);
     await renderManualPreview(state);
     updateManualNavButtons();
   } catch (error) {
@@ -1679,6 +1738,11 @@ manualTasks.addEventListener("click", (event) => {
         select.innerHTML = windows.length
           ? '<option value="">撮影対象を選択</option>' + windows.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)} (${item.width}×${item.height})</option>`).join("")
           : '<option value="">表示中のウィンドウがありません</option>';
+        const source = manualCaptureSources[id!];
+        if (source?.kind === "window") {
+          const matching = windows.filter((item) => item.title === source.title);
+          if (matching.length === 1) select.value = matching[0].id;
+        }
       } catch (error) {
         select.innerHTML = '<option value="">この環境ではウィンドウ撮影を利用できません</option>';
         manualStatus.textContent = String(error);
@@ -1691,18 +1755,17 @@ manualTasks.addEventListener("click", (event) => {
     const window = select?.value;
     if (!window) { select?.focus(); return; }
     const inset = (document.getElementById(`manual-window-inset-${id}`) as HTMLInputElement | null)?.value || "0";
-    void (async () => {
-      try {
-        manualStatus.textContent = `ウィンドウを撮影中: ${id}…`;
-        await callManual("capture-window", { id, window, inset });
-        await callManual("build", { draft: true });
-        delete manualScreenshotCache[id];
-        await refreshManual();
-        manualStatus.textContent = `外部アプリのウィンドウを撮影・登録しました: ${id}`;
-      } catch (error) {
-        manualStatus.textContent = `ウィンドウ撮影に失敗しました: ${String(error)}`;
-      }
-    })();
+    void captureManualTask("capture-window", id, { window, inset });
+  }
+  if (button.dataset.manualRecapture) {
+    void captureManualTask("recapture", button.dataset.manualRecapture);
+  }
+  if (button.dataset.manualCaptureScenario) {
+    const id = button.dataset.manualCaptureScenario;
+    const input = document.getElementById(`manual-capture-scenario-${id}`) as HTMLInputElement | null;
+    const path = input?.value.trim();
+    if (!path) { input?.focus(); return; }
+    void captureManualTask("capture-source-save", id, { input: path });
   }
   if (button.dataset.manualImageToggle) {
     const id = button.dataset.manualImageToggle;

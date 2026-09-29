@@ -196,6 +196,23 @@ pub fn load(root: &Path, input: &str) -> Result<String, String> {
         .map_err(|error| format!("Failed to read scenario {}: {error}", path.display()))
 }
 
+pub(super) fn validate_capture_task(root: &Path, input: &str, id: &str) -> Result<(), String> {
+    let raw = load(root, input)?;
+    let scenario: Scenario =
+        serde_json::from_str(&raw).map_err(|error| format!("Invalid scenario JSON: {error}"))?;
+    let docs = project_path(root, &read_config(root).docs)?;
+    validate_scenario(&scenario, &docs)?;
+    if !scenario.steps.iter().any(|step| {
+        step.get("screenshot")
+            .and_then(|shot| shot.get("task"))
+            .and_then(serde_json::Value::as_str)
+            == Some(id)
+    }) {
+        return Err(format!("シナリオに撮影タスク「{id}」がありません。screenshot の task に同じ ID を指定してください。"));
+    }
+    Ok(())
+}
+
 pub fn link(root: &Path, input: &str, page: &str) -> Result<String, String> {
     if !input.starts_with("manual/scenarios/") || !input.ends_with(".json") {
         return Err("Scenario files must be under manual/scenarios/ with a .json extension".into());

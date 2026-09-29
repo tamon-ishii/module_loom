@@ -110,9 +110,8 @@ pub fn agent_json(
             "claude"
         }
         "grok" => {
-            let grok_prompt = format!(
-                "{prompt}\nReturn a JSON object only, matching this schema: {schema_str}"
-            );
+            let grok_prompt =
+                format!("{prompt}\nReturn a JSON object only, matching this schema: {schema_str}");
             cmd_args.extend([
                 "--no-auto-update".into(),
                 "-p".into(),
@@ -193,7 +192,10 @@ pub fn agent_json(
     if agent == "agy" {
         if let Some(status) = parsed.get("status").and_then(|s| s.as_str()) {
             if status != "SUCCESS" {
-                let err = parsed.get("error").and_then(|e| e.as_str()).unwrap_or("Agy failed");
+                let err = parsed
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Agy failed");
                 return Err(err.to_string());
             }
         }
@@ -283,8 +285,14 @@ pub fn get_models(root: &Path, agent: &str) -> Result<Value, String> {
                     if let Some(result) = item.get("result").and_then(|r| r.as_object()) {
                         if let Some(data) = result.get("data").and_then(|d| d.as_array()) {
                             for entry in data {
-                                if !entry.get("hidden").and_then(|h| h.as_bool()).unwrap_or(false) {
-                                    if let Some(model_id) = entry.get("model").and_then(|m| m.as_str()) {
+                                if !entry
+                                    .get("hidden")
+                                    .and_then(|h| h.as_bool())
+                                    .unwrap_or(false)
+                                {
+                                    if let Some(model_id) =
+                                        entry.get("model").and_then(|m| m.as_str())
+                                    {
                                         let label = entry
                                             .get("displayName")
                                             .and_then(|d| d.as_str())

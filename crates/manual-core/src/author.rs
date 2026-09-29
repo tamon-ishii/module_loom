@@ -329,23 +329,28 @@ pub fn record_diagram(
     let tmp = tempdir().map_err(|e| e.to_string())?;
     let output_dir = tmp.path().join("moduleloom");
 
-    let status = Command::new(cli)
-        .args([
-            "--mkdocs",
-            &output_dir.to_string_lossy(),
-            "--lang",
-            "ja",
-            &project
-                .canonicalize()
-                .unwrap_or_else(|_| project.to_path_buf())
-                .to_string_lossy(),
-        ])
-        .output()
-        .map_err(|e| format!("ModuleLoom CLI failed to execute: {e}"))?;
+    if cli.is_empty() {
+        let result = crate::analyze_directory(project)?;
+        crate::mkdocs::generate_with_lang(&result, &output_dir, "ja")?;
+    } else {
+        let status = Command::new(cli)
+            .args([
+                "--mkdocs",
+                &output_dir.to_string_lossy(),
+                "--lang",
+                "ja",
+                &project
+                    .canonicalize()
+                    .unwrap_or_else(|_| project.to_path_buf())
+                    .to_string_lossy(),
+            ])
+            .output()
+            .map_err(|e| format!("ModuleLoom CLI failed to execute: {e}"))?;
 
-    if !status.status.success() {
-        let err = String::from_utf8_lossy(&status.stderr);
-        return Err(format!("ModuleLoom CLI failed: {}", err.trim()));
+        if !status.status.success() {
+            let err = String::from_utf8_lossy(&status.stderr);
+            return Err(format!("ModuleLoom CLI failed: {}", err.trim()));
+        }
     }
 
     let page = fs::read_to_string(output_dir.join("docs").join("index.md"))
