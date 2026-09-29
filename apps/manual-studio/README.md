@@ -7,7 +7,7 @@
 Debian/Ubuntuでは、作成した `.deb` をインストールするとアプリ一覧に **Manual Studio** が表示されます。
 
 ```sh
-sudo apt install ./manual-studio_0.1.0_amd64.deb
+sudo apt install "./Manual Studio_0.1.0_amd64.deb"
 manual-studio
 ```
 
