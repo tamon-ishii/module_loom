@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  analyzer-platforms:
+    name: Analyzer ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-latest
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked -p moduleloom-analyzer --bin analyze
+      - name: Test desktop scenario validation
+        run: cargo test --locked -p moduleloom-analyzer --lib manual::desktop_scenario::tests
+
   analyze:
     runs-on: ubuntu-22.04
     steps:
@@ -23,7 +45,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth zenity at-spi2-core
       - run: npm ci
       - run: npm run build
       - name: Stage jscpd for Tauri tests
@@ -32,4 +54,6 @@ jobs:
         run: |
           cargo build --locked --bin analyze
           python scripts/stage_desktop_analyzer.py "" --debug
+      - name: Smoke-test desktop accessibility scenario
+        run: xvfb-run -a dbus-run-session -- python3 scripts/smoke_desktop_scenario.py target/debug/analyze
       - run: cargo test --workspace

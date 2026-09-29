@@ -114,7 +114,7 @@ CLI の `--manual ui-map --root .` は、アプリの HTML・TypeScript・JavaSc
 
 `--manual generate-impacted --root . --ref HEAD` は、同じ計画の `generate_tasks` だけを順に更新します。実行前に `impact-plan` で対象を確認してください。途中で生成が失敗した場合はその時点で終了し、それ以前に更新したタスクは残ります。スクリーンショットや承認済みタスク、ページ単位の候補は自動更新しません。
 
-### Web 画面の撮影シナリオ
+### 操作シナリオ（Web・デスクトップ）
 
 デスクトップ版、PyCharm 版、VS Code 版の **ドキュメント生成 → マニュアルの保守と検証** からも、更新候補の確認、Web UI 探索、UI Map の更新と観測 JSON の取り込み、シナリオの保存・読み込み・実行、E2E、根拠確認、読者別ビルドを操作できます。外部アプリの画面を調べた観測 JSON は **UI Map を更新・取り込む** にパスを指定します。シナリオを保存した後、プレビューで対象ページを選び **表示中ページに紐づけ** を押すと、そのページへ `ai:scenario` を追加します。
 
@@ -133,7 +133,32 @@ Web アプリでは操作を JSON ファイルに記録し、順に実行でき�
 }
 ```
 
-原稿には `settings-shot` という `kind=screenshot` の `ai:task` を用意します。`--manual scenario-run --root . --input scenario.json` を実行すると、指定した要素だけを `docs/assets/settings-shot.png` に撮影し、タスクの `ai:generated` に画像リンクを登録します。`selector` を省けば表示中のページ全体を撮影します。操作には `goto`、`click`、`fill`（`{"selector":"#name","value":"example"}`）、`expect_visible`、`screenshot` を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。現在の実行対象は Web ページです。
+原稿には `settings-shot` という `kind=screenshot` の `ai:task` を用意します。`--manual scenario-run --root . --input scenario.json` を実行すると、指定した要素だけを `docs/assets/settings-shot.png` に撮影し、タスクの `ai:generated` に画像リンクを登録します。`selector` を省けば表示中のページ全体を撮影します。Web 操作には `goto`、`click`、`fill`（`{"selector":"#name","value":"example"}`）、`expect_visible`、`screenshot` を使用できます。失敗時はステップ番号を表示し、タスクへの登録は行いません。
+
+デスクトップアプリでは `platform` を `desktop` にします。次の例はアプリを起動し、タイトルに `Settings` を含むウィンドウを選択して撮影します。`launch` のプログラムは対象プロジェクトを作業ディレクトリとして起動します。既に起動しているアプリなら `launch` は省けます。
+
+```json
+{
+  "version": 1,
+  "platform": "desktop",
+  "steps": [
+    {"launch": {"program": "my-app", "args": []}},
+    {"window": "Settings"},
+    {"fill": {"selector": "text_field[name='Name']", "value": "Example"}},
+    {"expect_value": {"selector": "text_field[name='Name']", "value": "Example"}},
+    {"press": "button[name='Save']"},
+    {"expect_visible": "static_text[name='Saved']"},
+    {"screenshot": {"task": "settings-shot", "selector": "static_text[name='Saved']", "inset": 8}}
+  ]
+}
+```
+
+`window` はタイトルで選択し、出現を最大 10 秒待ちます。xa11y のセレクタを使う操作は `press`、`focus`、`toggle`、`select`、`scroll_into_view`、`fill`、`text`、`expect_visible`、`expect_hidden`、`expect_enabled`、`expect_disabled`、`expect_focused`、`expect_value` です。`fill` は現在の値を置き換え、`text` はカーソル位置へ追加入力します。`text` は文字列なら現在の入力先へ送信し、`{"selector":"text_field[name='Name']","value":"Ada"}` なら指定要素に直接入力します。`key` は `"Ctrl+S"`、または `{"selector":"text_field[name='Name']","keys":"Ctrl+A"}` と指定できます。後者は要素にフォーカスしてから送信するため、Wayland ではこちらを使用してください。
+
+
+`screenshot` に `selector` を指定すると xa11y でその要素を撮影し、省くとウィンドウ全体を撮影します。`inset` は撮影範囲の内側の余白です。`expect_window` はウィンドウの出現だけを確認します。`click` の座標は選択したウィンドウの左上から指定します。`click` と文字列形式の `text`・`key` には xa11y の入力シミュレーションを使います。`wait_ms` は最大 30000 ミリ秒の待機です。最初から対象ウィンドウが分かる場合はトップレベルの `window` にタイトルまたは一覧の `query`（例: `app:zenity::Settings`）を指定できます。macOS ではアクセシビリティと入力の権限が必要です。Linux/Wayland の入力シミュレーションには `/dev/uinput` の権限が必要です。Wayland でウィンドウ全体を撮影する際はシステムのポータルダイアログで対象を選びます。Wayland で要素を撮影する場合は対象を前面に表示し、アクセシビリティ情報と画面撮影の許可を用意してください。
+
+セレクタを調べるには、画面の **アクセシビリティのウィンドウ一覧** から対象を選び **要素を表示** を押します。CLI の `--manual list-accessible-windows --root .` は、現在のプロセスに限る `id` と、シナリオで使う `query` を返します。`--manual inspect-window --root . --window 'pid:1234:/example/window'` で選んだウィンドウの要素ツリーを表示できます。`id` は一覧の更新やアプリ再起動で変わることがあるため、シナリオの `window` には `query` の値（例: `app:zenity::Settings`）を設定してください。これはアプリ名とタイトルで対象を探すため、プロセス ID が変わっても利用できます。要素ツリーの役割と名前から、たとえば `button[name='Save']` のような xa11y セレクタを作成します。
 
 `--manual scenario-test --root . --input scenario.json` は同じ操作を実行しますが、撮影画像を原稿へ登録しません。マニュアルの操作手順を CI で確認する場合は、原稿に `<!-- ai:scenario file=manual/scenarios/settings.json -->` を記載し、`--manual e2e --root .` を実行します。参照されたシナリオを順に実行し、失敗したページとステップを報告します。シナリオの操作は実際のアプリに作用するため、テスト用のデータと環境を使用してください。
 

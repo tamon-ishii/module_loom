@@ -60,6 +60,25 @@ The application SHALL scan `ai:task` tags for text, screenshot, and diagram work
 - **WHEN** a screenshot task instruction or interactive feedback prompt specifies element IDs, classes, keywords, circles, arrows, or quoted text descriptions
 - **THEN** ModuleLoom automatically renders a red circular or rounded rectangular highlight boundary, a directional arrow, and a styled semi-transparent speech-bubble text label positioned near the target element during capture.
 
+### Requirement: Run Desktop Manual Scenarios
+The application SHALL run desktop scenarios using accessibility selectors for controls and shall register captured PNGs against existing screenshot tasks only after every scenario step succeeds.
+
+#### Scenario: Inspect available desktop controls
+- **WHEN** a user lists accessible windows and inspects one of them
+- **THEN** ModuleLoom shows its application, title, stable window query, and accessibility tree so the user can author selectors for a scenario.
+
+#### Scenario: Interact with an accessible application
+- **WHEN** a desktop scenario selects a window and uses a selector-based action or state assertion
+- **THEN** ModuleLoom scopes the action to that window and reports the failing step if the control cannot be used or observed.
+- **WHEN** a scenario provides a selector for text or key input
+- **THEN** ModuleLoom focuses that control and sends the input to it.
+
+#### Scenario: Capture a window or element
+- **WHEN** a desktop scenario requests a screenshot for an existing `kind=screenshot` task
+- **THEN** ModuleLoom captures the selected window or the element named by `selector`, applies the requested inset, and records the PNG after all steps finish successfully.
+- **WHEN** the session uses a Wayland screenshot portal and no element selector is given
+- **THEN** ModuleLoom asks the user to choose the window through the portal.
+
 ### Requirement: Centralized Settings Popup Modal
 The application SHALL provide a unified settings popup modal accessible from the header to configure build destinations, source paths, and AI parameters.
 
@@ -101,4 +120,3 @@ The application SHALL persist AI selections, models, and build parameters both p
 #### Scenario: Immediate persistence on change
 - **WHEN** a user selects an AI CLI, model, or document format
 - **THEN** the application persists the choice to local storage and updates the project configuration file.
-

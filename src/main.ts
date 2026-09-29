@@ -1246,6 +1246,7 @@ async function runManual(action: string, extras: Record<string, unknown> = {}): 
 
 function formatManualWorkflowResult(action: string, raw: string): string {
   if (action === "scenario-load") return "シナリオを読み込みました。";
+  if (action === "inspect-window") return raw;
   let result: any;
   try { result = JSON.parse(raw); } catch { return raw || "完了しました"; }
   if (action === "impact-plan") {
@@ -1259,6 +1260,7 @@ function formatManualWorkflowResult(action: string, raw: string): string {
   }
   if (action === "generate-impacted") return `更新: ${(result.generated || []).join(", ") || "なし"}\n手作業: ${(result.manual_tasks || []).join(", ") || "なし"}`;
   if (action === "ui-explore") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面、${result.total_elements ?? 0} 要素`;
+  if (action === "list-accessible-windows") return `アクセシビリティのウィンドウ: ${result.length ?? 0} 件`;
   if (action === "ui-map" || action === "ui-map-import") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面`;
   if (action === "scenario-run" || action === "scenario-test") return `操作 ${result.steps ?? 0} ステップに成功しました。${action === "scenario-run" ? `登録画像: ${(result.captured || []).join(", ") || "なし"}` : "画像は登録していません。"}`;
   if (action === "e2e") return `マニュアル E2E: ${result.total ?? 0} 件成功\n${(result.passed || []).map((item: any) => `${item.page}: ${item.file} (${item.steps} ステップ)`).join("\n")}`;
@@ -1274,10 +1276,22 @@ async function runManualWorkflow(action: string, extras: Record<string, unknown>
   try {
     const raw = await callManual(action, extras);
     if (action === "scenario-load") manualScenarioJson.value = raw;
+    if (action === "list-accessible-windows") {
+      const windows = JSON.parse(raw) as Array<{ id: string; query: string; title: string; app: string; pid: number | null }>;
+      const select = document.getElementById("manual-a11y-window") as HTMLSelectElement;
+      select.replaceChildren(new Option("調べるウィンドウを選択", ""), ...windows.map((item) =>
+        {
+          const option = new Option(`${item.title} — ${item.app}${item.pid == null ? "" : ` (${item.pid})`}`, item.id);
+          option.dataset.query = item.query;
+          return option;
+        }));
+    }
     if (action === "scenario-run" || action === "generate-impacted") {
       await callManual("build", { draft: true });
     }
-    manualWorkflowOutput.textContent = formatManualWorkflowResult(action, raw);
+    manualWorkflowOutput.textContent = action === "inspect-window"
+      ? `ウィンドウ: ${String(extras.window)}\n${raw}`
+      : formatManualWorkflowResult(action, raw);
     manualStatus.textContent = "保守・検証処理が完了しました";
   } catch (error) {
     manualWorkflowOutput.textContent = `失敗: ${String(error)}`;
@@ -1299,6 +1313,35 @@ bindManualWorkflow("manual-generate-impacted", "generate-impacted", () => ({ git
 bindManualWorkflow("manual-ui-explore", "ui-explore", () => ({ url: manualExploreUrl.value.trim(), max_pages: manualExplorePages.value.trim() || "10" }));
 bindManualWorkflow("manual-ui-map", "ui-map");
 bindManualWorkflow("manual-ui-map-import", "ui-map-import", () => ({ input: manualObservationPath.value.trim() }));
+bindManualWorkflow("manual-a11y-list", "list-accessible-windows");
+bindManualWorkflow("manual-a11y-inspect", "inspect-window", () => ({ window: (document.getElementById("manual-a11y-window") as HTMLSelectElement).value }));
+document.getElementById("manual-a11y-set-window")?.addEventListener("click", () => {
+  const windowId = (document.getElementById("manual-a11y-window") as HTMLSelectElement).value;
+  if (!windowId) {
+    manualWorkflowOutput.textContent = "先に一覧からウィンドウを選択してください。";
+    return;
+  }
+  try {
+    const scenario = manualScenarioJson.value.trim()
+      ? JSON.parse(manualScenarioJson.value) as Record<string, unknown>
+      : { version: 1, steps: [] };
+    if (!scenario || Array.isArray(scenario) || typeof scenario !== "object") {
+      throw new Error("シナリオ JSON の最上位はオブジェクトにしてください。");
+    }
+    if (scenario.platform === "web" || (scenario.platform !== "desktop" && "base_url" in scenario)) {
+      throw new Error("Web シナリオはそのままデスクトップ用に変更できません。デスクトップ用 JSON に切り替えてください。");
+    }
+    scenario.platform = "desktop";
+    if (!Array.isArray(scenario.steps)) scenario.steps = [];
+    const windowQuery = (document.getElementById("manual-a11y-window") as HTMLSelectElement).selectedOptions[0]?.dataset.query;
+    if (!windowQuery) throw new Error("選択したウィンドウの検索条件がありません。一覧を更新してください。");
+    scenario.window = windowQuery;
+    manualScenarioJson.value = JSON.stringify(scenario, null, 2);
+    manualWorkflowOutput.textContent = `選択したウィンドウの検索条件を設定しました: ${windowQuery}`;
+  } catch (error) {
+    manualWorkflowOutput.textContent = `シナリオ JSON を更新できません: ${String(error)}`;
+  }
+});
 bindManualWorkflow("manual-scenario-load", "scenario-load", scenarioInput);
 bindManualWorkflow("manual-scenario-save", "scenario-save", () => ({ ...scenarioInput(), json: manualScenarioJson.value }));
 bindManualWorkflow("manual-scenario-link", "scenario-link", () => ({ ...scenarioInput(), page: manualPage.value }));

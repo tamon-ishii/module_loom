@@ -5,13 +5,14 @@ pub mod builder;
 pub mod config;
 pub mod context;
 pub mod deps;
+mod desktop_scenario;
 pub mod fact;
 pub mod preview;
 pub mod scenario;
 pub mod task;
 pub mod template;
-pub mod uimap;
 pub mod ui_explore;
+pub mod uimap;
 pub mod window_capture;
 
 use std::collections::HashSet;
@@ -55,6 +56,9 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         "context",
         "markits-render",
         "list-windows",
+        "list-accessible-windows",
+        "inspect-window",
+        "activate-window",
         "capture-window",
         "scenario-run",
         "scenario-save",
@@ -162,6 +166,15 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     match action {
         "list-windows" => serde_json::to_string(&window_capture::list_windows()?)
             .map_err(|error| error.to_string()),
+        "list-accessible-windows" => desktop_scenario::list_accessible_windows(),
+        "inspect-window" => {
+            desktop_scenario::inspect_window(window_opt.ok_or("inspect-window requires --window")?)
+        }
+        "activate-window" => {
+            let window_id = window_opt.ok_or("activate-window requires --window")?;
+            serde_json::to_string(&window_capture::activate_window(window_id)?)
+                .map_err(|error| error.to_string())
+        }
         "capture-window" => {
             let task_id = id_opt.ok_or("capture-window requires --id")?;
             let window_id = window_opt.ok_or("capture-window requires --window")?;
@@ -369,11 +382,24 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
         }
         "build" => {
             if let Some(audience) = audience_opt {
-                audience::build(root, &templates_path, &generated_path, &output_path, draft_flag, audience)
+                audience::build(
+                    root,
+                    &templates_path,
+                    &generated_path,
+                    &output_path,
+                    draft_flag,
+                    audience,
+                )
             } else {
-                builder::build(&templates_path, &generated_path, &output_path, draft_flag, Some(root))
+                builder::build(
+                    &templates_path,
+                    &generated_path,
+                    &output_path,
+                    draft_flag,
+                    Some(root),
+                )
             }
-        },
+        }
         "ui-map" => {
             let map = if refresh_flag {
                 uimap::refresh_ui_map(root)
@@ -420,8 +446,9 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             let cli = cli_opt.unwrap_or("target/debug/analyze");
             let mut generated = Vec::new();
             for task_id in &plan.generate_tasks {
-                author::generate_task(root, task_id, cli, "")
-                    .map_err(|error| format!("Failed to generate impacted task {task_id}: {error}"))?;
+                author::generate_task(root, task_id, cli, "").map_err(|error| {
+                    format!("Failed to generate impacted task {task_id}: {error}")
+                })?;
                 generated.push(task_id.clone());
             }
             serde_json::to_string_pretty(&serde_json::json!({
@@ -1548,8 +1575,7 @@ mod tests {
             .iter()
             .any(|r| r.contains("src/settings.rs")));
         let plan: serde_json::Value =
-            serde_json::from_str(&run(root, "impact-plan", &[("--ref", "HEAD")]).unwrap())
-                .unwrap();
+            serde_json::from_str(&run(root, "impact-plan", &[("--ref", "HEAD")]).unwrap()).unwrap();
         assert_eq!(plan["manual_tasks"], serde_json::json!(["settings-shot"]));
         assert_eq!(plan["generate_tasks"], serde_json::json!([]));
         assert!(deps::analyze_git_impact(root, Some("no-such-ref"))
