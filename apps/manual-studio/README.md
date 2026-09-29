@@ -18,10 +18,10 @@ Markdown編集と撮影にはNode.jsやRust、ModuleLoom本体は不要です。
 ローカル起動はリポジトリのルートで実行します。
 
 ```sh
-./start-manual-studio.sh
+python3 start_manual_studio.py
 ```
 
-初回だけ依存を準備してビルドします。ソースを変更した後は `./start-manual-studio.sh --build`、変更を随時反映する開発モードは `./start-manual-studio.sh --dev` を使います。スクリプトは別のフォルダーから絶対パスで実行することもできます。
+初回だけ依存を準備してビルドします。ソースを変更した後は `python3 start_manual_studio.py --build`、変更を随時反映する開発モードは `python3 start_manual_studio.py --dev` を使います。Windowsでは `python start_manual_studio.py` を実行してください。スクリプトは別のフォルダーから絶対パスで実行することもできます。Linux/macOS用の `./start-manual-studio.sh` も利用できます。
 
 配布用アプリは `npm run manual:bundle` で作成します。LinuxでDebianパッケージのみを作る場合は `npm run manual:bundle -- --bundles deb` を実行します。出力はリポジトリの `target/release/bundle/` です。RustとTauriの各OSのビルド依存が必要です。共有の解析ライブラリはアプリに組み込まれます。
 
