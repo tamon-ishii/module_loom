@@ -45,7 +45,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth zenity at-spi2-core
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth zenity at-spi2-core openbox
       - run: npm ci
       - run: npm run build
       - name: Stage jscpd for Tauri tests
@@ -55,5 +55,5 @@ jobs:
           cargo build --locked --bin analyze
           python scripts/stage_desktop_analyzer.py "" --debug
       - name: Smoke-test desktop accessibility scenario
-        run: xvfb-run -a dbus-run-session -- python3 scripts/smoke_desktop_scenario.py target/debug/analyze
+        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/moduleloom-openbox.log 2>&1 & python3 scripts/smoke_desktop_scenario.py target/debug/analyze'
       - run: cargo test --workspace
