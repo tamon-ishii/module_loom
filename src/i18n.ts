@@ -12,6 +12,7 @@ const exact: Record<string, string> = {
   "コードから UI Map を更新": "Update UI Map from code",
   "観測 JSON のパス（プロジェクトからの相対パス、または絶対パス）": "Observation JSON path (relative to project or absolute)",
   "観測結果を取り込む": "Import observations",
+  "AIで生成文全体の主張を追加確認する": "Use AI to review claims throughout generated text",
   "更新": "Refresh",
   "作成設定": "Setup",
   "対象プロジェクト": "Project root",

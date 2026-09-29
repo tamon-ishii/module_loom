@@ -302,6 +302,7 @@ const manualScenarioPath = document.getElementById("manual-scenario-path") as HT
 const manualScenarioJson = document.getElementById("manual-scenario-json") as HTMLTextAreaElement;
 const manualAudience = document.getElementById("manual-audience") as HTMLSelectElement;
 const manualAudienceDraft = document.getElementById("manual-audience-draft") as HTMLInputElement;
+const manualFactAi = document.getElementById("manual-fact-ai") as HTMLInputElement;
 const manualPage = document.getElementById("manual-page") as HTMLSelectElement;
 const manualPreview = document.getElementById("manual-preview") as HTMLElement;
 const manualPreviewIframe = document.getElementById("manual-preview-iframe") as HTMLIFrameElement;
@@ -1261,7 +1262,7 @@ function formatManualWorkflowResult(action: string, raw: string): string {
   if (action === "ui-map" || action === "ui-map-import") return `UI Map を更新しました: ${result.views?.length ?? 0} 画面`;
   if (action === "scenario-run" || action === "scenario-test") return `操作 ${result.steps ?? 0} ステップに成功しました。${action === "scenario-run" ? `登録画像: ${(result.captured || []).join(", ") || "なし"}` : "画像は登録していません。"}`;
   if (action === "e2e") return `マニュアル E2E: ${result.total ?? 0} 件成功\n${(result.passed || []).map((item: any) => `${item.page}: ${item.file} (${item.steps} ステップ)`).join("\n")}`;
-  if (action === "fact-check") return `根拠確認: ${result.passed ?? 0}/${result.checked ?? 0} 件成功\n根拠タグのない文章タスク: ${(result.unreviewed_text_tasks || []).join(", ") || "なし"}`;
+  if (action === "fact-check") return `根拠確認: ${result.passed ?? 0}/${result.checked ?? 0} 件成功\n未確認の文章タスク: ${(result.unreviewed_text_tasks || []).join(", ") || "なし"}\nAIで追加確認した文章タスク: ${(result.ai_reviewed_text_tasks || []).join(", ") || "なし"}`;
   return JSON.stringify(result, null, 2);
 }
 
@@ -1304,7 +1305,7 @@ bindManualWorkflow("manual-scenario-link", "scenario-link", () => ({ ...scenario
 bindManualWorkflow("manual-scenario-test", "scenario-test", scenarioInput);
 bindManualWorkflow("manual-scenario-run", "scenario-run", scenarioInput);
 bindManualWorkflow("manual-e2e", "e2e");
-bindManualWorkflow("manual-fact-check", "fact-check", () => ({ check: true }));
+bindManualWorkflow("manual-fact-check", "fact-check", () => ({ check: true, ai: manualFactAi.checked }));
 bindManualWorkflow("manual-build-audience", "build", () => ({ audience: manualAudience.value, draft: manualAudienceDraft.checked }));
 
 btnPreviewModeHtml?.addEventListener("click", () => {

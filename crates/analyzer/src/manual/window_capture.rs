@@ -1,6 +1,4 @@
 use serde::Serialize;
-#[cfg(not(target_os = "linux"))]
-use std::path::Path;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WindowInfo {
@@ -15,6 +13,7 @@ pub struct WindowInfo {
 #[cfg(target_os = "linux")]
 mod linux {
     use super::WindowInfo;
+    use ashpd::desktop::screenshot::{AvailableTargets, Screenshot};
     use image::{ImageBuffer, Rgb};
     use std::ffi::{CStr, CString};
     use std::os::raw::{c_int, c_long, c_uchar, c_ulong, c_void};
@@ -23,6 +22,38 @@ mod linux {
     use std::thread;
     use std::time::Duration;
     use x11_dl::xlib;
+
+    const PORTAL_WINDOW_ID: &str = "portal";
+
+    fn is_wayland() -> bool {
+        std::env::var("XDG_SESSION_TYPE").is_ok_and(|session| session.eq_ignore_ascii_case("wayland"))
+    }
+
+    fn capture_portal(inset: u32, destination: &Path) -> Result<WindowInfo, String> {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()
+            .map_err(|error| format!("Could not start screenshot portal: {error}"))?;
+        let uri = runtime.block_on(async {
+            let response = Screenshot::request()
+                .interactive(true)
+                .target(AvailableTargets::Window)
+                .send()
+                .await
+                .map_err(|error| format!("Screenshot portal request failed: {error}"))?
+                .response()
+                .map_err(|error| format!("Screenshot was cancelled or denied: {error}"))?;
+            Ok::<String, String>(response.uri().to_string())
+        })?;
+        let source = url::Url::parse(&uri).map_err(|error| format!("Invalid screenshot URI: {error}"))?
+            .to_file_path().map_err(|_| "Screenshot portal did not return a local file")?;
+        let image = image::open(&source).map_err(|error| format!("Could not read portal screenshot: {error}"))?;
+        let crop = inset.checked_mul(2).ok_or("Inset is too large")?;
+        let width = image.width().checked_sub(crop).ok_or("Inset exceeds captured image width")?;
+        let height = image.height().checked_sub(crop).ok_or("Inset exceeds captured image height")?;
+        if width == 0 || height == 0 { return Err("Capture area is empty".into()); }
+        image.crop_imm(inset, inset, width, height).save(destination)
+            .map_err(|error| error.to_string())?;
+        Ok(WindowInfo { id: PORTAL_WINDOW_ID.into(), title: "Selected window".into(), x: 0, y: 0, width, height })
+    }
 
     struct DisplayConnection {
         api: xlib::Xlib,
@@ -38,9 +69,6 @@ mod linux {
 
     impl DisplayConnection {
         fn open() -> Result<Self, String> {
-            if std::env::var("XDG_SESSION_TYPE").is_ok_and(|session| session.eq_ignore_ascii_case("wayland")) {
-                return Err("Wayland window capture requires a portal backend; register a PNG manually on this session".into());
-            }
             let api = xlib::Xlib::open().map_err(|error| format!("X11 is unavailable: {error}"))?;
             let display = unsafe { (api.XOpenDisplay)(ptr::null()) };
             if display.is_null() {
@@ -161,6 +189,9 @@ mod linux {
     }
 
     pub fn list_windows() -> Result<Vec<WindowInfo>, String> {
+        if is_wayland() {
+            return Ok(vec![WindowInfo { id: PORTAL_WINDOW_ID.into(), title: "Choose a window in the system screenshot dialog".into(), x: 0, y: 0, width: 1, height: 1 }]);
+        }
         let conn = DisplayConnection::open()?;
         let mut windows: Vec<_> = conn.client_windows()?.into_iter().filter_map(|id| conn.info(id)).collect();
         windows.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
@@ -168,6 +199,10 @@ mod linux {
     }
 
     pub fn capture_window(window_id: &str, inset: u32, destination: &Path) -> Result<WindowInfo, String> {
+        if is_wayland() {
+            if window_id != PORTAL_WINDOW_ID { return Err("Choose the portal window option on Wayland".into()); }
+            return capture_portal(inset, destination);
+        }
         let id = u64::from_str_radix(window_id.trim_start_matches("0x"), 16)
             .map_err(|_| format!("Invalid X11 window ID: {window_id}"))? as xlib::Window;
         let conn = DisplayConnection::open()?;
@@ -237,12 +272,67 @@ mod linux {
 #[cfg(target_os = "linux")]
 pub use linux::{capture_window, list_windows};
 
-#[cfg(not(target_os = "linux"))]
-pub fn list_windows() -> Result<Vec<WindowInfo>, String> {
-    Err("Window capture currently requires a Linux X11 session".into())
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod native {
+    use super::WindowInfo;
+    use std::path::Path;
+    use xcap::Window;
+
+    fn info(window: &Window) -> Result<WindowInfo, String> {
+        Ok(WindowInfo {
+            id: format!("0x{:x}", window.id().map_err(|error| error.to_string())?),
+            title: window.title().map_err(|error| error.to_string())?,
+            x: window.x().map_err(|error| error.to_string())?,
+            y: window.y().map_err(|error| error.to_string())?,
+            width: window.width().map_err(|error| error.to_string())?,
+            height: window.height().map_err(|error| error.to_string())?,
+        })
+    }
+
+    pub fn list_windows() -> Result<Vec<WindowInfo>, String> {
+        let mut windows = Vec::new();
+        for window in Window::all().map_err(|error| error.to_string())? {
+            if window.is_minimized().unwrap_or(true) { continue; }
+            if let Ok(item) = info(&window) {
+                if !item.title.trim().is_empty() && item.width > 0 && item.height > 0 {
+                    windows.push(item);
+                }
+            }
+        }
+        windows.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+        Ok(windows)
+    }
+
+    pub fn capture_window(window_id: &str, inset: u32, destination: &Path) -> Result<WindowInfo, String> {
+        let id = u32::from_str_radix(window_id.trim_start_matches("0x"), 16)
+            .map_err(|_| format!("Invalid window ID: {window_id}"))?;
+        let window = Window::all().map_err(|error| error.to_string())?.into_iter()
+            .find(|item| item.id().is_ok_and(|candidate| candidate == id))
+            .ok_or("Selected window is no longer open")?;
+        if window.is_minimized().unwrap_or(true) {
+            return Err("Selected window is minimized".into());
+        }
+        let details = info(&window)?;
+        let image = window.capture_image().map_err(|error| format!("Could not capture window: {error}"))?;
+        let crop = inset.checked_mul(2).ok_or("Inset is too large")?;
+        let width = image.width().checked_sub(crop).ok_or("Inset exceeds captured image width")?;
+        let height = image.height().checked_sub(crop).ok_or("Inset exceeds captured image height")?;
+        if width == 0 || height == 0 { return Err("Capture area is empty".into()); }
+        let cropped = image::imageops::crop_imm(&image, inset, inset, width, height).to_image();
+        cropped.save(destination).map_err(|error| error.to_string())?;
+        Ok(details)
+    }
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn capture_window(_window_id: &str, _inset: u32, _destination: &Path) -> Result<WindowInfo, String> {
-    Err("Window capture currently requires a Linux X11 session".into())
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub use native::{capture_window, list_windows};
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+pub fn list_windows() -> Result<Vec<WindowInfo>, String> {
+    Err("Window capture is unsupported on this platform".into())
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+pub fn capture_window(_window_id: &str, _inset: u32, _destination: &std::path::Path) -> Result<WindowInfo, String> {
+    Err("Window capture is unsupported on this platform".into())
 }

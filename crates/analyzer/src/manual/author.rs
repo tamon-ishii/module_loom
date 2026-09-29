@@ -57,7 +57,7 @@ pub fn draft(root: &Path) -> Result<(), String> {
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
         - You MUST include at least one kind=screenshot ai:task in index.md. Do not omit it or replace it with a static image link. Put it immediately after the short introduction and before navigation.\n\
         - The screenshot task prompt must describe a real screen of the TARGET application and the controls that should be visible. It appears in ModuleLoom's 「更新対象アセット」 list, where the instruction can be copied for an agent with access to the target application and the resulting PNG can be registered.\n\
-        - kind=screenshot tasks must describe only real screens of the target application. ModuleLoom can capture a selected visible window on Linux/X11, but it does not navigate the target application; do not request a screenshot of ModuleLoom or assume a DOM selector from ModuleLoom refers to the target application.\n\
+        - kind=screenshot tasks must describe only real screens of the target application. ModuleLoom can capture a selected window on Linux/X11, macOS, and Windows; Wayland uses the system screenshot chooser. ModuleLoom does not navigate the target desktop application; do not request a screenshot of ModuleLoom or assume a DOM selector from ModuleLoom refers to the target application.\n\
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
         - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\

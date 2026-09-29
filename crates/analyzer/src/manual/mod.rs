@@ -98,6 +98,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
     let mut clear_flag = false;
     let mut refresh_flag = false;
     let mut check_flag = false;
+    let mut ai_flag = false;
     let mut url_opt: Option<&str> = None;
     let mut max_pages_opt: Option<&str> = None;
     let mut audience_opt: Option<&str> = None;
@@ -111,6 +112,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             "--clear" => clear_flag = true,
             "--refresh" => refresh_flag = true,
             "--check" => check_flag = true,
+            "--ai" => ai_flag = true,
             "--brief" => brief_opt = Some(*value),
             "--agent" => agent_opt = Some(*value),
             "--model" => model_opt = Some(*value),
@@ -205,7 +207,7 @@ pub fn run(root: &Path, action: &str, options: &[(&str, &str)]) -> Result<String
             scenario::test(root, input)
         }
         "e2e" => scenario::test_manual(root),
-        "fact-check" => fact::verify(root, check_flag),
+        "fact-check" => fact::verify_with_ai(root, check_flag, ai_flag),
         "state" => {
             let state_val = get_state(root)?;
             serde_json::to_string(&state_val).map_err(|e| e.to_string())

@@ -185,6 +185,9 @@ async function handlePluginCommand(folder, webview, message) {
       if (args.check === true || args.check === 'true') {
         cliArgs.push('--check');
       }
+      if (args.ai === true || args.ai === 'true') {
+        cliArgs.push('--ai');
+      }
       if (['generate-task', 'generate-text-all', 'generate-impacted'].includes(args.action)) {
         cliArgs.push('--cli', analyzerExecutable(commandFolder));
       }

@@ -27,7 +27,7 @@ fn main() {
         let mut position = 3;
         while position < args.len() {
             let key = args[position].as_str();
-            if key == "--draft" || key == "--clear" || key == "--refresh" || key == "--check" {
+            if key == "--draft" || key == "--clear" || key == "--refresh" || key == "--check" || key == "--ai" {
                 options.push((key, ""));
                 position += 1;
                 continue;

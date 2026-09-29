@@ -171,6 +171,7 @@ async fn manual_action(
     max_pages: Option<String>,
     audience: Option<String>,
     check: Option<bool>,
+    ai: Option<bool>,
     app: AppHandle,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -199,6 +200,7 @@ async fn manual_action(
         if let Some(ref value) = max_pages { options.push(("--max-pages", value)); }
         if let Some(ref value) = audience { options.push(("--audience", value)); }
         if check.unwrap_or(false) { options.push(("--check", "")); }
+        if ai.unwrap_or(false) { options.push(("--ai", "")); }
         if draft.unwrap_or(false) { options.push(("--draft", "")); }
         let binary_name = if cfg!(windows) { "analyze.exe" } else { "analyze" };
         let bundled = app.path().resolve(format!("binaries/{binary_name}"), BaseDirectory::Resource).ok();
