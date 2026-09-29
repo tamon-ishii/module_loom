@@ -2,16 +2,28 @@
 
 ドキュメント生成専用のデスクトップアプリです。ModuleLoom本体を起動せず、Markdownの編集、撮影、UI Map、シナリオ、HTML公開を扱えます。
 
-## 起動
+## Linuxの配布版
 
-開発環境ではリポジトリのルートで実行します。
+Debian/Ubuntuでは、作成した `.deb` をインストールするとアプリ一覧に **Manual Studio** が表示されます。
 
 ```sh
-npm ci
-npm run manual:app
+sudo apt install ./manual-studio_0.1.0_amd64.deb
+manual-studio
 ```
 
-配布用アプリは `npm run manual:bundle` で作成します。RustとTauriの各OSのビルド依存が必要です。共有の解析ライブラリはアプリに組み込まれます。
+Markdown編集と撮影にはNode.jsやRust、ModuleLoom本体は不要です。HTML生成やAI生成には、下記の外部ツールが必要です。
+
+## 開発環境から起動
+
+ローカル起動はリポジトリのルートで実行します。
+
+```sh
+./start-manual-studio.sh
+```
+
+初回だけ依存を準備してビルドします。ソースを変更した後は `./start-manual-studio.sh --build`、変更を随時反映する開発モードは `./start-manual-studio.sh --dev` を使います。スクリプトは別のフォルダーから絶対パスで実行することもできます。
+
+配布用アプリは `npm run manual:bundle` で作成します。LinuxでDebianパッケージのみを作る場合は `npm run manual:bundle -- --bundles deb` を実行します。出力はリポジトリの `target/release/bundle/` です。RustとTauriの各OSのビルド依存が必要です。共有の解析ライブラリはアプリに組み込まれます。
 
 ブラウザーで開発するときは `cargo build -p manual-core --bin manualctl` の後に `npm run manual:dev` を実行します。ブラウザー版でも実際のプロジェクトを読み書きします。
 
@@ -48,6 +60,15 @@ UI Mapだけではクリックや撮影は実行されません。手順の実�
 ## 生成に必要なツール
 
 Markdown編集とネイティブ撮影はアプリ内で動作します。HTML出力にはPython/MkDocs、AI生成には選択したAI CLI、WebシナリオにはNode.js/Playwrightが必要です。デスクトップ自動操作は対象アプリがアクセシビリティ情報を公開している必要があります。
+
+HTML生成には `mkdocs-material` をインストールしてください。プロジェクトごとの環境を使う例:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install mkdocs-material
+```
+
+Windowsでは `.venv\Scripts\python -m pip install mkdocs-material` を実行し、その環境を有効にしてアプリを起動します。MkDocsが見つからない場合は、ビルド結果にHTML生成をスキップしたことが表示されます。
 
 ## 構成
 
