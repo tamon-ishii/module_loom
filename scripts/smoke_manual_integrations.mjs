@@ -10,13 +10,14 @@ const [mode, target] = process.argv.slice(2);
 assert.ok(['--ai', '--native'].includes(mode) && target, 'Usage: node scripts/smoke_manual_integrations.mjs --ai AGENT | --native BINARY');
 const execute = promisify(execFile);
 const root = await mkdtemp(path.join(os.tmpdir(), 'manual-integration-smoke-'));
-const cli = path.resolve('target/debug/manualctl');
+const executable = name => process.platform === 'win32' && !name.endsWith('.exe') ? `${name}.exe` : name;
+const cli = path.resolve(executable('target/debug/manualctl'));
 let app;
 try {
   await mkdir(path.join(root, 'docs'));
   const request = async (action, options = {}) => {
     const { stdout } = await execute(cli, ['--request', JSON.stringify({ root, action, options })], {
-      timeout: 180_000, maxBuffer: 2_000_000,
+      timeout: mode === '--native' ? 30_000 : 180_000, maxBuffer: 2_000_000,
     });
     return stdout.trim();
   };
@@ -35,16 +36,17 @@ try {
   } else {
     await writeFile(path.join(root, 'docs/index.md'), '<!-- ai:task id=studio-window kind=screenshot\nManual Studioウィンドウを撮影する。\n-->\n');
     const launch = async () => {
-      app = spawn(path.resolve(target), [], { stdio: ['ignore', 'ignore', 'pipe'] });
+      app = spawn(path.resolve(executable(target)), [], { stdio: ['ignore', 'ignore', 'pipe'] });
       let startupError = '';
+      let failed = false;
       app.stderr.on('data', chunk => { startupError += chunk.toString(); });
-      app.on('error', error => { startupError += error.message; });
+      app.on('error', error => { failed = true; startupError += error.message; });
       for (let attempt = 0; attempt < 30; attempt++) {
         const windows = JSON.parse(await request('list-windows'));
         const matches = windows.filter(item => item.title === 'Manual Studio');
         assert.ok(matches.length <= 1, 'Close other Manual Studio windows before running this test.');
         if (matches.length === 1) return matches[0];
-        if (app.exitCode !== null) break;
+        if (failed || app.exitCode !== null) break;
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       throw new Error(`Packaged application window did not appear: ${startupError}`);
@@ -62,10 +64,10 @@ try {
     const sources = JSON.parse(await readFile(path.join(root, 'manual/capture_sources.json'), 'utf8'));
     assert.equal(sources['studio-window'].title, 'Manual Studio');
     assert.equal('id' in sources['studio-window'], false);
-    console.log('Native integration passed: packaged application launch, X11 capture, saved-source recapture after restart.');
+    console.log(`Native integration passed (${process.platform}): application launch, window capture, saved-source recapture after restart.`);
   }
 } finally {
-  if (app && app.exitCode === null) {
+  if (app?.pid && app.exitCode === null) {
     const exited = new Promise(resolve => app.once('exit', resolve));
     app.kill('SIGTERM');
     await exited;

@@ -48,6 +48,9 @@ jobs:
           node scripts/smoke_manual_studio.mjs --start-server
       - name: Build Manual Studio
         run: cargo build --locked -p manual-studio
+      - name: Smoke-test native Manual Studio capture after restart
+        timeout-minutes: 2
+        run: node scripts/smoke_manual_integrations.mjs --native target/debug/manual-studio
 
   analyze:
     runs-on: ubuntu-22.04
@@ -88,3 +91,8 @@ jobs:
           cargo build --locked -p manual-core --bin manualctl
           node scripts/smoke_manual_studio.mjs --start-server
       - run: cargo test --workspace
+      - name: Build Manual Studio
+        run: cargo build --locked -p manual-studio
+      - name: Smoke-test native Manual Studio capture after restart
+        timeout-minutes: 2
+        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native target/debug/manual-studio'

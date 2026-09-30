@@ -77,7 +77,7 @@ Windowsでは `.venv\Scripts\python -m pip install mkdocs-material` を実行し
 MkDocsがあればHTML出力まで、なければスキップ表示を確認します。検証用プロジェクトは一時フォルダーに作成して終了時に削除します。Google ChromeとNode.jsが必要です。
 開発サーバーも自動で起動・終了する場合は `node scripts/smoke_manual_studio.mjs --start-server` を使います。CIではLinux・Windows・macOSでこの操作確認を実行します。
 
-Linux/X11の配布バイナリは `node scripts/smoke_manual_integrations.mjs --native target/release/manual-studio` で、起動・撮影・アプリ再起動後の再撮影を確認できます。他のManual Studioウィンドウを閉じてから実行してください。
+配布バイナリは `node scripts/smoke_manual_integrations.mjs --native target/release/manual-studio` で、起動・撮影・アプリ再起動後の再撮影を確認できます。Windowsでは `.exe` を自動で補います。Linux/X11・Windows・macOSのデスクトップ環境で実行し、macOSでは画面収録の権限が必要です。他のManual Studioウィンドウを閉じてから実行してください。
 実際のAI CLIでの生成は `node scripts/smoke_manual_integrations.mjs --ai agy` で確認できます。最後の引数には設定可能なAI CLIのIDを指定します。選択したCLIのアカウントを使い、一時プロジェクトのソースを説明する文章を生成して根拠コメントを検証します。
 
 ## 構成
