@@ -38,18 +38,29 @@ try {
     const launch = async () => {
       app = spawn(path.resolve(executable(target)), [], { stdio: ['ignore', 'ignore', 'pipe'] });
       let startupError = '';
+      let enumerationError = '';
       let failed = false;
       app.stderr.on('data', chunk => { startupError += chunk.toString(); });
       app.on('error', error => { failed = true; startupError += error.message; });
       for (let attempt = 0; attempt < 30; attempt++) {
-        const windows = JSON.parse(await request('list-windows'));
+        let windows;
+        try {
+          windows = JSON.parse(await request('list-windows'));
+          enumerationError = '';
+        } catch (error) {
+          // Xvfb and the window manager start asynchronously in CI. Retry only
+          // their initial missing-list condition, keeping other errors fatal.
+          if (process.platform !== 'linux' || !String(error.stderr).includes('The window manager does not expose its window list')) throw error;
+          enumerationError = String(error.stderr).trim();
+          windows = [];
+        }
         const matches = windows.filter(item => item.title === 'Manual Studio');
         assert.ok(matches.length <= 1, 'Close other Manual Studio windows before running this test.');
         if (matches.length === 1) return matches[0];
-        if (failed || app.exitCode !== null) break;
+        if (failed || app.exitCode !== null || app.signalCode !== null) break;
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      throw new Error(`Packaged application window did not appear: ${startupError}`);
+      throw new Error(`Packaged application window did not appear: ${startupError || enumerationError}`);
     };
     const window = await launch();
     await request('capture-window', { id: 'studio-window', window: window.id, inset: '0' });
@@ -67,7 +78,7 @@ try {
     console.log(`Native integration passed (${process.platform}): application launch, window capture, saved-source recapture after restart.`);
   }
 } finally {
-  if (app?.pid && app.exitCode === null) {
+  if (app?.pid && app.exitCode === null && app.signalCode === null) {
     const exited = new Promise(resolve => app.once('exit', resolve));
     app.kill('SIGTERM');
     await exited;
