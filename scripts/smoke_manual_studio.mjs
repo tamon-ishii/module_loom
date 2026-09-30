@@ -1,14 +1,34 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
 
 // Run against `npm run manual:dev` after building manualctl.
 const base = process.env.MANUAL_STUDIO_URL || 'http://127.0.0.1:5174';
 const root = await mkdtemp(path.join(os.tmpdir(), 'manual-studio-smoke-'));
 let browser;
+let server;
 try {
+  if (process.argv.includes('--start-server')) {
+    server = spawn(process.execPath, [path.resolve('node_modules/vite/bin/vite.js'), '--config', 'apps/manual-studio/vite.config.ts'], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let diagnostics = '';
+    let failed = false;
+    server.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk.toString()).slice(-8000); });
+    server.on('error', error => { failed = true; diagnostics += error.message; });
+    let ready = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (failed || server.exitCode !== null) throw new Error(`Development server failed: ${diagnostics}`);
+      try { ready = (await fetch(base)).ok; } catch { /* Server is still starting. */ }
+      if (ready) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.ok(ready, `Development server did not start: ${diagnostics}`);
+  }
   await mkdir(path.join(root, 'docs'));
   await mkdir(path.join(root, 'empty'));
   await writeFile(path.join(root, 'docs/index.md'), '# Smoke guide\n\nOriginal text\n');
@@ -63,7 +83,7 @@ try {
   await idle();
   assert.match(await readFile(path.join(root, 'empty/docs/new.md'), 'utf8'), /# New guide/);
   const project = path.join(root, 'empty');
-  await symlink(path.resolve('node_modules'), path.join(project, 'node_modules'), 'dir');
+  await symlink(path.resolve('node_modules'), path.join(project, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   await writeFile(path.join(project, 'screen.html'), '<h1>Capture target</h1><button>Continue</button>');
   await page.locator('[data-insert="screenshot"]').click();
   await page.locator('#save-page').click();
@@ -72,7 +92,7 @@ try {
   await page.locator('[data-tab="scenarios"]').click();
   await page.locator('#scenario-path').fill('manual/scenarios/smoke.json');
   await page.locator('#scenario-json').fill(JSON.stringify({
-    version: 1, platform: 'web', base_url: new URL(`file://${project}/screen.html`).href,
+    version: 1, platform: 'web', base_url: pathToFileURL(path.join(project, 'screen.html')).href,
     steps: [{ goto: './screen.html' }, { expect_visible: 'button' }, { screenshot: { task } }],
   }));
   await page.locator('#scenario-save').click();
@@ -93,6 +113,7 @@ try {
   await idle();
   assert.equal(await page.locator('#status').evaluate(node => node.classList.contains('error')), false);
   const buildResult = await page.locator('#publish-result').innerText();
+  if (process.env.MANUAL_STUDIO_REQUIRE_HTML === '1') assert.match(buildResult, /Site:/);
   if (buildResult.includes('Site:')) {
     assert.match(await readFile(path.join(project, 'manual/new.html'), 'utf8'), /New guide/);
   } else {
@@ -102,5 +123,10 @@ try {
   console.log(`Manual Studio smoke passed: edit, preview, save, detached conflict, project switch, new page, saved scenario recapture, ${buildResult.includes('Site:') ? 'HTML build' : 'missing MkDocs message'}.`);
 } finally {
   await browser?.close();
+  if (server && server.exitCode === null) {
+    const exited = new Promise(resolve => server.once('exit', resolve));
+    server.kill();
+    await exited;
+  }
   await rm(root, { recursive: true, force: true });
 }

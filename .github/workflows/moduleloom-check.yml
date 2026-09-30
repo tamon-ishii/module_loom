@@ -36,6 +36,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run manual:build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install mkdocs-material
+      - name: Smoke-test Manual Studio editing and saved web capture
+        env:
+          MANUAL_STUDIO_REQUIRE_HTML: '1'
+        run: |
+          cargo build --locked -p manual-core --bin manualctl
+          node scripts/smoke_manual_studio.mjs --start-server
       - name: Build Manual Studio
         run: cargo build --locked -p manual-studio
 
@@ -57,6 +67,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run manual:build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install mkdocs-material
       - name: Stage jscpd for Tauri tests
         run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
       - name: Build and stage analyzer for Tauri tests
@@ -68,14 +82,9 @@ jobs:
       - name: Test disappearing X11 windows
         run: xvfb-run -a cargo test --locked -p manual-core destroyed_window_is_skipped_without_exiting -- --ignored
       - name: Smoke-test Manual Studio editing and saved web capture
+        env:
+          MANUAL_STUDIO_REQUIRE_HTML: '1'
         run: |
           cargo build --locked -p manual-core --bin manualctl
-          npm run manual:dev >/tmp/manual-studio-vite.log 2>&1 &
-          studio_server_pid=$!
-          trap 'kill "$studio_server_pid"' EXIT
-          for attempt in {1..30}; do
-            if curl --silent --fail http://127.0.0.1:5174/ >/dev/null; then break; fi
-            sleep 1
-          done
-          node scripts/smoke_manual_studio.mjs
+          node scripts/smoke_manual_studio.mjs --start-server
       - run: cargo test --workspace

@@ -75,6 +75,7 @@ Windowsでは `.venv\Scripts\python -m pip install mkdocs-material` を実行し
 `cargo test -p manual-core` と `npm run manual:build` で共有エンジンとUIを確認します。
 `cargo build -p manual-core --bin manualctl` の後に `npm run manual:dev` を起動し、別のターミナルで `node scripts/smoke_manual_studio.mjs` を実行すると、Chromeで編集・プレビュー・保存・別ウィンドウの保存競合・空のプロジェクトへの切り替え・ページ作成・保存したWebシナリオからの再撮影を確認できます。
 MkDocsがあればHTML出力まで、なければスキップ表示を確認します。検証用プロジェクトは一時フォルダーに作成して終了時に削除します。Google ChromeとNode.jsが必要です。
+開発サーバーも自動で起動・終了する場合は `node scripts/smoke_manual_studio.mjs --start-server` を使います。CIではLinux・Windows・macOSでこの操作確認を実行します。
 
 Linux/X11の配布バイナリは `node scripts/smoke_manual_integrations.mjs --native target/release/manual-studio` で、起動・撮影・アプリ再起動後の再撮影を確認できます。他のManual Studioウィンドウを閉じてから実行してください。
 実際のAI CLIでの生成は `node scripts/smoke_manual_integrations.mjs --ai agy` で確認できます。最後の引数には設定可能なAI CLIのIDを指定します。選択したCLIのアカウントを使い、一時プロジェクトのソースを説明する文章を生成して根拠コメントを検証します。

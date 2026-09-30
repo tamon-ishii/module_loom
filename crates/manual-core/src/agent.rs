@@ -159,17 +159,10 @@ pub fn agent_json(
     if !output.status.success() {
         let err_text = String::from_utf8_lossy(&output.stderr);
         let out_text = String::from_utf8_lossy(&output.stdout);
-        let msg = if !err_text.trim().is_empty() {
-            err_text.trim()
-        } else {
-            out_text.trim()
-        };
-        let tail = if msg.len() > 2000 {
-            &msg[msg.len() - 2000..]
-        } else {
-            msg
-        };
-        return Err(format!("{agent} failed: {tail}"));
+        return Err(format!(
+            "{agent} failed: {}",
+            failure_message(&err_text, &out_text)
+        ));
     }
 
     if agent == "codex" {
@@ -220,6 +213,79 @@ pub fn agent_json(
     }
 
     Ok(parsed)
+}
+
+fn failure_message(stderr: &str, stdout: &str) -> String {
+    for output in [stderr, stdout] {
+        if let Ok(value) = serde_json::from_str::<Value>(output.trim()) {
+            let message = value
+                .get("error")
+                .and_then(|error| {
+                    error
+                        .as_str()
+                        .or_else(|| error.get("message").and_then(Value::as_str))
+                })
+                .or_else(|| value.get("result").and_then(Value::as_str));
+            if let Some(message) = message.filter(|message| !message.trim().is_empty()) {
+                return bounded_failure_message(message.trim()).to_string();
+            }
+        }
+    }
+    let message = if stderr.trim().is_empty() {
+        stdout.trim()
+    } else {
+        stderr.trim()
+    };
+    bounded_failure_message(message).to_string()
+}
+
+fn bounded_failure_message(message: &str) -> &str {
+    let mut start = message.len().saturating_sub(2000);
+    while !message.is_char_boundary(start) {
+        start += 1;
+    }
+    &message[start..]
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::failure_message;
+
+    #[test]
+    fn structured_cli_error_shows_the_actionable_reason() {
+        assert_eq!(
+            failure_message(
+                "",
+                r#"{"is_error":true,"result":"Not logged in · Please run /login","usage":{"input_tokens":0}}"#
+            ),
+            "Not logged in · Please run /login"
+        );
+        assert_eq!(
+            failure_message(
+                "warning",
+                r#"{"error":{"message":"Authentication expired"}}"#
+            ),
+            "Authentication expired"
+        );
+    }
+
+    #[test]
+    fn plain_cli_errors_prefer_stderr() {
+        assert_eq!(
+            failure_message(" CLI unavailable \n", "output"),
+            "CLI unavailable"
+        );
+        assert_eq!(failure_message("", " Failed \n"), "Failed");
+    }
+
+    #[test]
+    fn long_japanese_errors_are_truncated_on_a_character_boundary() {
+        let message = "認証エラー".repeat(300);
+        let result = failure_message(&message, "");
+        assert!(result.len() <= 2000);
+        assert!(message.ends_with(&result));
+        assert!(!result.is_empty());
+    }
 }
 
 pub fn get_models(root: &Path, agent: &str) -> Result<Value, String> {
