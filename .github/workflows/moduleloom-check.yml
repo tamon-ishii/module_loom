@@ -98,7 +98,7 @@ jobs:
           dpkg-query -W manual-studio
       - name: Smoke-test installed Manual Studio capture after restart
         timeout-minutes: 2
-        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native /usr/bin/manual-studio'
+        run: xvfb-run -a -s '-screen 0 1920x1200x24' dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native /usr/bin/manual-studio'
       - name: Preserve the tested Debian package
         uses: actions/upload-artifact@v4
         with:
