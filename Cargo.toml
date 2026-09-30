@@ -1,6 +1,9 @@
 [workspace]
 members = [
     "crates/analyzer",
+    "crates/analysis-core",
+    "crates/manual-core",
+    "apps/manual-studio/src-tauri",
     "crates/markits",
     "src-tauri",
 ]

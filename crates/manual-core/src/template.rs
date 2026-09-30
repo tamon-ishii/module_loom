@@ -3,7 +3,9 @@ use std::path::Path;
 use tempfile::tempdir_in;
 use walkdir::WalkDir;
 
-use super::config::{config_path, project_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF};
+use super::config::{
+    config_path, project_path, read_config, ManualConfig, MkDocsConfig, DEFAULT_BRIEF,
+};
 use super::task::{collect_markdown_files, parse_page_tags, utc_now, PageTag};
 use crate::analyze_directory;
 
@@ -16,7 +18,16 @@ pub fn init_template(
     agent_opt: Option<&str>,
     model_opt: Option<&str>,
 ) -> Result<(), String> {
-    init_template_inner(root, template_type, clear, docs_opt, output_opt, agent_opt, model_opt, None)
+    init_template_inner(
+        root,
+        template_type,
+        clear,
+        docs_opt,
+        output_opt,
+        agent_opt,
+        model_opt,
+        None,
+    )
 }
 
 #[cfg(test)]
@@ -26,7 +37,16 @@ pub(crate) fn init_template_with_response(
     clear: bool,
     response: Result<serde_json::Value, String>,
 ) -> Result<(), String> {
-    init_template_inner(root, template_type, clear, None, None, None, None, Some(response))
+    init_template_inner(
+        root,
+        template_type,
+        clear,
+        None,
+        None,
+        None,
+        None,
+        Some(response),
+    )
 }
 
 fn init_template_inner(
@@ -77,7 +97,8 @@ fn init_template_inner(
     } else {
         existing_cfg.model.clone()
     };
-    let is_offline_or_test = response.is_none() && (cfg!(test) || std::env::var("MODULELOOM_OFFLINE_TEMPLATE").is_ok());
+    let is_offline_or_test =
+        response.is_none() && (cfg!(test) || std::env::var("MODULELOOM_OFFLINE_TEMPLATE").is_ok());
     if !is_offline_or_test && response.is_none() && super::agent::which_binary(&agent).is_none() {
         return Err(format!("AI CLI is unavailable: {agent}。インストールされているエージェントを選択するか、PATHを確認してください。"));
     }
@@ -85,11 +106,18 @@ fn init_template_inner(
     let templates = project_path(root, &docs_dir_name)?;
     let output_path = project_path(root, &output_dir_name)?;
     let project_root = root.canonicalize().map_err(|e| e.to_string())?;
-    if templates == project_root || output_path == project_root
-        || templates.starts_with(&output_path) || output_path.starts_with(&templates) {
+    if templates == project_root
+        || output_path == project_root
+        || templates.starts_with(&output_path)
+        || output_path.starts_with(&templates)
+    {
         return Err("Template and output directories must be separate".to_string());
     }
-    let existing = if templates.is_dir() { collect_markdown_files(&templates) } else { Vec::new() };
+    let existing = if templates.is_dir() {
+        collect_markdown_files(&templates)
+    } else {
+        Vec::new()
+    };
     if !existing.is_empty() && !clear {
         return Err("EXISTING_DOCS_CONFIRM_REQUIRED".to_string());
     }
@@ -101,12 +129,20 @@ fn init_template_inner(
         for entry in WalkDir::new(&templates) {
             let entry = entry.map_err(|e| e.to_string())?;
             if entry.file_type().is_symlink() {
-                return Err(format!("Symbolic links are not supported in manual templates: {}", entry.path().display()));
+                return Err(format!(
+                    "Symbolic links are not supported in manual templates: {}",
+                    entry.path().display()
+                ));
             }
-            if !entry.file_type().is_file() || entry.path().extension().is_some_and(|ext| ext == "md") {
+            if !entry.file_type().is_file()
+                || entry.path().extension().is_some_and(|ext| ext == "md")
+            {
                 continue;
             }
-            let rel = entry.path().strip_prefix(&templates).map_err(|e| e.to_string())?;
+            let rel = entry
+                .path()
+                .strip_prefix(&templates)
+                .map_err(|e| e.to_string())?;
             let dest = staged_docs.join(rel);
             if let Some(parent) = dest.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -126,14 +162,20 @@ fn init_template_inner(
 
     if !existing.is_empty() {
         let backup_root = root.join(&output_dir_name).join(".backup");
-        fs::create_dir_all(&backup_root)
-            .map_err(|e| format!("Failed to create backup directory {}: {e}", backup_root.display()))?;
+        fs::create_dir_all(&backup_root).map_err(|e| {
+            format!(
+                "Failed to create backup directory {}: {e}",
+                backup_root.display()
+            )
+        })?;
         let backup = tempfile::Builder::new()
             .prefix(&format!("{}-", utc_now().replace(':', "-")))
             .tempdir_in(&backup_root)
             .map_err(|e| format!("Failed to create backup directory: {e}"))?;
         for old_file in &existing {
-            let rel = old_file.strip_prefix(&templates).map_err(|e| e.to_string())?;
+            let rel = old_file
+                .strip_prefix(&templates)
+                .map_err(|e| e.to_string())?;
             let dest = backup.path().join(rel);
             if let Some(parent) = dest.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -274,7 +316,11 @@ fn generate_template_with_llm(
         "additionalProperties": false
     });
 
-    let res = if let Some(response) = response { response? } else { super::agent::agent_json(root, &prompt, &schema, agent, model)? };
+    let res = if let Some(response) = response {
+        response?
+    } else {
+        super::agent::agent_json(root, &prompt, &schema, agent, model)?
+    };
     let pages = res
         .get("pages")
         .and_then(|p| p.as_array())
@@ -310,9 +356,10 @@ fn generate_template_with_llm(
             .unwrap_or_default();
         let mut ids = std::collections::HashSet::new();
         let tags = parse_page_tags("index.md", index_content, &mut ids)?;
-        if !tags.iter().any(|tag| {
-            matches!(tag, PageTag::Task { task, .. } if task.kind == "screenshot")
-        }) {
+        if !tags
+            .iter()
+            .any(|tag| matches!(tag, PageTag::Task { task, .. } if task.kind == "screenshot"))
+        {
             return Err(format!(
                 "{agent} manual draft must include an index.md screenshot ai:task for the 更新対象アセット list"
             ));
@@ -337,12 +384,16 @@ fn finish_generated_template(root: &Path, templates: &Path, output_dir_name: &st
         let generated = root.join("manual").join("ai");
         for t in &task_list {
             if t.kind == "diagram" {
-                if super::author::generate_task(root, &t.id, "analyze", "").is_err() {
-                    let fallback_diagram = "```mermaid\ngraph TD\n    Main[メイン処理] --> Sub[主要モジュール]\n```";
+                if super::author::generate_task(root, &t.id, "", "").is_err() {
+                    let fallback_diagram =
+                        "```mermaid\ngraph TD\n    Main[メイン処理] --> Sub[主要モジュール]\n```";
                     let _ = super::task::save_answer(&generated, t, fallback_diagram);
                 }
             } else if t.kind == "text" {
-                let default_body = format!("{}\n\n本プロジェクトの仕様および構造に基づいた解説です。", t.prompt);
+                let default_body = format!(
+                    "{}\n\n本プロジェクトの仕様および構造に基づいた解説です。",
+                    t.prompt
+                );
                 let _ = super::task::save_answer(&generated, t, &default_body);
             }
         }
@@ -358,7 +409,6 @@ fn finish_generated_template(root: &Path, templates: &Path, output_dir_name: &st
         true,
         Some(root),
     );
-
 }
 
 fn init_manual_template(root: &Path, templates: &Path, project_name: &str) -> Result<(), String> {

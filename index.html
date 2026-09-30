@@ -272,6 +272,7 @@
                 <span id="manual-assets-summary" class="manual-assets-summary">0 件のアセット</span>
               </div>
               <p>Markdown 原稿内の <code>ai:task</code> タグで指定したスクリーンショット、Mermaid 図、解説文を表示します。通常の画像リンクは対象に含まれません。</p>
+              <p>画像は最初に「撮影元を選ぶ」から撮影すると、撮影元と外枠の設定をプロジェクトに保存します。次回は「同じ撮影元で更新」を使えます。画面を開く操作も繰り返す場合は、操作シナリオを画像の撮影手順として保存してください。</p>
               <div id="manual-tasks" class="manual-tasks"></div>
             </div>
 
@@ -298,16 +299,26 @@
                 <div class="manual-actions"><button id="manual-ui-explore" class="btn-secondary" type="button">UI Map に取り込む</button></div>
               </details>
               <details>
-                <summary>UI Map を更新・取り込む</summary>
-                <p>プロジェクトの画面定義から UI Map を作るか、外部アプリを調べた観測 JSON を取り込みます。</p>
-                <div class="manual-actions"><button id="manual-ui-map" class="btn-secondary" type="button">コードから UI Map を更新</button></div>
+                <summary>画面・操作の一覧（UI Map）</summary>
+                <p>アプリのどの画面に、どんなボタンや入力欄があるかを整理します。AIの原稿生成と、コード変更後の更新候補の判定に使います。画像の撮影元は上の画像カードで、操作手順は下のシナリオで保存します。</p>
+                <ol><li>「コードから画面一覧を作る」を押す。</li><li>画面名を開いて、検出されたボタンや入力欄を確認する。</li><li>不足する画面はWeb探索や観測JSONの取り込みで補う。</li></ol>
+                <div class="manual-actions"><button id="manual-ui-map" class="btn-secondary" type="button">コードから画面一覧を作る</button></div>
+                <div id="manual-uimap-content"></div>
                 <label>観測 JSON のパス（プロジェクトからの相対パス、または絶対パス）
                   <input id="manual-observation-path" type="text" placeholder="manual/observations/settings.json" />
                 </label>
                 <div class="manual-actions"><button id="manual-ui-map-import" class="btn-secondary" type="button">観測結果を取り込む</button></div>
               </details>
               <details>
-                <summary>Web 操作シナリオ</summary>
+                <summary>操作シナリオ（Web・デスクトップ）</summary>
+                <label>調べるデスクトップウィンドウ
+                  <select id="manual-a11y-window"><option value="">一覧を取得してください</option></select>
+                </label>
+                <div class="manual-actions">
+                  <button id="manual-a11y-list" class="btn-secondary" type="button">アクセシビリティのウィンドウ一覧</button>
+                  <button id="manual-a11y-inspect" class="btn-secondary" type="button">要素を表示</button>
+                  <button id="manual-a11y-set-window" class="btn-secondary" type="button">選択ウィンドウをシナリオに設定</button>
+                </div>
                 <label>シナリオファイル（プロジェクト内）
                   <input id="manual-scenario-path" type="text" value="manual/scenarios/settings.json" />
                 </label>
@@ -321,7 +332,7 @@
                   <button id="manual-scenario-test" class="btn-secondary" type="button">テスト実行</button>
                   <button id="manual-scenario-run" class="btn-secondary" type="button">実行して画像登録</button>
                 </div>
-                <p>操作は実際の Web アプリに作用します。撮影タスクは原稿の <code>ai:task</code> と同じ ID を指定してください。</p>
+                <p>Web とデスクトップの操作に対応します。デスクトップでは <code>"platform":"desktop"</code> を指定し、xa11y のセレクタで操作・状態確認・要素撮影を行えます。セレクタは上のアクセシビリティ一覧でウィンドウを選び、要素ツリーから確認できます。選択ウィンドウをシナリオに設定すると、アプリ名とタイトルで探す条件を保存できます。撮影タスクは原稿の <code>ai:task</code> と同じ ID を指定してください。</p>
               </details>
               <details>
                 <summary>検証と読者別出力</summary>

@@ -33,6 +33,11 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux analyzer dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev
       - run: cargo build --locked --release --bin analyze
       - name: Stage analyzer
         shell: bash
@@ -87,7 +92,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 libxkbcommon-dev
       - run: npm ci
       - name: Stage jscpd v5 and its license
         run: python scripts/stage_jscpd_wheel.py src-tauri/binaries

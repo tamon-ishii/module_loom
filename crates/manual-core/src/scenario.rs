@@ -7,19 +7,25 @@ use tempfile::tempdir_in;
 
 use super::author;
 use super::config::{project_path, read_config};
+use super::desktop_scenario;
 use super::task::{collect_markdown_files, find_task, get_code_block_ranges, is_inside_ranges};
 
 #[derive(Deserialize)]
 struct Scenario {
     version: u32,
+    #[serde(default)]
+    platform: Option<String>,
+    #[serde(default)]
     base_url: String,
+    #[serde(default)]
+    window: String,
     steps: Vec<serde_json::Value>,
 }
 
-#[derive(Deserialize)]
-struct RunResult {
-    captured: Vec<String>,
-    steps: usize,
+#[derive(Deserialize, Serialize)]
+pub(super) struct RunResult {
+    pub captured: Vec<String>,
+    pub steps: usize,
 }
 
 pub fn run(root: &Path, input: &str) -> Result<String, String> {
@@ -44,38 +50,55 @@ fn run_mode(root: &Path, input: &str, record: bool) -> Result<String, String> {
     validate_scenario(&scenario, &docs)?;
 
     let temporary = tempdir_in(root).map_err(|error| error.to_string())?;
-    let script = temporary.path().join("scenario_runner.mjs");
     let captured_dir = temporary.path().join("captured");
-    fs::write(&script, include_str!("scenario_runner.mjs")).map_err(|error| error.to_string())?;
-    let result = Command::new("node")
-        .arg(&script)
-        .arg(&input_path)
-        .arg(&captured_dir)
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("Failed to start Node.js scenario runner: {error}"))?;
-    if !result.status.success() {
-        return Err(format!(
-            "Scenario failed: {}",
-            String::from_utf8_lossy(&result.stderr).trim()
-        ));
+    let completed = if scenario.platform.as_deref() == Some("desktop") {
+        desktop_scenario::run(root, &scenario.window, &scenario.steps, &captured_dir)?
+    } else {
+        let script = temporary.path().join("scenario_runner.mjs");
+        fs::write(&script, include_str!("scenario_runner.mjs"))
+            .map_err(|error| error.to_string())?;
+        let result = Command::new("node")
+            .arg(&script)
+            .arg(&input_path)
+            .arg(&captured_dir)
+            .current_dir(root)
+            .output()
+            .map_err(|error| format!("Failed to start Node.js scenario runner: {error}"))?;
+        if !result.status.success() {
+            return Err(format!(
+                "Scenario failed: {}",
+                String::from_utf8_lossy(&result.stderr).trim()
+            ));
+        }
+        serde_json::from_slice::<RunResult>(&result.stdout)
+            .map_err(|error| format!("Invalid scenario runner output: {error}"))?
+    };
+    if completed.steps != scenario.steps.len() {
+        return Err("Scenario runner did not complete all steps".into());
     }
-    let output = String::from_utf8(result.stdout).map_err(|error| error.to_string())?;
-    let completed: RunResult = serde_json::from_str(&output)
-        .map_err(|error| format!("Invalid scenario runner output: {error}"))?;
     if record {
         for task_id in &completed.captured {
             author::record_screenshot(root, task_id, &captured_dir.join(format!("{task_id}.png")))?;
         }
     }
-    if completed.steps != scenario.steps.len() {
-        return Err("Scenario runner did not complete all steps".into());
-    }
-    Ok(output)
+    serde_json::to_string(&completed).map_err(|error| error.to_string())
 }
 
 fn validate_scenario(scenario: &Scenario, docs: &Path) -> Result<(), String> {
-    if scenario.version != 1 || scenario.base_url.trim().is_empty() || scenario.steps.is_empty() {
+    if scenario.version != 1 || scenario.steps.is_empty() {
+        return Err("Scenario requires version 1 and at least one step".into());
+    }
+    if scenario.platform.as_deref() == Some("desktop") {
+        return desktop_scenario::validate(&scenario.steps, docs);
+    }
+    if scenario
+        .platform
+        .as_deref()
+        .is_some_and(|platform| platform != "web")
+    {
+        return Err("Scenario platform must be web or desktop".into());
+    }
+    if scenario.base_url.trim().is_empty() {
         return Err("Scenario requires version 1, base_url, and at least one step".into());
     }
     if !["http://", "https://", "file://"]
@@ -173,6 +196,23 @@ pub fn load(root: &Path, input: &str) -> Result<String, String> {
         .map_err(|error| format!("Failed to read scenario {}: {error}", path.display()))
 }
 
+pub(super) fn validate_capture_task(root: &Path, input: &str, id: &str) -> Result<(), String> {
+    let raw = load(root, input)?;
+    let scenario: Scenario =
+        serde_json::from_str(&raw).map_err(|error| format!("Invalid scenario JSON: {error}"))?;
+    let docs = project_path(root, &read_config(root).docs)?;
+    validate_scenario(&scenario, &docs)?;
+    if !scenario.steps.iter().any(|step| {
+        step.get("screenshot")
+            .and_then(|shot| shot.get("task"))
+            .and_then(serde_json::Value::as_str)
+            == Some(id)
+    }) {
+        return Err(format!("シナリオに撮影タスク「{id}」がありません。screenshot の task に同じ ID を指定してください。"));
+    }
+    Ok(())
+}
+
 pub fn link(root: &Path, input: &str, page: &str) -> Result<String, String> {
     if !input.starts_with("manual/scenarios/") || !input.ends_with(".json") {
         return Err("Scenario files must be under manual/scenarios/ with a .json extension".into());
@@ -266,5 +306,29 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("invalid scenario step"));
         assert!(!root.join("manual/scenarios/broken.json").exists());
+    }
+
+    #[test]
+    fn desktop_scenario_can_be_saved_without_web_url() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs/index.md"),
+            "<!-- ai:task id=settings-shot kind=screenshot\nSettings window\n-->\n",
+        )
+        .unwrap();
+        let saved = save(
+            root,
+            "manual/scenarios/settings.json",
+            r#"{"version":1,"platform":"desktop","steps":[{"window":"Settings"},{"screenshot":{"task":"settings-shot"}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            saved,
+            root.join("manual/scenarios/settings.json")
+                .display()
+                .to_string()
+        );
     }
 }

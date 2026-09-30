@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use super::config::{project_path, read_config};
 use super::agent::agent_json;
+use super::config::{project_path, read_config};
 use super::task::{
     collect_target_markdown_files, get_code_block_ranges, is_inside_ranges, parse_page_tags,
     PageTag,
@@ -105,10 +105,16 @@ fn audit_text(
         "additionalProperties": false
     });
     let response = agent_json(root, &prompt, &schema, agent, model)?;
-    let audit: AiAudit = serde_json::from_value(response).map_err(|error| format!("Invalid AI fact audit: {error}"))?;
+    let audit: AiAudit = serde_json::from_value(response)
+        .map_err(|error| format!("Invalid AI fact audit: {error}"))?;
     let mut results = Vec::new();
     if !audit.coverage_complete {
-        results.push(FactResult { page: page.to_string(), claim: format!("{task_id}: complete coverage"), passed: false, issues: vec!["AI could not review every application claim".into()] });
+        results.push(FactResult {
+            page: page.to_string(),
+            claim: format!("{task_id}: complete coverage"),
+            passed: false,
+            issues: vec!["AI could not review every application claim".into()],
+        });
     }
     for claim in audit.claims {
         let mut issues = Vec::new();
@@ -119,15 +125,27 @@ fn audit_text(
             issues.push(format!("AI verdict: {} ({})", claim.verdict, claim.reason));
         } else {
             let fact = FactClaim {
-                claim: claim.excerpt.clone(), file: claim.file, contains: claim.contains,
-                ui: claim.ui, symbol: claim.symbol,
+                claim: claim.excerpt.clone(),
+                file: claim.file,
+                contains: claim.contains,
+                ui: claim.ui,
+                symbol: claim.symbol,
             };
-            if fact.file.is_some() && fact.contains.is_none() && fact.ui.is_none() && fact.symbol.is_none() {
+            if fact.file.is_some()
+                && fact.contains.is_none()
+                && fact.ui.is_none()
+                && fact.symbol.is_none()
+            {
                 issues.push("Source file alone does not establish the claim; include an exact source substring".into());
             }
             issues.extend(check_claim(root, &fact, selectors, symbols));
         }
-        results.push(FactResult { page: page.to_string(), claim: format!("{task_id}: {}", claim.excerpt), passed: issues.is_empty(), issues });
+        results.push(FactResult {
+            page: page.to_string(),
+            claim: format!("{task_id}: {}", claim.excerpt),
+            passed: issues.is_empty(),
+            issues,
+        });
     }
     Ok(results)
 }
@@ -258,7 +276,10 @@ pub fn verify_with_ai(root: &Path, strict: bool, ai: bool) -> Result<String, Str
         for tag in parse_page_tags(&page, &content, &mut ids)? {
             if let PageTag::Generated { range, task, body } = tag {
                 if task.kind == "text" {
-                    if !fact_ranges.iter().any(|fact| fact.start >= range.start && fact.end <= range.end) {
+                    if !fact_ranges
+                        .iter()
+                        .any(|fact| fact.start >= range.start && fact.end <= range.end)
+                    {
                         unreviewed_text_tasks.push(task.id.clone());
                     }
                     if ai {
@@ -271,7 +292,16 @@ pub fn verify_with_ai(root: &Path, strict: bool, ai: bool) -> Result<String, Str
     let mut ai_reviewed_text_tasks = Vec::new();
     if ai {
         for (page, task_id, body) in generated_text {
-            let audit = audit_text(root, &page, &task_id, &body, &config.agent, &config.model, &selectors, &symbols)?;
+            let audit = audit_text(
+                root,
+                &page,
+                &task_id,
+                &body,
+                &config.agent,
+                &config.model,
+                &selectors,
+                &symbols,
+            )?;
             if audit.iter().all(|result| result.passed) {
                 unreviewed_text_tasks.retain(|id| id != &task_id);
                 ai_reviewed_text_tasks.push(task_id);
@@ -334,8 +364,11 @@ mod tests {
         let root = tmp.path();
         fs::create_dir_all(root.join("docs")).unwrap();
         fs::write(root.join("docs/index.md"), "<!-- ai:task id=guide kind=text\nExplain the settings.\n-->\n<!-- ai:generated id=guide kind=text -->\nThe settings screen has a save button.\n<!-- /ai:generated -->\n").unwrap();
-        let report: serde_json::Value = serde_json::from_str(&verify(root, false).unwrap()).unwrap();
+        let report: serde_json::Value =
+            serde_json::from_str(&verify(root, false).unwrap()).unwrap();
         assert_eq!(report["unreviewed_text_tasks"][0], "guide");
-        assert!(verify(root, true).unwrap_err().contains("unreviewed generated text task"));
+        assert!(verify(root, true)
+            .unwrap_err()
+            .contains("unreviewed generated text task"));
     }
 }

@@ -57,13 +57,13 @@ pub fn draft(root: &Path) -> Result<(), String> {
         IMPORTANT RULES FOR TASKS & LAYOUT:\n\
         - You MUST include at least one kind=screenshot ai:task in index.md. Do not omit it or replace it with a static image link. Put it immediately after the short introduction and before navigation.\n\
         - The screenshot task prompt must describe a real screen of the TARGET application and the controls that should be visible. It appears in ModuleLoom's 「更新対象アセット」 list, where the instruction can be copied for an agent with access to the target application and the resulting PNG can be registered.\n\
-        - kind=screenshot tasks must describe only real screens of the target application. ModuleLoom can capture a selected window on Linux/X11, macOS, and Windows; Wayland uses the system screenshot chooser. ModuleLoom does not navigate the target desktop application; do not request a screenshot of ModuleLoom or assume a DOM selector from ModuleLoom refers to the target application.\n\
+        - kind=screenshot tasks must describe only real screens of the target application. ModuleLoom can capture a selected window on Linux/X11, macOS, and Windows; Wayland uses the system screenshot chooser. A desktop scenario can launch and operate the target application on supported desktops. Do not request a screenshot of ModuleLoom or assume a DOM selector from ModuleLoom refers to the target application.\n\
         - kind=diagram tasks must ONLY request generating the pure Mermaid dependency graph via ModuleLoom CLI for key modules.\n\
         - If an explanation, annotation, walkthrough, or caption of a screenshot or diagram is needed, create a separate dedicated kind=text task directly before or after it.\n\
         - Design chapters directly matching the application's actual modules, UI features, and workflows.\n\
         - For each page, add an <!-- ai:audience user -->, <!-- ai:audience developer -->, or <!-- ai:audience maintainer --> directive when it serves one reader group; omit the directive for shared pages.\n\
         - Add <!-- ai:depends task=TASK_ID file=PROJECT_RELATIVE_PATH --> for known source-to-task links. Do not guess file paths.\n\
-        - For workflows suitable for repeatable Web UI testing, describe the steps in the task prompt. A scenario file can later be linked with <!-- ai:scenario file=manual/scenarios/NAME.json -->.\n\
+        - For workflows suitable for repeatable Web or desktop UI testing, describe the steps in the task prompt. A scenario file can later be linked with <!-- ai:scenario file=manual/scenarios/NAME.json -->.\n\
         Do not invent non-existent UI labels. Return at most 8 pages.\n\n\
         {}\n\n\
         Brief:\n{brief}",
@@ -329,20 +329,28 @@ pub fn record_diagram(
     let tmp = tempdir().map_err(|e| e.to_string())?;
     let output_dir = tmp.path().join("moduleloom");
 
-    let status = Command::new(cli)
-        .args([
-            "--mkdocs",
-            &output_dir.to_string_lossy(),
-            "--lang",
-            "ja",
-            &project.canonicalize().unwrap_or_else(|_| project.to_path_buf()).to_string_lossy(),
-        ])
-        .output()
-        .map_err(|e| format!("ModuleLoom CLI failed to execute: {e}"))?;
+    if cli.is_empty() {
+        let result = crate::analyze_directory(project)?;
+        crate::mkdocs::generate_with_lang(&result, &output_dir, "ja")?;
+    } else {
+        let status = Command::new(cli)
+            .args([
+                "--mkdocs",
+                &output_dir.to_string_lossy(),
+                "--lang",
+                "ja",
+                &project
+                    .canonicalize()
+                    .unwrap_or_else(|_| project.to_path_buf())
+                    .to_string_lossy(),
+            ])
+            .output()
+            .map_err(|e| format!("ModuleLoom CLI failed to execute: {e}"))?;
 
-    if !status.status.success() {
-        let err = String::from_utf8_lossy(&status.stderr);
-        return Err(format!("ModuleLoom CLI failed: {}", err.trim()));
+        if !status.status.success() {
+            let err = String::from_utf8_lossy(&status.stderr);
+            return Err(format!("ModuleLoom CLI failed: {}", err.trim()));
+        }
     }
 
     let page = fs::read_to_string(output_dir.join("docs").join("index.md"))

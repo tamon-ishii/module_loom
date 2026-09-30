@@ -77,7 +77,10 @@ pub fn get_code_block_ranges(content: &str) -> Vec<std::ops::Range<usize>> {
 }
 
 pub fn is_inside_ranges(range: &std::ops::Range<usize>, ranges: &[std::ops::Range<usize>]) -> bool {
-    ranges.iter().any(|r| (range.start >= r.start && range.end <= r.end) || (range.start < r.end && range.end > r.start))
+    ranges.iter().any(|r| {
+        (range.start >= r.start && range.end <= r.end)
+            || (range.start < r.end && range.end > r.start)
+    })
 }
 
 pub fn generate_auto_id(
@@ -95,7 +98,11 @@ pub fn generate_auto_id(
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect();
     let clean_stem = clean_stem.trim_matches('-');
-    let stem = if clean_stem.is_empty() { "task" } else { clean_stem };
+    let stem = if clean_stem.is_empty() {
+        "task"
+    } else {
+        clean_stem
+    };
 
     let hash = source_hash(kind, prompt);
     let short_hash = if hash.len() >= 6 { &hash[..6] } else { &hash };
@@ -129,9 +136,8 @@ pub enum PageTag {
 }
 
 pub fn task_regex() -> Regex {
-    Regex::new(
-        r"(?s)<!--\s*ai:task(?P<attrs>[^\r\n]*)\r?\n(?P<prompt>.*?)\r?\n-->",
-    ).expect("valid task regex")
+    Regex::new(r"(?s)<!--\s*ai:task(?P<attrs>[^\r\n]*)\r?\n(?P<prompt>.*?)\r?\n-->")
+        .expect("valid task regex")
 }
 
 pub fn generated_regex() -> Regex {
@@ -149,7 +155,8 @@ pub fn answer_regex() -> Regex {
 pub fn collect_markdown_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md") {
+        if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md")
+        {
             files.push(entry.path().to_path_buf());
         }
     }
@@ -170,7 +177,9 @@ pub fn collect_target_markdown_files(root: &Path, config: &ManualConfig) -> Vec<
         let target_path = root.join(trimmed);
         if target_path.is_file() {
             if target_path.extension().map_or(false, |ext| ext == "md") {
-                let canon = target_path.canonicalize().unwrap_or_else(|_| target_path.clone());
+                let canon = target_path
+                    .canonicalize()
+                    .unwrap_or_else(|_| target_path.clone());
                 if visited_paths.insert(canon) {
                     let rel = trimmed.replace('\\', "/");
                     files.push((rel, target_path));
@@ -178,8 +187,13 @@ pub fn collect_target_markdown_files(root: &Path, config: &ManualConfig) -> Vec<
             }
         } else if target_path.is_dir() {
             let is_docs_dir = trimmed == config.docs || target_path == templates;
-            for entry in WalkDir::new(&target_path).into_iter().filter_map(|e| e.ok()) {
-                if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md") {
+            for entry in WalkDir::new(&target_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                if entry.file_type().is_file()
+                    && entry.path().extension().map_or(false, |ext| ext == "md")
+                {
                     let path = entry.path().to_path_buf();
                     let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
                     if visited_paths.insert(canon) {
@@ -203,7 +217,9 @@ pub fn collect_target_markdown_files(root: &Path, config: &ManualConfig) -> Vec<
 
     if templates.is_dir() && !config.targets.iter().any(|t| t == &config.docs) {
         for entry in WalkDir::new(&templates).into_iter().filter_map(|e| e.ok()) {
-            if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "md") {
+            if entry.file_type().is_file()
+                && entry.path().extension().map_or(false, |ext| ext == "md")
+            {
                 let path = entry.path().to_path_buf();
                 let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
                 if visited_paths.insert(canon) {
@@ -224,7 +240,10 @@ pub fn collect_target_markdown_files(root: &Path, config: &ManualConfig) -> Vec<
 
 fn extract_attr<'a>(re: &Regex, s: &'a str) -> Option<&'a str> {
     re.captures(s).and_then(|cap| {
-        cap.get(1).or_else(|| cap.get(2)).or_else(|| cap.get(3)).map(|m| m.as_str())
+        cap.get(1)
+            .or_else(|| cap.get(2))
+            .or_else(|| cap.get(3))
+            .map(|m| m.as_str())
     })
 }
 
@@ -241,7 +260,8 @@ pub fn parse_page_tags(
     let kind_re = Regex::new(r#"(?:^|\s)kind=(?:"([^"]+)"|'([^']+)'|([^\s>]+))"#).unwrap();
     let source_hash_re = Regex::new(r#"\bsource-sha256=([a-f0-9]{64})"#).unwrap();
     let prompt_re = Regex::new(r#"\bprompt-b64=([A-Za-z0-9+/=]+)"#).unwrap();
-    let approved_re = Regex::new(r#"\bapproved-at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"#).unwrap();
+    let approved_re =
+        Regex::new(r#"\bapproved-at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"#).unwrap();
     let valid_id_re = Regex::new(r#"^[a-z][a-z0-9-]*$"#).unwrap();
 
     struct RawTask {
@@ -263,12 +283,20 @@ pub fn parse_page_tags(
         if is_inside_ranges(&range, &code_blocks) {
             continue;
         }
-        let attrs = cap.name("attrs").map(|a| a.as_str()).unwrap_or("").to_string();
+        let attrs = cap
+            .name("attrs")
+            .map(|a| a.as_str())
+            .unwrap_or("")
+            .to_string();
         let prompt = cap.name("prompt").unwrap().as_str().trim().to_string();
         if prompt.is_empty() {
             return Err(format!("Empty instruction in page: {page_rel}"));
         }
-        raw_tasks.push(RawTask { range, attrs, prompt });
+        raw_tasks.push(RawTask {
+            range,
+            attrs,
+            prompt,
+        });
     }
 
     let mut raw_gens = Vec::new();
@@ -278,7 +306,11 @@ pub fn parse_page_tags(
         if is_inside_ranges(&range, &code_blocks) {
             continue;
         }
-        let attrs = cap.name("attrs").map(|a| a.as_str()).unwrap_or("").to_string();
+        let attrs = cap
+            .name("attrs")
+            .map(|a| a.as_str())
+            .unwrap_or("")
+            .to_string();
         let body = cap.name("body").unwrap().as_str().to_string();
         raw_gens.push(RawGenerated { range, attrs, body });
     }
@@ -287,11 +319,15 @@ pub fn parse_page_tags(
     let mut paired_prompts: HashMap<usize, String> = HashMap::new();
     let mut paired_tasks = HashSet::new();
     for (gen_index, generated) in raw_gens.iter().enumerate() {
-        let Some(gen_id) = extract_attr(&id_re, &generated.attrs) else { continue };
+        let Some(gen_id) = extract_attr(&id_re, &generated.attrs) else {
+            continue;
+        };
         if let Some((task_index, source)) = raw_tasks.iter().enumerate().find(|(_, source)| {
             extract_attr(&id_re, &source.attrs) == Some(gen_id)
                 && source.range.end <= generated.range.start
-                && content[source.range.end..generated.range.start].trim().is_empty()
+                && content[source.range.end..generated.range.start]
+                    .trim()
+                    .is_empty()
         }) {
             paired_prompts.insert(gen_index, source.prompt.clone());
             paired_tasks.insert(task_index);
@@ -302,7 +338,9 @@ pub fn parse_page_tags(
     for t in &raw_tasks {
         if let Some(id_str) = extract_attr(&id_re, &t.attrs) {
             if !valid_id_re.is_match(id_str) {
-                return Err(format!("Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)"));
+                return Err(format!(
+                    "Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)"
+                ));
             }
             if existing_ids.contains(id_str) {
                 return Err(format!("Duplicate task ID: {id_str}"));
@@ -313,7 +351,9 @@ pub fn parse_page_tags(
     for (gen_index, g) in raw_gens.iter().enumerate() {
         if let Some(id_str) = extract_attr(&id_re, &g.attrs) {
             if !valid_id_re.is_match(id_str) {
-                return Err(format!("Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)"));
+                return Err(format!(
+                    "Invalid task ID: '{id_str}' (must match ^[a-z][a-z0-9-]*$)"
+                ));
             }
             if existing_ids.contains(id_str) && !paired_prompts.contains_key(&gen_index) {
                 return Err(format!("Duplicate task ID: {id_str}"));
@@ -328,10 +368,14 @@ pub fn parse_page_tags(
 
     // Pass 2: Build Task objects, assigning auto IDs where omitted
     for (task_index, t) in raw_tasks.into_iter().enumerate() {
-        if paired_tasks.contains(&task_index) { continue; }
+        if paired_tasks.contains(&task_index) {
+            continue;
+        }
         let kind = if let Some(k) = extract_attr(&kind_re, &t.attrs) {
             if k != "text" && k != "screenshot" && k != "diagram" {
-                return Err(format!("Invalid task kind: '{k}' (must be text, screenshot, or diagram)"));
+                return Err(format!(
+                    "Invalid task kind: '{k}' (must be text, screenshot, or diagram)"
+                ));
             }
             k.to_string()
         } else {
@@ -355,7 +399,10 @@ pub fn parse_page_tags(
             source_sha256: hash,
             status: "missing".to_string(),
         };
-        tags.push(PageTag::Task { range: t.range, task });
+        tags.push(PageTag::Task {
+            range: t.range,
+            task,
+        });
     }
 
     // Pass 3: Build Generated objects
@@ -377,7 +424,8 @@ pub fn parse_page_tags(
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(encoded.get(1).unwrap().as_str())
                 .map_err(|e| format!("Invalid prompt-b64 in page {page_rel}: {e}"))?;
-            String::from_utf8(bytes).map_err(|e| format!("Invalid prompt-b64 in page {page_rel}: {e}"))?
+            String::from_utf8(bytes)
+                .map_err(|e| format!("Invalid prompt-b64 in page {page_rel}: {e}"))?
         } else {
             format!("AI生成コンテンツ ({kind})")
         };
@@ -398,7 +446,11 @@ pub fn parse_page_tags(
             source_sha256: current_hash,
             status,
         };
-        tags.push(PageTag::Generated { range: g.range, task, body: g.body });
+        tags.push(PageTag::Generated {
+            range: g.range,
+            task,
+            body: g.body,
+        });
     }
 
     tags.sort_by_key(|t| match t {
@@ -428,13 +480,18 @@ pub fn tasks_for_config(root: &Path, config: &ManualConfig) -> Result<Vec<Task>,
 
 pub fn tasks(templates: &Path) -> Result<Vec<Task>, String> {
     if let Some(parent) = templates.parent() {
-        if parent.join("manual_setting.json").is_file() || parent.join("manual").join("config.json").is_file() {
+        if parent.join("manual_setting.json").is_file()
+            || parent.join("manual").join("config.json").is_file()
+        {
             let config = read_config(parent);
             return tasks_for_config(parent, &config);
         }
     }
     if !templates.is_dir() {
-        return Err(format!("Template directory is missing: {}", templates.display()));
+        return Err(format!(
+            "Template directory is missing: {}",
+            templates.display()
+        ));
     }
     let mut found = Vec::new();
     let mut ids = HashSet::new();
@@ -461,15 +518,20 @@ pub fn tasks(templates: &Path) -> Result<Vec<Task>, String> {
 pub fn read_answer(path: &Path, task: &Task) -> Result<(String, String, Option<String>), String> {
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let a_re = answer_regex();
-    let cap = a_re.captures(&content).ok_or_else(|| format!("Invalid answer header: {}", path.display()))?;
-    
+    let cap = a_re
+        .captures(&content)
+        .ok_or_else(|| format!("Invalid answer header: {}", path.display()))?;
+
     let id = cap.name("id").unwrap().as_str();
     if id != task.id {
         return Err(format!("Invalid answer header: {}", path.display()));
     }
     let hash = cap.name("hash").unwrap().as_str();
     if hash != task.source_sha256 {
-        return Err(format!("Stale answer for {}; record it again after reviewing the instruction", task.id));
+        return Err(format!(
+            "Stale answer for {}; record it again after reviewing the instruction",
+            task.id
+        ));
     }
     let body = cap.name("body").unwrap().as_str().trim();
     if body.is_empty() {
@@ -500,7 +562,11 @@ pub fn scan_entries(templates: &Path, generated: &Path) -> Vec<Task> {
         } else {
             match read_answer(&answer_path, task) {
                 Ok((_, _, approved)) => {
-                    task.status = if approved.is_some() { "approved".to_string() } else { "current".to_string() };
+                    task.status = if approved.is_some() {
+                        "approved".to_string()
+                    } else {
+                        "current".to_string()
+                    };
                 }
                 Err(_) => {
                     task.status = "stale".to_string();
@@ -521,7 +587,9 @@ pub fn find_task(templates: &Path, task_id: &str) -> Result<Task, String> {
 pub fn update_task_prompt(templates: &Path, task_id: &str, prompt: &str) -> Result<(), String> {
     let prompt = prompt.trim();
     if prompt.is_empty() || prompt.contains("<!--") || prompt.contains("-->") {
-        return Err("Task instruction must be nonempty and cannot contain HTML comment markers".to_string());
+        return Err(
+            "Task instruction must be nonempty and cannot contain HTML comment markers".to_string(),
+        );
     }
     let task = find_task(templates, task_id)?;
     let page_path = if templates.join(&task.page).is_file() {
@@ -546,7 +614,10 @@ pub fn update_task_prompt(templates: &Path, task_id: &str, prompt: &str) -> Resu
         }
     }
     if matches.len() != 1 {
-        return Err(format!("Expected one ai:task instruction for {task_id}; found {}", matches.len()));
+        return Err(format!(
+            "Expected one ai:task instruction for {task_id}; found {}",
+            matches.len()
+        ));
     }
     let (start, end, attrs) = matches.pop().unwrap();
     let attrs = if extract_attr(&id_re, &attrs).is_some() {
@@ -587,7 +658,9 @@ pub fn update_task_in_docs(
     let kind = &task.kind;
     let created = utc_now();
     let hash_val = &task.source_sha256;
-    let approved_attr = approved.map(|a| format!(" approved-at={a}")).unwrap_or_default();
+    let approved_attr = approved
+        .map(|a| format!(" approved-at={a}"))
+        .unwrap_or_default();
     let hash_attr = if !hash_val.is_empty() {
         format!(" source-sha256={hash_val}")
     } else {
@@ -604,9 +677,11 @@ pub fn update_task_in_docs(
     let mut ids = HashSet::new();
     let tags = parse_page_tags(&page_rel, &content, &mut ids)?;
 
-    if let Some(target_tag) = tags.iter().find(|t| matches!(t,
-        PageTag::Generated { task: t, .. } if t.id == *task_id
-    )) {
+    if let Some(target_tag) = tags.iter().find(|t| {
+        matches!(t,
+            PageTag::Generated { task: t, .. } if t.id == *task_id
+        )
+    }) {
         let range = match target_tag {
             PageTag::Generated { range, .. } => range,
             PageTag::Task { .. } => unreachable!(),
@@ -619,9 +694,11 @@ pub fn update_task_in_docs(
         return Ok(());
     }
 
-    if let Some(PageTag::Task { range, .. }) = tags.iter().find(|t| matches!(t,
-        PageTag::Task { task: t, .. } if t.id == *task_id
-    )) {
+    if let Some(PageTag::Task { range, .. }) = tags.iter().find(|t| {
+        matches!(t,
+            PageTag::Task { task: t, .. } if t.id == *task_id
+        )
+    }) {
         let source_tag = &content[range.start..range.end];
         let id_attr_re = Regex::new(r#"(?:^|\s)id=(?:\"[^\"]+\"|'[^']+'|[^\s>]+)"#).unwrap();
         let task_tag = if id_attr_re.is_match(source_tag) {
@@ -681,16 +758,21 @@ pub fn approve_task(templates: &Path, generated: &Path, task_id: &str) -> Result
             let old_block = &content[range.start..range.end];
             let g_re = generated_regex();
             if let Some(cap) = g_re.captures(old_block) {
-                let mut attrs = cap.name("attrs").map(|a| a.as_str()).unwrap_or("").to_string();
+                let mut attrs = cap
+                    .name("attrs")
+                    .map(|a| a.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 if !attrs.contains("approved-at=") {
                     attrs = format!("{attrs} approved-at={now}");
                 } else {
                     let re_attr = Regex::new(r"approved-at=\S+").unwrap();
-                    attrs = re_attr.replace(&attrs, format!("approved-at={now}").as_str()).to_string();
+                    attrs = re_attr
+                        .replace(&attrs, format!("approved-at={now}").as_str())
+                        .to_string();
                 }
-                let replacement = format!(
-                    "<!-- ai:generated{attrs} -->\n{body}\n<!-- /ai:generated -->"
-                );
+                let replacement =
+                    format!("<!-- ai:generated{attrs} -->\n{body}\n<!-- /ai:generated -->");
                 let mut new_content = String::with_capacity(content.len() + replacement.len());
                 new_content.push_str(&content[..range.start]);
                 new_content.push_str(&replacement);

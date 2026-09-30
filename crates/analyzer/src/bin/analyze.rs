@@ -18,16 +18,32 @@ struct IncrementalInput {
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.get(1).is_some_and(|arg| arg == "--manual") {
-        let Some(action) = args.get(2) else {
-            eprintln!("Usage: moduleloom-analyze --manual ACTION --root PROJECT [OPTIONS]");
-            std::process::exit(2);
-        };
+        let action = args.get(2).map(String::as_str);
+        if action.is_none() || matches!(action, Some("--help" | "-h")) {
+            println!(
+                "Usage: moduleloom-analyze --manual ACTION --root PROJECT [OPTIONS]\n\
+                 Actions include list-accessible-windows, inspect-window, activate-window,\n\
+                 capture-window, scenario-save, scenario-test, scenario-run, and e2e.\n\
+                 For desktop scenarios set platform=desktop and use --input SCENARIO.json.\n\
+                 Use --manual list-accessible-windows to discover windows and selectors."
+            );
+            if action.is_none() {
+                std::process::exit(2);
+            }
+            return;
+        }
+        let action = action.unwrap();
         let mut root = ".".to_string();
         let mut options = Vec::<(&str, &str)>::new();
         let mut position = 3;
         while position < args.len() {
             let key = args[position].as_str();
-            if key == "--draft" || key == "--clear" || key == "--refresh" || key == "--check" || key == "--ai" {
+            if key == "--draft"
+                || key == "--clear"
+                || key == "--refresh"
+                || key == "--check"
+                || key == "--ai"
+            {
                 options.push((key, ""));
                 position += 1;
                 continue;
@@ -91,7 +107,7 @@ fn main() {
             println!("Usage: moduleloom-analyze [OPTIONS] [PROJECT_PATH]");
             println!("  --diagnostics      Run code diagnostics and print AI-ready JSON");
             println!("  --install-skill    Install the bundled skill for detected coding agents");
-            println!("  --manual ACTION   Manage the manual (ui-explore, impact-plan, scenario-run, e2e, fact-check, build, ...)");
+            println!("  --manual ACTION   Manage the manual (ui-explore, desktop accessibility, scenario-run, e2e, build, ...)");
             println!("  --quality-report   Alias of --diagnostics");
             println!("  --quality --json   Print the full analysis with diagnostics");
             println!("  --max-score N      Exit with status 1 if the score exceeds N");

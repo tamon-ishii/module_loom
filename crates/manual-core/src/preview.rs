@@ -11,7 +11,8 @@ use super::agent::get_agents;
 use super::builder::build;
 use super::config::{has_config, project_path, read_config, DEFAULT_BRIEF};
 use super::task::{
-    collect_target_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks, utc_now, PageTag,
+    collect_target_markdown_files, parse_page_tags, read_answer, scan_entries, source_hash, tasks,
+    utc_now, PageTag,
 };
 
 pub fn render_page_markdown(
@@ -93,7 +94,13 @@ pub fn inline_html_assets(output: &Path, html_text: &str) -> String {
         let m = cap.get(0).unwrap();
         step1.push_str(&html_text[last_idx..m.start()]);
         let href = cap.name("href").unwrap().as_str();
-        let clean = href.split('?').next().unwrap_or(href).split('#').next().unwrap_or(href);
+        let clean = href
+            .split('?')
+            .next()
+            .unwrap_or(href)
+            .split('#')
+            .next()
+            .unwrap_or(href);
         let clean_rel = clean.trim_start_matches(|c| c == '.' || c == '/');
 
         let mut css_path = output.join(clean_rel);
@@ -111,7 +118,9 @@ pub fn inline_html_assets(output: &Path, html_text: &str) -> String {
 
         if css_path.is_file() {
             if let Ok(css_content) = fs::read_to_string(&css_path) {
-                step1.push_str(&format!("<style>/* inlined {href} */\n{css_content}\n</style>"));
+                step1.push_str(&format!(
+                    "<style>/* inlined {href} */\n{css_content}\n</style>"
+                ));
                 last_idx = m.end();
                 continue;
             }
@@ -121,8 +130,7 @@ pub fn inline_html_assets(output: &Path, html_text: &str) -> String {
     }
     step1.push_str(&html_text[last_idx..]);
 
-    let img_pattern =
-        Regex::new(r#"(?i)<img\s+[^>]*src=["'](?P<src>[^"']+)["'][^>]*>"#).unwrap();
+    let img_pattern = Regex::new(r#"(?i)<img\s+[^>]*src=["'](?P<src>[^"']+)["'][^>]*>"#).unwrap();
 
     let mut step2 = String::new();
     last_idx = 0;
@@ -130,7 +138,13 @@ pub fn inline_html_assets(output: &Path, html_text: &str) -> String {
         let m = cap.get(0).unwrap();
         step2.push_str(&step1[last_idx..m.start()]);
         let src = cap.name("src").unwrap().as_str();
-        let clean = src.split('?').next().unwrap_or(src).split('#').next().unwrap_or(src);
+        let clean = src
+            .split('?')
+            .next()
+            .unwrap_or(src)
+            .split('#')
+            .next()
+            .unwrap_or(src);
         let clean_rel = clean.trim_start_matches(|c| c == '.' || c == '/');
 
         let mut img_path = output.join(clean_rel);
@@ -164,7 +178,9 @@ pub fn inline_html_assets(output: &Path, html_text: &str) -> String {
                     if metadata.len() < 10_000_000 {
                         if let Ok(bytes) = fs::read(&img_path) {
                             let b64 = BASE64.encode(bytes);
-                            let tag = m.as_str().replace(src, &format!("data:{mime_type};base64,{b64}"));
+                            let tag = m
+                                .as_str()
+                                .replace(src, &format!("data:{mime_type};base64,{b64}"));
                             step2.push_str(&tag);
                             last_idx = m.end();
                             continue;
@@ -268,7 +284,9 @@ pub fn preview_html(root: &Path, page: &str) -> Result<String, String> {
             );
             return Ok(html_body);
         }
-        return Err(format!("HTML page is missing: {page}. Please build the manual first."));
+        return Err(format!(
+            "HTML page is missing: {page}. Please build the manual first."
+        ));
     }
 
     let content = fs::read_to_string(&target).map_err(|e| e.to_string())?;
@@ -285,7 +303,10 @@ pub fn preview_asset(root: &Path, page: &str, asset: &str) -> Result<String, Str
     let asset_name = asset_path.file_name().unwrap_or_default();
 
     let candidate_paths = [
-        page_path.parent().map(|p| p.join(asset)).unwrap_or_default(),
+        page_path
+            .parent()
+            .map(|p| p.join(asset))
+            .unwrap_or_default(),
         templates.join("assets").join(asset_name),
         templates.join(asset),
         generated.join("assets").join(asset_name),
@@ -300,7 +321,11 @@ pub fn preview_asset(root: &Path, page: &str, asset: &str) -> Result<String, Str
     }
 
     let img = image.ok_or_else(|| "Preview image is missing".to_string())?;
-    let ext = img.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = img
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     let mime = match ext.as_str() {
         "png" => Some("image/png"),
         "jpg" | "jpeg" => Some("image/jpeg"),
@@ -368,12 +393,19 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
     let image_link = Regex::new(r"!\[[^\]]*\]\((?P<path>[^)]+)\)").unwrap();
     let mut image_assets = HashMap::new();
     for (page, path) in collect_target_markdown_files(root, &config) {
-        let Ok(content) = fs::read_to_string(&path) else { continue };
-        let Ok(tags) = parse_page_tags(&page, &content, &mut Default::default()) else { continue };
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(tags) = parse_page_tags(&page, &content, &mut Default::default()) else {
+            continue;
+        };
         for tag in tags {
             if let PageTag::Generated { task, body, .. } = tag {
                 if task.kind == "screenshot" {
-                    if let Some(asset) = image_link.captures(&body).and_then(|found| found.name("path")) {
+                    if let Some(asset) = image_link
+                        .captures(&body)
+                        .and_then(|found| found.name("path"))
+                    {
                         image_assets.insert(task.id, asset.as_str().to_string());
                     }
                 }
@@ -389,6 +421,8 @@ pub fn get_state(root: &Path) -> Result<serde_json::Value, String> {
         "brief": brief,
         "tasks": tasks,
         "image_assets": image_assets,
+        "capture_sources": super::capture_source::read(root)?,
+        "ui_map": fs::read_to_string(project_path(root, "manual/ui_map.json")?).ok().and_then(|raw| serde_json::from_str::<super::uimap::UIMap>(&raw).ok()),
         "pages": pages,
         "preview": preview,
         "preview_html": preview_html_content,

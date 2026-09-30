@@ -46,3 +46,7 @@ moduleloom-analyze --mkdocs ./moduleloom-docs ./my-project
 `--check` は解析エラー、アーキテクチャルール違反、依存宣言の問題がある場合に終了コード 1 を返します。循環や肥大化も失敗条件に含める場合は `--check-all` を使用します。診断の指摘は `--diagnostics` で JSON に出力できます。
 
 解析対象のルートに `moduleloom.toml` を置くと、肥大化の閾値やアーキテクチャルールを設定できます。
+
+## ドキュメント専用アプリ
+
+[Manual Studio](apps/manual-studio/README.md) は、Markdown編集・プレビュー・撮影・HTML生成を独立したウィンドウで扱えます。開発環境での起動は `npm run manual:app` です。

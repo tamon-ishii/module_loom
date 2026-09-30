@@ -9,6 +9,49 @@ permissions:
   contents: read
 
 jobs:
+  analyzer-platforms:
+    name: Analyzer ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-latest
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked -p moduleloom-analyzer --bin analyze
+      - name: Test desktop scenario validation
+        run: cargo test --locked -p manual-core --lib desktop_scenario::tests
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run manual:build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install mkdocs-material
+      - name: Smoke-test Manual Studio editing and saved web capture
+        env:
+          MANUAL_STUDIO_REQUIRE_HTML: '1'
+        run: |
+          cargo build --locked -p manual-core --bin manualctl
+          node scripts/smoke_manual_studio.mjs --start-server
+      - name: Build Manual Studio
+        run: cargo build --locked -p manual-studio
+      - name: Smoke-test native Manual Studio capture after restart
+        timeout-minutes: 2
+        run: node scripts/smoke_manual_integrations.mjs --native target/debug/manual-studio
+
   analyze:
     runs-on: ubuntu-22.04
     steps:
@@ -23,13 +66,42 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxkbcommon-dev xvfb xauth zenity at-spi2-core openbox
       - run: npm ci
       - run: npm run build
+      - run: npm run manual:build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install mkdocs-material
       - name: Stage jscpd for Tauri tests
         run: python scripts/stage_jscpd_wheel.py src-tauri/binaries
       - name: Build and stage analyzer for Tauri tests
         run: |
           cargo build --locked --bin analyze
           python scripts/stage_desktop_analyzer.py "" --debug
+      - name: Smoke-test desktop accessibility scenario
+        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/moduleloom-openbox.log 2>&1 & python3 scripts/smoke_desktop_scenario.py target/debug/analyze'
+      - name: Test disappearing X11 windows
+        run: xvfb-run -a cargo test --locked -p manual-core destroyed_window_is_skipped_without_exiting -- --ignored
+      - name: Smoke-test Manual Studio editing and saved web capture
+        env:
+          MANUAL_STUDIO_REQUIRE_HTML: '1'
+        run: |
+          cargo build --locked -p manual-core --bin manualctl
+          node scripts/smoke_manual_studio.mjs --start-server
       - run: cargo test --workspace
+      - name: Build and install the Manual Studio Debian package
+        run: |
+          npm run manual:bundle -- --bundles deb
+          sudo apt-get install -y "./target/release/bundle/deb/Manual Studio_0.1.0_amd64.deb"
+          dpkg-query -W manual-studio
+      - name: Smoke-test installed Manual Studio capture after restart
+        timeout-minutes: 2
+        run: xvfb-run -a -s '-screen 0 1920x1200x24' dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native /usr/bin/manual-studio'
+      - name: Preserve the tested Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-studio-linux-amd64
+          path: target/release/bundle/deb/*.deb
+          if-no-files-found: error
