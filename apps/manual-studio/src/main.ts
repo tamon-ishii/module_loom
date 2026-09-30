@@ -128,6 +128,12 @@ async function openProject(root: string): Promise<void> {
   status("プロジェクトを開いています…");
   const loaded = JSON.parse(await rpc("state", {}, root)) as State;
   projectRoot = root; workspace = loaded; documentState = null; dirty = false;
+  clearTimeout(previewTimer); ++previewVersion;
+  editor.value = "";
+  element<HTMLIFrameElement>("markdown-preview").srcdoc = "";
+  element("editor-title").textContent = "Markdownを編集する";
+  document.title = "Manual Studio";
+  updateSaveState(); updateCursor();
   input("project-root").value = root;
   localStorage.setItem("manual-studio-project", root);
   element("project-label").textContent = root;

@@ -70,6 +70,12 @@ python3 -m venv .venv
 
 Windowsでは `.venv\Scripts\python -m pip install mkdocs-material` を実行し、その環境を有効にしてアプリを起動します。MkDocsが見つからない場合は、ビルド結果にHTML生成をスキップしたことが表示されます。
 
+## 開発時の動作確認
+
+`cargo test -p manual-core` と `npm run manual:build` で共有エンジンとUIを確認します。
+`cargo build -p manual-core --bin manualctl` の後に `npm run manual:dev` を起動し、別のターミナルで `node scripts/smoke_manual_studio.mjs` を実行すると、Chromeで編集・プレビュー・保存・別ウィンドウの保存競合・空のプロジェクトへの切り替え・ページ作成・保存したWebシナリオからの再撮影を確認できます。
+MkDocsがあればHTML出力まで、なければスキップ表示を確認します。検証用プロジェクトは一時フォルダーに作成して終了時に削除します。Google ChromeとNode.jsが必要です。
+
 ## 構成
 
 - `crates/manual-core`: 原稿、撮影、シナリオ、UI Map、生成・公開、編集API。
