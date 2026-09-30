@@ -65,6 +65,8 @@ jobs:
           python scripts/stage_desktop_analyzer.py "" --debug
       - name: Smoke-test desktop accessibility scenario
         run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/moduleloom-openbox.log 2>&1 & python3 scripts/smoke_desktop_scenario.py target/debug/analyze'
+      - name: Test disappearing X11 windows
+        run: xvfb-run -a cargo test --locked -p manual-core destroyed_window_is_skipped_without_exiting -- --ignored
       - name: Smoke-test Manual Studio editing and saved web capture
         run: |
           cargo build --locked -p manual-core --bin manualctl

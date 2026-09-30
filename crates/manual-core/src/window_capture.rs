@@ -34,11 +34,33 @@ mod linux {
     use std::os::raw::{c_int, c_long, c_uchar, c_ulong, c_void};
     use std::path::Path;
     use std::ptr;
+    use std::sync::{Mutex, MutexGuard};
     use std::thread;
     use std::time::Duration;
     use x11_dl::xlib;
 
     const PORTAL_WINDOW_ID: &str = "portal";
+
+    type ErrorHandler = unsafe extern "C" fn(*mut xlib::Display, *mut xlib::XErrorEvent) -> c_int;
+    // Xlib's handler is process-wide. Serialize our connections and delegate errors
+    // on toolkit-owned displays to the previous handler.
+    static CONNECTION_LOCK: Mutex<()> = Mutex::new(());
+    static ERROR_HANDLER: Mutex<(usize, Option<ErrorHandler>)> = Mutex::new((0, None));
+
+    unsafe extern "C" fn handle_error(
+        display: *mut xlib::Display,
+        event: *mut xlib::XErrorEvent,
+    ) -> c_int {
+        let (capture_display, previous) = *ERROR_HANDLER
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if display as usize == capture_display && (*event).error_code == xlib::BadWindow {
+            // A client can disappear between reading _NET_CLIENT_LIST and
+            // inspecting it. XGetWindowAttributes then returns zero.
+            return 0;
+        }
+        previous.map_or(0, |handler| handler(display, event))
+    }
 
     fn capture_portal(inset: u32, destination: &Path) -> Result<WindowInfo, String> {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -92,25 +114,46 @@ mod linux {
         api: xlib::Xlib,
         display: *mut xlib::Display,
         root: xlib::Window,
+        previous_handler: Option<ErrorHandler>,
+        _lock: MutexGuard<'static, ()>,
     }
 
     impl Drop for DisplayConnection {
         fn drop(&mut self) {
             unsafe {
                 (self.api.XCloseDisplay)(self.display);
+                (self.api.XSetErrorHandler)(self.previous_handler);
             }
+            *ERROR_HANDLER
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = (0, None);
         }
     }
 
     impl DisplayConnection {
         fn open() -> Result<Self, String> {
+            let lock = CONNECTION_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             let api = xlib::Xlib::open().map_err(|error| format!("X11 is unavailable: {error}"))?;
             let display = unsafe { (api.XOpenDisplay)(ptr::null()) };
             if display.is_null() {
                 return Err("Cannot open the X11 display. Window capture currently requires a Linux X11 session".into());
             }
             let root = unsafe { (api.XDefaultRootWindow)(display) };
-            Ok(Self { api, display, root })
+            let mut handler_state = ERROR_HANDLER
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous_handler = unsafe { (api.XSetErrorHandler)(Some(handle_error)) };
+            *handler_state = (display as usize, previous_handler);
+            drop(handler_state);
+            Ok(Self {
+                api,
+                display,
+                root,
+                previous_handler,
+                _lock: lock,
+            })
         }
 
         fn atom(&self, name: &str) -> xlib::Atom {
@@ -457,7 +500,60 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use super::channel;
+        use super::{
+            channel, handle_error, xlib, DisplayConnection, CONNECTION_LOCK, ERROR_HANDLER,
+        };
+
+        #[test]
+        fn error_handler_preserves_other_displays_and_unrelated_errors() {
+            unsafe extern "C" fn previous(
+                _: *mut xlib::Display,
+                _: *mut xlib::XErrorEvent,
+            ) -> std::os::raw::c_int {
+                37
+            }
+            let _lock = CONNECTION_LOCK.lock().unwrap();
+            // The callback compares this token without dereferencing Display.
+            let mut display_token = 0u8;
+            let capture = (&mut display_token as *mut u8).cast::<xlib::Display>();
+            let original = *ERROR_HANDLER.lock().unwrap();
+            *ERROR_HANDLER.lock().unwrap() = (capture as usize, Some(previous));
+            let mut event: xlib::XErrorEvent = unsafe { std::mem::zeroed() };
+            event.error_code = xlib::BadWindow;
+            let stale_window = unsafe { handle_error(capture, &mut event) };
+            let other_display = unsafe { handle_error(std::ptr::null_mut(), &mut event) };
+            event.error_code = xlib::BadMatch;
+            let unrelated_error = unsafe { handle_error(capture, &mut event) };
+            *ERROR_HANDLER.lock().unwrap() = original;
+            assert_eq!(stale_window, 0);
+            assert_eq!(other_display, 37);
+            assert_eq!(unrelated_error, 37);
+        }
+
+        #[test]
+        #[ignore = "requires an X11 display"]
+        fn destroyed_window_is_skipped_without_exiting() {
+            let connection = DisplayConnection::open().unwrap();
+            let window = unsafe {
+                (connection.api.XCreateSimpleWindow)(
+                    connection.display,
+                    connection.root,
+                    0,
+                    0,
+                    10,
+                    10,
+                    0,
+                    0,
+                    0,
+                )
+            };
+            unsafe {
+                (connection.api.XDestroyWindow)(connection.display, window);
+                (connection.api.XSync)(connection.display, 0);
+            }
+            assert!(connection.info(window).is_none());
+            assert!(connection.property(window, "_NET_WM_NAME").is_none());
+        }
 
         #[test]
         fn rgb_masks_decode_x11_pixel() {
