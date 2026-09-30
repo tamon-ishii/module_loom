@@ -91,8 +91,17 @@ jobs:
           cargo build --locked -p manual-core --bin manualctl
           node scripts/smoke_manual_studio.mjs --start-server
       - run: cargo test --workspace
-      - name: Build Manual Studio
-        run: cargo build --locked -p manual-studio
-      - name: Smoke-test native Manual Studio capture after restart
+      - name: Build and install the Manual Studio Debian package
+        run: |
+          npm run manual:bundle -- --bundles deb
+          sudo apt-get install -y "./target/release/bundle/deb/Manual Studio_0.1.0_amd64.deb"
+          dpkg-query -W manual-studio
+      - name: Smoke-test installed Manual Studio capture after restart
         timeout-minutes: 2
-        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native target/debug/manual-studio'
+        run: xvfb-run -a dbus-run-session -- bash -c 'openbox >/tmp/manual-studio-openbox.log 2>&1 & node scripts/smoke_manual_integrations.mjs --native /usr/bin/manual-studio'
+      - name: Preserve the tested Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-studio-linux-amd64
+          path: target/release/bundle/deb/*.deb
+          if-no-files-found: error

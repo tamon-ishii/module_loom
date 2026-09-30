@@ -78,6 +78,7 @@ MkDocsがあればHTML出力まで、なければスキップ表示を確認し�
 開発サーバーも自動で起動・終了する場合は `node scripts/smoke_manual_studio.mjs --start-server` を使います。CIではLinux・Windows・macOSでこの操作確認を実行します。
 
 配布バイナリは `node scripts/smoke_manual_integrations.mjs --native target/release/manual-studio` で、起動・撮影・アプリ再起動後の再撮影を確認できます。Windowsでは `.exe` を自動で補います。Linux/X11・Windows・macOSのデスクトップ環境で実行し、macOSでは画面収録の権限が必要です。他のManual Studioウィンドウを閉じてから実行してください。
+Linux CIではリリース用 `.deb` を作成して実際にインストールし、インストールした `/usr/bin/manual-studio` で撮影と再起動後の再撮影を確認します。検証済みパッケージはCIの `manual-studio-linux-amd64` アーティファクトから取得できます。
 実際のAI CLIでの生成は `node scripts/smoke_manual_integrations.mjs --ai agy` で確認できます。最後の引数には設定可能なAI CLIのIDを指定します。選択したCLIのアカウントを使い、一時プロジェクトのソースを説明する文章を生成して根拠コメントを検証します。
 
 ## 構成
